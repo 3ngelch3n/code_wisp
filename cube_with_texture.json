@@ -752,7 +752,7 @@
 
     "Material.001": {
 	"d": 1.0,
-	"map_Kd": "texture01.png"
+	"map_Kd": "https://i.postimg.cc/xCPN8FCj/texture01.png"
 	}
 
   }
