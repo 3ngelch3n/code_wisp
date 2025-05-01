@@ -29,8 +29,13 @@ let Point = { x: 0, y: 0, z: 0 }
 let cameraPos = { x: 0, y: 0, z: 0 }
 let cameraRot = { x: 0, y: 0, z: 0 }
 let cameraVel = { x: 0, y: 0 }
-let cameraHorizontalSpeed = 15
-let cameraDistRange = {min: 13, max: 19}
+let cameraTargetRotY = 0
+let cameraTurning = false
+let cameraHorizontalSpeed = 400
+let cameraStepAngle = 22.5
+let cameraDampThreshold = 0.01
+let cameraHorizontalDamp = 5
+let cameraDistRange = { min: 13, max: 19 }
 let cameraDist = cameraDistRange.min
 let fov = 90
 let aspect_ratio = screenWidth / screenHeight
@@ -100,7 +105,7 @@ let rotS = 5
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
   clone.visible = true
-  wait(0.07)
+  wait(0.08)
   clone.delete()
 })
 
@@ -118,6 +123,7 @@ forever(function () {
 
 //__DRAWING THE GAME UI__
 function draw_ui() {
+  /*
   DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
     "L",
     "I",
@@ -137,13 +143,27 @@ function draw_ui() {
     "S",
     " ",
     "" + coins,
-  ])
+  ])*/
+  /*
   DrawBigNumberInt(leftSide, 160, playerPos.x, 10, ["X", ":", " "], [])
   DrawBigNumberInt(leftSide, 130, playerPos.y, 10, ["Y", ":", " "], [])
-  DrawBigNumberInt(leftSide, 100, playerPos.z, 10, ["Z", ":", " "], [])
+  DrawBigNumberInt(leftSide, 100, playerPos.z, 10, ["Z", ":", " "], [])*/
 }
 
 function moveCam() {
+  cameraRot.y += cameraVel.y
+  if (cameraTurning) {
+    let diff = cameraTargetRotY - cameraRot.y
+    if (Math.abs(diff) <= cameraDampThreshold) {
+      cameraRot.y = cameraTargetRotY
+      cameraTurning = false
+    } else {
+      cameraRot.y +=
+        Math.sign(diff) *
+        Math.min(Math.abs(diff), cameraHorizontalSpeed * (1 / 60))
+    }
+  }
+
   let dirZ = Math.cos(cameraRot.y) * Math.cos(cameraRot.x)
   let dirY = Math.sin(cameraRot.x)
   let dirX = Math.sin(cameraRot.y) * Math.cos(cameraRot.x)
@@ -214,7 +234,7 @@ function inputs() {
   if (!onGround) {
     moveMult = airHandling
   }
-/*
+  /*
   if (Keyboard.keyHeld(Key.W)) {
     movedThisFrame = true
     playerVel.x += dirX * moveS * moveMult
@@ -245,17 +265,21 @@ function inputs() {
     jumpingThisFrame = true
   }*/
 
-  if (Keyboard.keyHeld(Key.ArrowLeft)) {
-    cameraRot.y += rotS
-  }
-  if (Keyboard.keyHeld(Key.ArrowRight)) {
-    cameraRot.y -= rotS
+  if (!cameraTurning) {
+    if (Keyboard.keyDown(Key.ArrowLeft)) {
+      cameraTargetRotY += cameraStepAngle
+      cameraTurning = true
+    }
+    if (Keyboard.keyDown(Key.ArrowRight)) {
+      cameraTargetRotY -= cameraStepAngle
+      cameraTurning = true
+    }
   }
   if (Keyboard.keyHeld(Key.ArrowUp)) {
-    cameraRot.x -= rotS
+    cameraDist = cameraDistRange.min
   }
   if (Keyboard.keyHeld(Key.ArrowDown)) {
-    cameraRot.x += rotS
+    cameraDist = cameraDistRange.max
   }
 }
 
@@ -278,8 +302,6 @@ function draw() {
   InitTrigonometry()
 
   let s = playerSize
-  xs += 8
-  //playerPos.y += Math.sin(xs)/16
   let x = playerPos.x
   let y = playerPos.y
   let z = playerPos.z
@@ -298,15 +320,9 @@ function draw() {
   Draw3dLine(s + x, -s + y, -s + z, s + x, -s + y, s + z, 0.1)
   Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z, 0.1)
   Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z, 0.1)
-
+  
   Draw3dLine(0, -s, -24, 0, -s, 24, 0.1)
   Draw3dLine(-24, -s, 0, 24, -s, 0, 0.1)
-
-  //Draw3dLine(0, -s, -24, 0, -s, 24, 0.1)
-  //Draw3dLine(-24, -s, 0, 24, -s, 0, 0.1)
-
-  //Draw3dLine(-1, 0, 3, -1, 0, 4, 0.1)
-  //Draw3dLine(-1, 0, 3, -1, 1, 3, 0.1)
 }
 
 function SetPoint1(x: number, y: number, z: number) {
@@ -358,11 +374,25 @@ function Draw3dLine(
   SetPoint2(x2, y2 * cosX - z2 * sinX, y2 * sinX + z2 * cosX)
   if (z1 > near_plane || z2 > near_plane) {
     ZClipping()
-    DrawLine((x1 / z1) * FL, (y1 / z1) * FL, (x2 / z2) * FL, (y2 / z2) * FL)
+    DrawLine((x1 / z1) * FL, (y1 / z1) * FL, (x2 / z2) * FL, (y2 / z2) * FL, false)
   }
 }
 
-function DrawLine(x1: number, y1: number, x2: number, y2: number) {
+function DrawLine(x1: number, y1: number, x2: number, y2: number, shouldNotCheckClipping: boolean = true) {
+  if (!shouldNotCheckClipping) {
+    Game.stop()
+  let result = clipLineToScreen(x1, y1, x2, y2)
+
+  if (result == null) {
+    return
+  } else {
+    x1 = result.x1
+    x2 = result.x2
+    y1 = result.y1
+    y2 = result.y2
+  }
+  }
+    
   sprite.x = x1
   sprite.y = y1
   sprite.pointTowards(x2, y2)
@@ -372,28 +402,87 @@ function DrawLine(x1: number, y1: number, x2: number, y2: number) {
   let linelength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
   sprite.x += vx * halfLineSize
   sprite.y -= vy * halfLineSize
-  if (inBounds(sprite.x, sprite.y)) {
-    createClone()
-  }
-
+  createClone()
   linelength -= lineSize
   while (linelength > errorMargin) {
     sprite.x += vx * lineSize
     sprite.y -= vy * lineSize
-    if (inBounds(sprite.x, sprite.y)) {
-      createClone()
-    }
+    createClone()
     linelength -= lineSize
   }
 }
 
-function inBounds(x: number, y: number) {
-  let sW = screenWidth / 2
-  let sH = screenHeight / 2
-  if (x < sW && x > -sW && y < sH && y > -sH) {
-    return true
+function clipLineToScreen(x1: number, y1: number, x2: number, y2: number) {
+  const INSIDE = 0
+  const LEFT = 1
+  const RIGHT = 2
+  const BOTTOM = 4
+  const TOP = 8
+
+  const xmin = -screenWidth / 2
+  const xmax = screenWidth / 2
+  const ymin = -screenHeight / 2
+  const ymax = screenHeight / 2
+
+  let x: number
+  let y: number
+
+  function computeOutCode(x: number, y: number) {
+    let code = INSIDE
+
+    if (x < xmin) code |= LEFT
+    else if (x > xmax) code |= RIGHT
+    if (y < ymin) code |= BOTTOM
+    else if (y > ymax) code |= TOP
+
+    return code
   }
-  return false
+
+  let outcode1 = computeOutCode(x1, y1)
+  let outcode2 = computeOutCode(x2, y2)
+  let accept = false
+
+  while (true) {
+    if (!(outcode1 | outcode2)) {
+      accept = true
+      break
+    } else if (outcode1 & outcode2) {
+      break
+    } else {
+      let outcodeOut = outcode1 ? outcode1 : outcode2
+      let x, y
+
+      if (outcodeOut & TOP) {
+        x = x1 + ((x2 - x1) * (ymax - y1)) / (y2 - y1)
+        y = ymax
+      } else if (outcodeOut & BOTTOM) {
+        x = x1 + ((x2 - x1) * (ymin - y1)) / (y2 - y1)
+        y = ymin
+      } else if (outcodeOut & RIGHT) {
+        y = y1 + ((y2 - y1) * (xmax - x1)) / (x2 - x1)
+        x = xmax
+      } else if (outcodeOut & LEFT) {
+        y = y1 + ((y2 - y1) * (xmin - x1)) / (x2 - x1)
+        x = xmin
+      }
+
+      if (outcodeOut === outcode1) {
+        x1 = x!
+        y1 = y!
+        outcode1 = computeOutCode(x1, y1)
+      } else {
+        x2 = x!
+        y2 = y!
+        outcode2 = computeOutCode(x2, y2)
+      }
+    }
+  }
+
+  if (accept) {
+    return { x1, y1, x2, y2 }
+  } else {
+    return null
+  }
 }
 
 function DrawBigNumberInt(
