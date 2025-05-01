@@ -54,13 +54,15 @@ let y2 = 0
 let z1 = 0
 let z2 = 0
 
+let renderLayer = { GameFrame: 0, DynamicUI: 5, StaticUI: 10 }
+
 //__GAME_VARIABLES__
 let lives = 3
 let coins = 0
 let playerSize = 5.0 / 2
 
-let update_UI:boolean = true
-let update_Game:boolean = true
+let update_UI = 2
+let update_Game = 2
 
 //__PLAYER_VARIABLES__
 let playerPos = { x: 0, y: 0, z: 0 }
@@ -112,17 +114,31 @@ let maxVelY = -7.5
 let moveS = 0.25
 let rotS = 5
 
+let currentFrame = 0
+
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
-  clone.visible = true
   let type = Math.round(clone.transparency)
+  clone.transparency = 0
+  clone.visible = true
   if (type == 0) {
-    onMessage('deleteFrame', function() {
+    onMessage("deleteFrameA", function () {
       clone.delete()
     })
-  }
-  if (type == 1) {
-    onMessage('delteUI', function() {
+  } else if (type == 1) {
+    onMessage("deleteFrameB", function () {
+      clone.delete()
+    })
+  } else if (type == 5) {
+    onMessage("deleteDynamicUIA", function () {
+      clone.delete()
+    })
+  } else if (type == 6) {
+    onMessage("deleteDynamicUIB", function () {
+      clone.delete()
+    })
+  } else if (type == 10 || type == 11) {
+    onMessage("deleteStaticUI", function () {
       clone.delete()
     })
   }
@@ -132,23 +148,26 @@ init()
 
 //__MAIN_LOOP__
 forever(function () {
+  currentFrame = 1 - currentFrame
+  if (currentFrame == 1) {
+    sendMessage("deleteFrameA")
+    sendMessage("deleteDynamicUIA")
+  } else {
+    sendMessage("deleteFrameB")
+    sendMessage("deleteDynamicUIB")
+  }
   inputs()
   movePlayer()
   moveCam()
-  if (update_Game) {
-    sendMessage('deleteFrame')
-    draw_game()
-  }
-  if (update_UI) {
-    sendMessage('deleteUI')  
-    draw_ui()
-  }
+  drawGame()
+  drawUI()
+  drawStaticUI()
   wait(frameTime)
 })
 
 //__DRAWING THE GAME UI__
-function draw_ui() {
-  sprite.transparency = 1
+function drawUI() {
+  sprite.transparency = renderLayer.DynamicUI + currentFrame
   DrawBigNumberInt(
     leftSide,
     160,
@@ -168,6 +187,10 @@ function draw_ui() {
     ["S", ":", " "],
     [],
   )
+}
+
+function drawStaticUI() {
+  sprite.transparency = renderLayer.StaticUI + currentFrame
 }
 
 function moveCam() {
@@ -346,7 +369,8 @@ function init() {
 }
 let xs = 0
 
-function draw_game() {
+function drawGame() {
+  sprite.transparency = renderLayer.GameFrame + currentFrame
   InitTrigonometry()
 
   let s = playerSize
@@ -354,8 +378,7 @@ function draw_game() {
   let y = playerPos.y
   let z = playerPos.z
 
-  sprite.transparency = 0
-  Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z)
+  /*Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, s + y, -s + z)
   Draw3dLine(s + x, s + y, -s + z, -s + x, s + y, -s + z)
   Draw3dLine(-s + x, s + y, -s + z, -s + x, -s + y, -s + z)
@@ -368,7 +391,7 @@ function draw_game() {
   Draw3dLine(-s + x, -s + y, -s + z, -s + x, -s + y, s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, -s + y, s + z)
   Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z)
-  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)
+  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)*/
 
   Draw3dLine(0, -2, -240, 0, -2, 240)
   Draw3dLine(-240, -2, 0, 240, -2, 0)
@@ -1546,3 +1569,5 @@ function DrawText(RenderX: number, RenderY: number, text: string[]) {
     }
   }
 }
+
+//TEMP 
