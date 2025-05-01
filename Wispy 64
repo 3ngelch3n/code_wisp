@@ -17,12 +17,12 @@ let camera = {
   pitchVel: 0,
 
   turningYaw: false,
-  
+
   targetYaw: 0,
 
-  stepAngle: 22.5,
+  stepAngle: 33.333,
 
-  turningSpeedYaw: 200
+  turningSpeedYaw: 200,
 }
 
 const light = {
@@ -33,6 +33,10 @@ const light = {
 let horizontalSpeed = 0
 
 let playerRotation = 0
+
+let intendedY = 0
+let intendedX = 0
+let intendedMag = 0
 
 const moveSpeed = 0.1
 
@@ -136,10 +140,10 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   worldY = rotatedY
   worldZ = rotatedZ2 // Vermeide Division durch Null und Clipping von Punkten sehr nah an der Kamera
 
-  if (worldZ <= 1) {
+  if (worldZ <= 0.1) {
     return null
-  } // Perspektivische Division
-
+  }
+  
   const screenX = (projectionDistance * worldX) / worldZ
   const screenY = (projectionDistance * worldY) / worldZ
 
@@ -275,6 +279,8 @@ let player = {
   position: new Vector3(0, 0, 0),
   yaw: 0,
   pitch: 0,
+  forwardVel: 0,
+  intendedYaw: 0,
 }
 
 class AnimatableObject {
@@ -311,6 +317,9 @@ function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
 
 function fillTriangleProjected(triangle: Triangle) {
   const projectedVertices = triangle.vertices.map(project)
+   if (projectedVertices.some(v => v === null)) {
+    return;
+  }
   projectedVertices.sort((a, b) => a.y - b.y)
   const v1 = projectedVertices[0]
   const v2 = projectedVertices[1]
@@ -477,11 +486,25 @@ const mario_test =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/mario_wisp_test"
 const wisp_model_01 =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_model_01"
+const test_map= 
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/testmap"
 let playerCenter = new Vector3(0, 0, 0)
 let playerCount = 0
 
 importPlayer()
-
+loadModel(scene, test_map)
+/*let scale = 3
+const v1 = new Vector3(10*scale,0,10*scale)
+const v2 = new Vector3(-10*scale,0,10*scale)
+const v3 = new Vector3(10*scale,0,-10*scale)
+scene.push(new Triangle(v1, v2, v3, "#00A0FF", calculateNormal(
+                         v1, v2, v3), true, false))
+const v11 = new Vector3(-10*scale,0,-10*scale)
+const v12 = new Vector3(-10*scale,0,10*scale)
+const v13 = new Vector3(10*scale,0,-10*scale)
+scene.push(new Triangle(v11, v12, v13, "#001AFF", calculateNormal(
+                         v11, v12, v13), true, false))
+*/
 function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
   const ir = Math.floor(Math.max(0.0, Math.min(1.0, r)) * 255 + 0.5)
   const ig = Math.floor(Math.max(0.0, Math.min(1.0, g)) * 255 + 0.5)
@@ -606,6 +629,7 @@ function drawFrame() {
 
 function gameLoop() {
   inputs()
+  updatePlayer()
   updateCamera()
   updateLight()
   updateAnimations()
@@ -764,13 +788,17 @@ function drawFPS() {
   fps = 1000 / delta
   smoothFPS = smoothFPS * 0.9 + fps * 0.1
   ctx.fillStyle = "black"
-  ctx.fillRect(0, 0, 150, 40)
+  ctx.fillRect(0, 0, 230, 70)
   ctx.fillStyle = "lime"
   ctx.font = "bold 14px monospace"
   ctx.fillText("FPS: " + Math.round(smoothFPS), 5, 15)
   ctx.fillText(`X: ${camera.x.toFixed(2)}`, 5, 30)
   ctx.fillText(`Y: ${camera.y.toFixed(2)}`, 70, 30)
   ctx.fillText(`Z: ${camera.z.toFixed(2)}`, 135, 30)
+  ctx.fillText(`FV: ${player.forwardVel.toFixed(2)}`, 5, 45)
+  ctx.fillText(`PY: ${player.yaw.toFixed(2)}`, 80, 45)
+  ctx.fillText(`M: ${intendedMag.toFixed(2)}`, 145, 45)
+  ctx.fillText(`IY: ${player.intendedYaw.toFixed(2)}`, 5, 60)
 }
 
 function updateSkyBox() {
@@ -816,49 +844,89 @@ function rotateTowardsAngleDegrees(
   return newAngle
 }
 
-
-
 function inputs() {
+  intendedX = 0
+  intendedY = 0
   if (!camera.turningYaw) {
     if (Keyboard.keyDown(Key.ArrowRight)) {
-      camera.targetYaw = camera.targetYaw - camera.stepAngle;
-      camera.targetYaw = (camera.targetYaw % 360 + 360) % 360;
-      camera.turningYaw = true;
+      camera.targetYaw = camera.targetYaw - camera.stepAngle
+      camera.targetYaw = ((camera.targetYaw % 360) + 360) % 360
+      camera.turningYaw = true
     }
     if (Keyboard.keyDown(Key.ArrowLeft)) {
-      camera.targetYaw = camera.targetYaw + camera.stepAngle;
-      camera.targetYaw = (camera.targetYaw % 360 + 360) % 360;
-      camera.turningYaw = true;
+      camera.targetYaw = camera.targetYaw + camera.stepAngle
+      camera.targetYaw = ((camera.targetYaw % 360) + 360) % 360
+      camera.turningYaw = true
     }
   }
   if (Keyboard.keyHeld(Key.W)) {
-    
+    intendedY += 32
+  }
+  if (Keyboard.keyHeld(Key.S)) {
+    intendedY -= 32
+  }
+  if (Keyboard.keyHeld(Key.A)) {
+    intendedX -= 32
+  }
+  if (Keyboard.keyHeld(Key.D)) {
+    intendedX += 32
+  }
+  intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
+  player.intendedYaw = camera.yaw + atan2(intendedX, intendedY)
+}
+
+function atan2(x: number, y: number): number {
+  // Konstante für die Umrechnung von Radiant in Grad
+  const RADIANS_TO_DEGREES = 180 / Math.PI;
+
+  if (x > 0) {
+    // Winkel in Radiant * Umrechnungsfaktor
+    return Math.atan(y / x) * RADIANS_TO_DEGREES;
+  } else if (x < 0 && y >= 0) {
+    // (Winkel in Radiant + PI) * Umrechnungsfaktor
+    return (Math.atan(y / x) + Math.PI) * RADIANS_TO_DEGREES;
+  } else if (x < 0 && y < 0) {
+    // (Winkel in Radiant - PI) * Umrechnungsfaktor
+    return (Math.atan(y / x) - Math.PI) * RADIANS_TO_DEGREES;
+  } else if (x === 0 && y > 0) {
+    // PI/2 Radiant sind 90 Grad
+    return 90; // Oder (Math.PI / 2) * RADIANS_TO_DEGREES, ergibt 90
+  } else if (x === 0 && y < 0) {
+    // -PI/2 Radiant sind -90 Grad
+    return -90; // Oder (-Math.PI / 2) * RADIANS_TO_DEGREES, ergibt -90
+  } else {
+    // 0 Radiant ist 0 Grad
+    return 0; // Oder 0 * RADIANS_TO_DEGREES, ergibt 0
   }
 }
 
 function updateCamera() {
-  const cameraDist = 15
-  const cameraHeightOffset = 10
-  const cameraPitchAngle = -10
-
+  /*const cameraDist = 15
+  const cameraHeightOffset = 8
+  const cameraPitchAngle = -10*/
+  const cameraDist = 20
+  const cameraHeightOffset = 16
+  const cameraPitchAngle = -70
+  
   if (camera.turningYaw) {
-    let diff = camera.targetYaw - camera.yaw;
-    diff = (diff % 360 + 360) % 360;
+    let diff = camera.targetYaw - camera.yaw
+    diff = ((diff % 360) + 360) % 360
     if (diff > 180) {
-      diff -= 360;
+      diff -= 360
     }
 
     if (Math.abs(diff) <= 0.1) {
-      camera.yaw = camera.targetYaw;
-      camera.turningYaw = false;
+      camera.yaw = camera.targetYaw
+      camera.turningYaw = false
     } else {
       camera.yaw +=
         Math.sign(diff) *
-        Math.min(Math.abs(diff), camera.turningSpeedYaw * (1 / 60));
+        Math.min(Math.abs(diff), camera.turningSpeedYaw * (1 / 60))
     }
   }
 
-  camera.yaw = (camera.yaw % 360 + 360) % 360;
+  camera.yaw = ((camera.yaw % 360) + 360) % 360
+  camera.pitch = cameraPitchAngle
   let dirZ = Math.cos(camera.yaw) * Math.cos(camera.pitch)
   let dirY = Math.sin(camera.pitch)
   let dirX = Math.sin(camera.yaw) * Math.cos(camera.pitch)
@@ -867,67 +935,6 @@ function updateCamera() {
   camera.y = player.position.y + cameraHeightOffset - dirY * cameraDist
   camera.z = player.position.z - dirZ * cameraDist
 }
-
-/*
-  if (Keyboard.keyHeld(Key.Space)) {
-    camera.y += moveSpeed
-  }
-
-  if (Keyboard.keyHeld(Key.Shift)) {
-    camera.y -= moveSpeed
-  }
-
-  if (Keyboard.keyHeld(Key.ArrowLeft)) {
-    camera.yaw -= rotationSpeed
-  }
-
-  if (Keyboard.keyHeld(Key.ArrowRight)) {
-    camera.yaw += rotationSpeed
-  }
-
-  if (Keyboard.keyHeld(Key.ArrowUp)) {
-    camera.pitch -= rotationSpeed
-  }
-
-  if (Keyboard.keyHeld(Key.ArrowDown)) {
-    camera.pitch += rotationSpeed
-  }
-
-  if (Keyboard.keyHeld(Key.W)) {
-    horizontalSpeed += moveSpeed
-
-    playerRotation = camera.yaw
-  }
-
-  if (Keyboard.keyHeld(Key.A)) {
-    horizontalSpeed += moveSpeed
-
-    playerRotation = camera.yaw + 90
-  }
-
-  if (Keyboard.keyHeld(Key.S)) {
-    horizontalSpeed += moveSpeed
-
-    playerRotation = camera.yaw - 180
-  }
-
-  if (Keyboard.keyHeld(Key.D)) {
-    horizontalSpeed += moveSpeed
-
-    playerRotation = camera.yaw - 90
-  }
-
-  if (horizontalSpeed > 0.2) horizontalSpeed = 0.2
-
-  const dirX = -Math.sin(playerRotation)
-
-  const dirZ = Math.cos(playerRotation)
-
-  camera.x += dirX * horizontalSpeed
-
-  camera.z += dirZ * horizontalSpeed
-
-  camera.pitch = Math.max(-89, Math.min(89, camera.pitch))*/
 
 function loadModel(model: Triangle[], modelUrl: string) {
   fetch(modelUrl)
@@ -966,7 +973,7 @@ function loadModel(model: Triangle[], modelUrl: string) {
 
           const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
 
-          if (enable_outlines) {
+          /*if (enable_outlines) {
             const triangle = new Triangle(
               v1_3D,
               v2_3D,
@@ -977,7 +984,7 @@ function loadModel(model: Triangle[], modelUrl: string) {
               true,
             )
             model.push(triangle)
-          } else {
+          } else {*/
             const triangle = new Triangle(
               v1_3D,
               v2_3D,
@@ -987,14 +994,81 @@ function loadModel(model: Triangle[], modelUrl: string) {
               false,
               false,
             )
-            model.push(triangle)
-          }
+            scene.push(triangle)
+          //}
         }
       }
     })
     .catch((error) => {
       console.error("fehler beim laden der modeldata:", error)
     })
+}
+
+function updatePlayer() {
+  player_actions_moving()
+}
+
+function player_actions_moving() {
+  updateGroundMovement()
+  function updateGroundMovement() {
+  const currentYaw = player.yaw;
+  const intendedYaw = player.intendedYaw;
+  const currentForwardVel = player.forwardVel;
+  const inputMagnitude = intendedMag; // Globale Variable aus inputs()
+
+  // Aktualisiere den Gierwinkel (Yaw) des Spielers sanft in Richtung intendedYaw
+  // Nutzt deine existierende rotateTowardsAngleDegrees Funktion
+  const rotationSpeed = 10; // Übernommen aus deiner alten update_walking_speed Logik
+  player.yaw = rotateTowardsAngleDegrees(currentYaw, intendedYaw, rotationSpeed);
+
+  // Aktualisiere die Vorwärtsgeschwindigkeit basierend auf Input (intendedMag)
+  let maxTargetSpeed = 32; // Übernommen aus deiner alten update_walking_speed Logik
+  let targetSpeed = inputMagnitude < maxTargetSpeed ? inputMagnitude : maxTargetSpeed;
+
+  // Glättungsfaktor: Bestimmt, wie schnell die Geschwindigkeit den Zielwert erreicht.
+  // Passe diesen Wert an (z.B. 0.05 bis 0.2)
+  const smoothingFactor = 0.1;
+  player.forwardVel += (targetSpeed - currentForwardVel) * smoothingFactor;
+
+  // Begrenze die Maximalgeschwindigkeit (übernommen aus deiner alten update_walking_speed Logik)
+  if (player.forwardVel > 48) {
+    player.forwardVel = 48;
+  }
+
+  // Optional: Schnapp die Geschwindigkeit auf 0, wenn kein Input da ist
+  // und die Geschwindigkeit sehr nahe bei 0 liegt
+  if (targetSpeed === 0 && Math.abs(player.forwardVel) < 0.5) {
+    player.forwardVel = 0;
+  }
+
+  // Aktualisiere die Position des Spielers basierend auf forwardVel und dem aktuellen Yaw
+  // Annahme: Math.sin/cos akzeptieren Grad
+  const speed = player.forwardVel;
+  const yawDegrees = player.yaw;
+
+  const deltaX = speed * Math.sin(yawDegrees);
+  const deltaZ = speed * Math.cos(yawDegrees);
+
+  player.position.x += deltaX/15;
+  player.position.z += deltaZ/15;
+
+  // Anmerkung: Vertikale Bewegung (Y-Achse) wie Schwerkraft oder Sprünge
+  // müsste separat behandelt werden. Diese Funktion macht nur die Bewegung in der XZ-Ebene.
+}
+    function move() {
+      if (player.forwardVel === 0) {
+        return;
+      }
+
+      const speed = player.forwardVel;
+      const yawDegrees = player.yaw;
+
+      const deltaX = speed * Math.sin(yawDegrees);
+      const deltaZ = speed * Math.cos(yawDegrees);
+
+      player.position.x += deltaX;
+      player.position.z += deltaZ;
+    }
 }
 
 function importPlayer() {
@@ -1075,7 +1149,7 @@ function importPlayer() {
               faceColor,
               normal,
               false,
-              false,
+              true,
             )
             appendTo.push(triangle)
           }
