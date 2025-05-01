@@ -25,6 +25,12 @@ let camera = {
   turningSpeedYaw: 200,
 }
 
+enum collisionTypes {
+  floor,
+  wall,
+  ceiling,
+}
+
 const light = {
   yaw: 45,
   pitch: -45,
@@ -55,6 +61,12 @@ enum animations {
   jumping_fall,
   running,
   idle,
+}
+
+enum state {
+  ground,
+  air,
+  water,
 }
 
 let currentAnimation = animations.idle
@@ -229,6 +241,8 @@ let player = {
   pitch: 0,
   forwardVel: 0,
   intendedYaw: 0,
+  animWannaState: 0,
+  state: state.ground,
 }
 
 class AnimatableObject {
@@ -486,6 +500,50 @@ class Triangle {
   }
 }
 
+class collisionTriangle {
+  vertices: [Vector3, Vector3, Vector3]
+  normal: Vector3
+  collisionType: collisionTypes
+  originOffset: number
+
+  constructor(
+    v1: Vector3,
+    v2: Vector3,
+    v3: Vector3,
+    normal: Vector3,
+    collisionType: collisionTypes = collisionTypes.wall,
+  ) {
+    this.originOffset = 0
+    this.vertices = [v1, v2, v3]
+    this.collisionType = collisionType
+    this.normal = normal
+  }
+
+  updateCollisionData(
+    worldVertices: [Vector3, Vector3, Vector3],
+    worldNormal: Vector3,
+  ): void {
+    this.vertices = worldVertices // Aktualisiere die Eckpunkte auf Weltraum-Koordinaten
+    this.normal = worldNormal.normalize() // Aktualisiere und normalisiere die Normale im Weltraum
+
+    this.originOffset = -this.normal.dot(this.vertices[0])
+  }
+}
+
+const collisionTriangles: collisionTriangle[] = [
+  new collisionTriangle(
+    new Vector3(10, 0, 0),
+    new Vector3(-10, 0, -10),
+    new Vector3(-10, 0, 10),
+    calculateNormal(
+      new Vector3(10, 0, 0),
+      new Vector3(-10, 0, -10),
+      new Vector3(-10, 0, 10),
+    ),
+  ),
+]
+initCollisions()
+
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   let dir = new Vector3(0, 0, 1)
 
@@ -646,6 +704,7 @@ function drawFrame() {
 
   const outlineScaleFactor = 1.1
   const outlineColor = "#333333"
+  const off = 4
   scene
     .filter((triangle) => triangle.isPlayer)
     .forEach((triangle) => {
@@ -654,7 +713,7 @@ function drawFrame() {
         playerCenter.add(
           new Vector3(
             player.position.x,
-            player.position.y + 5,
+            player.position.y + off,
             player.position.z,
           ),
         ),
@@ -665,7 +724,7 @@ function drawFrame() {
         playerCenter.add(
           new Vector3(
             player.position.x,
-            player.position.y + 5,
+            player.position.y + off,
             player.position.z,
           ),
         ),
@@ -676,7 +735,7 @@ function drawFrame() {
         playerCenter.add(
           new Vector3(
             player.position.x,
-            player.position.y + 5,
+            player.position.y + off,
             player.position.z,
           ),
         ),
@@ -708,7 +767,7 @@ function drawFrame() {
   scene
     .filter((triangle) => triangle.isPlayer)
     .forEach((triangle) => {
-      scene.pop(triangle)
+      scene.pop()
     })
 }
 
@@ -1105,10 +1164,27 @@ function loadModel(model: Triangle[], modelUrl: string) {
     })
 }
 
+function initCollisions() {
+  collisionTriangles.forEach((triangle) => {
+    if (triangle.normal.y > 0.01) {
+      triangle.collisionType = collisionTypes.floor
+    } else if (triangle.normal.y < -0.01) {
+      triangle.collisionType = collisionTypes.ceiling
+    } else {
+      triangle.collisionType = collisionTypes.wall
+    }
+  })
+}
+
 function updatePlayer() {
   const isIdle = player.forwardVel == 0
   player_actions_moving(isIdle)
   if (player.forwardVel == 0) {
+    if (!isIdle) {
+      player.animWannaState = 0
+      animTime = 0
+      animTime2 = 0
+    }
     playerAnimIdle()
   } else {
     if (isIdle) {
@@ -1310,8 +1386,8 @@ function playerAnimRunning(runSpeed: number, off: number) {
   playerObj.Head.rotation = new rotation(off - timeSin2 * 7, 0, 7 - timeSin)
   playerObj.Head.position = new Vector3(0.2, timeSin2 / 7 - 0.1, 0)
   const diff = Math.random(-0.3, 0.3)
-  animTime += runSpeed + diff
-  animTime2 += runSpeed - diff
+  animTime = (animTime + runSpeed + diff) % 360
+  animTime2 = (animTime2 + runSpeed - diff) % 360
 }
 
 function playerAnimIdle() {
@@ -1319,6 +1395,7 @@ function playerAnimIdle() {
   const timeSinAbs = Math.abs(timeSin)
   const timeSinAbs4 = Math.abs(timeSin) / 4
   const timeSin2 = Math.sin(animTime2)
+  player.animWannaState = (player.animWannaState + 1) % 270
   playerObj.rightArm.rotation = new rotation(0, timeSin, -timeSinAbs)
   playerObj.rightArm.position = new Vector3(0, -timeSinAbs4, 0)
   playerObj.leftArm.rotation = new rotation(0, timeSin, -timeSinAbs)
@@ -1326,16 +1403,20 @@ function playerAnimIdle() {
 
   playerObj.leftLeg.rotation = new rotation(0, 0, -timeSin * 3)
   playerObj.leftLeg.position = new Vector3(0, 0, 0)
-  playerObj.rightLeg.rotation = new rotation(0, 0, timeSin2 * 3)
+  playerObj.rightLeg.rotation = new rotation(0, 0, timeSin * 3)
   playerObj.rightLeg.position = new Vector3(0, 0, 0)
 
   playerObj.Body.rotation = new rotation(0, 0, 0)
   playerObj.Body.position = new Vector3(0, -timeSinAbs4, 0)
-  playerObj.Head.rotation = new rotation(timeSin2 * 28, 0, timeSinAbs)
+  if (player.animWannaState > 90) {
+    playerObj.Head.rotation = new rotation(timeSin2 * 28, 0, timeSinAbs)
+  } else {
+    playerObj.Head.rotation = new rotation(timeSin2 / 2, 0, timeSinAbs)
+  }
   playerObj.Head.position = new Vector3(0, -timeSinAbs4, 0)
   const diff = Math.random(-0.3, 0.3)
-  animTime += 3 + diff
-  animTime2 += 2 - diff
+  animTime = (animTime + 3 + diff) % 360
+  animTime2 = (animTime2 + 2 - diff) % 360
 }
 
 function playerAnimJumpStart() {
@@ -1361,5 +1442,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUOasf
- 
+//LATESTBACKUO
