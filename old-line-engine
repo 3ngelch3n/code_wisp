@@ -234,36 +234,6 @@ function inputs() {
   if (!onGround) {
     moveMult = airHandling
   }
-  /*
-  if (Keyboard.keyHeld(Key.W)) {
-    movedThisFrame = true
-    playerVel.x += dirX * moveS * moveMult
-    playerVel.z += dirZ * moveS * moveMult
-  }
-  if (Keyboard.keyHeld(Key.S)) {
-    movedThisFrame = true
-    playerVel.x -= dirX * moveS * moveMult
-    playerVel.z -= dirZ * moveS * moveMult
-  }
-  if (Keyboard.keyHeld(Key.A)) {
-    movedThisFrame = true
-    playerPos.x += dirXR * moveS * moveMult
-    playerPos.z += dirZR * moveS * moveMult
-  }
-  if (Keyboard.keyHeld(Key.D)) {
-    movedThisFrame = true
-    playerVel.x -= dirXR * moveS * moveMult
-    playerVel.z -= dirZR * moveS * moveMult
-  }
-
-  if (Keyboard.keyDown(Key.Space) && onGround) {
-    playerVel.y = upwards_velocities.singe_jump
-    onGround = false
-  }
-
-  if (Keyboard.keyHeld(Key.Space)) {
-    jumpingThisFrame = true
-  }*/
 
   if (!cameraTurning) {
     if (Keyboard.keyDown(Key.ArrowLeft)) {
@@ -306,23 +276,27 @@ function draw() {
   let y = playerPos.y
   let z = playerPos.z
 
-  Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z, 0.1)
-  Draw3dLine(s + x, -s + y, -s + z, s + x, s + y, -s + z, 0.1)
-  Draw3dLine(s + x, s + y, -s + z, -s + x, s + y, -s + z, 0.1)
-  Draw3dLine(-s + x, s + y, -s + z, -s + x, -s + y, -s + z, 0.1)
+  /*
+  Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z)
+  Draw3dLine(s + x, -s + y, -s + z, s + x, s + y, -s + z)
+  Draw3dLine(s + x, s + y, -s + z, -s + x, s + y, -s + z)
+  Draw3dLine(-s + x, s + y, -s + z, -s + x, -s + y, -s + z)
 
-  Draw3dLine(-s + x, -s + y, s + z, s + x, -s + y, s + z, 0.1)
-  Draw3dLine(s + x, -s + y, s + z, s + x, s + y, s + z, 0.1)
-  Draw3dLine(s + x, s + y, s + z, -s + x, s + y, s + z, 0.1)
-  Draw3dLine(-s + x, s + y, s + z, -s + x, -s + y, s + z, 0.1)
+  Draw3dLine(-s + x, -s + y, s + z, s + x, -s + y, s + z)
+  Draw3dLine(s + x, -s + y, s + z, s + x, s + y, s + z)
+  Draw3dLine(s + x, s + y, s + z, -s + x, s + y, s + z)
+  Draw3dLine(-s + x, s + y, s + z, -s + x, -s + y, s + z)
 
-  Draw3dLine(-s + x, -s + y, -s + z, -s + x, -s + y, s + z, 0.1)
-  Draw3dLine(s + x, -s + y, -s + z, s + x, -s + y, s + z, 0.1)
-  Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z, 0.1)
-  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z, 0.1)
-  
-  Draw3dLine(0, -s, -24, 0, -s, 24, 0.1)
-  Draw3dLine(-24, -s, 0, 24, -s, 0, 0.1)
+  Draw3dLine(-s + x, -s + y, -s + z, -s + x, -s + y, s + z)
+  Draw3dLine(s + x, -s + y, -s + z, s + x, -s + y, s + z)
+  Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z)
+  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)*/
+
+  Draw3dLine(0, -2, -24, 0, -2, 24)
+  Draw3dLine(-24, -2, 0, 24, -2, 0)
+  Draw3dLine(0, -24, 0, 0, -24, 0)
+
+  RenderComplexShape()
 }
 
 function SetPoint1(x: number, y: number, z: number) {
@@ -362,7 +336,6 @@ function Draw3dLine(
   dx2: number,
   dy2: number,
   dz2: number,
-  size: number,
 ) {
   SetPoint1(dx1 - cameraPos.x, dy1 - cameraPos.y, dz1 - cameraPos.z)
   SetPoint2(dx2 - cameraPos.x, dy2 - cameraPos.y, dz2 - cameraPos.z)
@@ -374,25 +347,36 @@ function Draw3dLine(
   SetPoint2(x2, y2 * cosX - z2 * sinX, y2 * sinX + z2 * cosX)
   if (z1 > near_plane || z2 > near_plane) {
     ZClipping()
-    DrawLine((x1 / z1) * FL, (y1 / z1) * FL, (x2 / z2) * FL, (y2 / z2) * FL, false)
+    DrawLine(
+      (x1 / z1) * FL,
+      (y1 / z1) * FL,
+      (x2 / z2) * FL,
+      (y2 / z2) * FL,
+      false,
+    )
   }
 }
 
-function DrawLine(x1: number, y1: number, x2: number, y2: number, shouldNotCheckClipping: boolean = true) {
+function DrawLine(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  shouldNotCheckClipping: boolean = true,
+) {
   if (!shouldNotCheckClipping) {
-    Game.stop()
-  let result = clipLineToScreen(x1, y1, x2, y2)
+    let result = clipLineToScreen(x1, y1, x2, y2)
 
-  if (result == null) {
-    return
-  } else {
-    x1 = result.x1
-    x2 = result.x2
-    y1 = result.y1
-    y2 = result.y2
+    if (result == null) {
+      return
+    } else {
+      x1 = result.x1
+      x2 = result.x2
+      y1 = result.y1
+      y2 = result.y2
+    }
   }
-  }
-    
+
   sprite.x = x1
   sprite.y = y1
   sprite.pointTowards(x2, y2)
@@ -483,6 +467,11 @@ function clipLineToScreen(x1: number, y1: number, x2: number, y2: number) {
   } else {
     return null
   }
+}
+
+function RenderComplexShape() {
+
+  
 }
 
 function DrawBigNumberInt(
@@ -1482,3 +1471,6 @@ function DrawText(RenderX: number, RenderY: number, text: string[]) {
     }
   }
 }
+
+
+//BACKUP
