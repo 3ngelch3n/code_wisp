@@ -57,13 +57,14 @@ let z2 = 0
 //__GAME_VARIABLES__
 let lives = 3
 let coins = 0
-let playerSize = 2
+let playerSize = 5.0 / 2
 
 //__PLAYER_VARIABLES__
 let playerPos = { x: 0, y: 0, z: 0 }
-let playerMoveDir = 0
+let playerRotation = 0
 let playerSpeedVertical = 0
 let playerSpeedHorizontal = 0
+let playerWalkSpeed = 0.7
 enum playerStates {
   "idle",
   "run",
@@ -76,16 +77,16 @@ enum playerStates {
 }
 let playerState = playerStates.idle
 let upwards_velocities = {
-  singe_jump: 42,
-  double_jump: 52,
-  triple_jump: 69,
-  side_vault: 62,
-  backwards_vault: 62,
-  side: 20,
-  side_recover: 30,
-  long_kick: 12,
-  mid_air_kick: 20,
-  wallkick: 62,
+  single_jump: 4.2,
+  double_jump: 5.2,
+  triple_jump: 6.9,
+  side_vault: 6.2,
+  backwards_vault: 6.2,
+  side: 2.0,
+  side_recover: 3.0,
+  long_kick: 1.2,
+  mid_air_kick: 2.0,
+  wallkick: 6.2,
 }
 
 let jumpingThisFrame = false
@@ -93,11 +94,11 @@ let onGround = true
 let movedThisFrame = false
 let airHandling = 0
 
-let groundsoftVelX = 32
-let groundhardVelX = 48
+let groundsoftVelX = 3.2
+let groundhardVelX = 4.8
 
-let gravity = -4
-let maxVelY = -75
+let gravity = -0.4
+let maxVelY = -7.5
 
 let moveS = 0.25
 let rotS = 5
@@ -144,10 +145,17 @@ function draw_ui() {
     " ",
     "" + coins,
   ])*/
-  /*
-  DrawBigNumberInt(leftSide, 160, playerPos.x, 10, ["X", ":", " "], [])
-  DrawBigNumberInt(leftSide, 130, playerPos.y, 10, ["Y", ":", " "], [])
-  DrawBigNumberInt(leftSide, 100, playerPos.z, 10, ["Z", ":", " "], [])*/
+
+  DrawBigNumberInt(
+    leftSide,
+    160,
+    playerSpeedHorizontal,
+    10,
+    ["S", ":", " "],
+    [],
+  )
+  DrawBigNumberInt(leftSide, 130, cameraRot.y, 10, ["Y", ":", " "], [])
+  DrawBigNumberInt(leftSide, 100, playerRotation, 10, ["R", ":", " "], [])
 }
 
 function moveCam() {
@@ -174,52 +182,83 @@ function moveCam() {
 }
 
 function movePlayer() {
-  //let horizontalSpeed = Math.abs(playerVel.x) + Math.abs(playerVel.z)
-  //playerPos.x += playerVel.x
-  playerPos.y += playerSpeedVertical
-  //playerPos.z += playerVel.z
+  if (onGround) {
+    if (Keyboard.keyHeld(Key.W)) {
+      playerRotation = LerpAngle(playerRotation, cameraRot.y, 0.5)
+      playerSpeedHorizontal += playerWalkSpeed
+      movedThisFrame = true
+    }
+    if (Keyboard.keyHeld(Key.S)) {
+      playerRotation = LerpAngle(playerRotation, cameraRot.y -180, 0.5)
+      playerSpeedHorizontal += playerWalkSpeed
+      movedThisFrame = true
+    }
+    if (Keyboard.keyHeld(Key.D)) {
+      playerRotation = LerpAngle(playerRotation, cameraRot.y - 90, 0.5)
+      playerSpeedHorizontal += playerWalkSpeed
+      movedThisFrame = true
+    }
+    if (Keyboard.keyHeld(Key.A)) {
+      playerRotation = LerpAngle(playerRotation, cameraRot.y + 90, 0.5)
+      playerSpeedHorizontal += playerWalkSpeed
+      movedThisFrame = true
+    }
 
-  /*if (onGround) {
     if (movedThisFrame) {
-      playerVel.x = Math.round((playerVel.x / groundFrictionMoving) * 100) / 100
-      playerVel.z = Math.round((playerVel.z / groundFrictionMoving) * 100) / 100
-    } else {
-      playerVel.x = Math.round((playerVel.x / groundFrictionStill) * 100) / 100
-      playerVel.z = Math.round((playerVel.z / groundFrictionStill) * 100) / 100
+    if (playerSpeedHorizontal > groundsoftVelX) {
+      playerSpeedHorizontal = Math.round(playerSpeedHorizontal * 40) / 100
+      if (playerSpeedHorizontal > groundhardVelX) {
+        playerSpeedHorizontal = groundhardVelX
+      }
     }
   } else {
-    playerVel.x = Math.round((playerVel.x / airFriction) * 100) / 100
-    playerVel.z = Math.round((playerVel.z / airFriction) * 100) / 100
+    playerSpeedHorizontal = Math.round(playerSpeedHorizontal * 60) / 100
+  }
   }
 
-  if (playerPos.y < 0) {
-    onGround = true
-    playerPos.y = 0
-    playerVel.y = 0
-  }
+  let dirX = -Math.sin(playerRotation)
+  let dirZ = Math.cos(playerRotation)
 
+  playerPos.x += dirX * playerSpeedHorizontal
+    playerPos.z += dirZ * playerSpeedHorizontal
+  
   if (!onGround) {
-    if (jumpingThisFrame) {
-      if (startedJumping && playerVel.y > 0) {
-        playerVel.y += gravityJumpingUp
-      } else {
-        playerVel.y += gravityJump
-      }
-    } else {
-      playerVel.y += gravity
+    playerSpeedVertical += gravity // Anwendungs von Gravitation
+    playerSpeedVertical = Math.max(playerSpeedVertical, maxVelY) // Maximalwert der Geschwindigkeit
+  }
+
+  // Wenn der Spieler auf dem Boden ist
+  if (onGround) {
+    if (Keyboard.keyDown(Key.Space)) {
+      // Wenn der Spieler springt
+      playerSpeedVertical = upwards_velocities.single_jump
+      jumpingThisFrame = true
+      onGround = false
     }
   }
 
-  if (horizontalSpeed > softWalkSpeedCap) {
-    let reduceAmount = walkSpeed * 6
-    playerVel.x = Math.round((playerVel.x / reduceAmount) * 100) / 100
-    playerVel.z = Math.round((playerVel.x / reduceAmount) * 100) / 100
+  // Spielerposition aktualisieren
+  playerPos.y += playerSpeedVertical
+  checkGroundCollision() // Überprüfen, ob der Spieler den Boden berührt
+}
+
+function Lerp(start: number, end: number, mult: number) {
+  let diff = end - start
+  let nextVal = start + diff * mult
+  return nextVal
+}
+
+function LerpAngle(a: number, b: number, t: number) {
+  let diff = ((b - a + 540) % 360) - 180
+  return (a + diff * t + 360) % 360
+}
+
+function checkGroundCollision() {
+  if (playerPos.y <= 0) {
+    onGround = true
+    playerPos.y = 0
+    playerSpeedVertical = 0 // Stoppe die vertikale Geschwindigkeit, wenn der Spieler den Boden berührt
   }
-  if (horizontalSpeed > hardWalkSpeedCap) {
-    let reduceAmount = walkSpeed * 9
-    playerVel.x = Math.round((playerVel.x / reduceAmount) * 100) / 100
-    playerVel.z = Math.round((playerVel.x / reduceAmount) * 100) / 100
-  }*/
 }
 
 function inputs() {
@@ -237,11 +276,11 @@ function inputs() {
 
   if (!cameraTurning) {
     if (Keyboard.keyDown(Key.ArrowLeft)) {
-      cameraTargetRotY += cameraStepAngle
+      cameraTargetRotY = (cameraTargetRotY + cameraStepAngle) % 360
       cameraTurning = true
     }
     if (Keyboard.keyDown(Key.ArrowRight)) {
-      cameraTargetRotY -= cameraStepAngle
+      cameraTargetRotY = (cameraTargetRotY - cameraStepAngle) % 360
       cameraTurning = true
     }
   }
@@ -276,7 +315,6 @@ function draw() {
   let y = playerPos.y
   let z = playerPos.z
 
-  /*
   Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, s + y, -s + z)
   Draw3dLine(s + x, s + y, -s + z, -s + x, s + y, -s + z)
@@ -290,11 +328,11 @@ function draw() {
   Draw3dLine(-s + x, -s + y, -s + z, -s + x, -s + y, s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, -s + y, s + z)
   Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z)
-  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)*/
+  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)
 
-  Draw3dLine(0, -2, -24, 0, -2, 24)
-  Draw3dLine(-24, -2, 0, 24, -2, 0)
-  Draw3dLine(0, -24, 0, 0, -24, 0)
+  Draw3dLine(0, -2, -240, 0, -2, 240)
+  Draw3dLine(-240, -2, 0, 240, -2, 0)
+  //Draw3dLine(0, -24, 0, 0, -24, 0)
 
   RenderComplexShape()
 }
@@ -469,10 +507,7 @@ function clipLineToScreen(x1: number, y1: number, x2: number, y2: number) {
   }
 }
 
-function RenderComplexShape() {
-
-  
-}
+function RenderComplexShape() {}
 
 function DrawBigNumberInt(
   RenderX: number,
@@ -1471,6 +1506,3 @@ function DrawText(RenderX: number, RenderY: number, text: string[]) {
     }
   }
 }
-
-
-//BACKUP
