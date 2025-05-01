@@ -13,6 +13,10 @@ let frameTime = 0.0166666667
 frameTime *= 2
 let screenWidth = 640
 let screenHeight = 480
+let leftSide = -screenWidth / 2
+let rightSide = screenWidth / 2
+let topSide = screenHeight / 2
+let bottomSide = -screenHeight / 2
 
 //__TEXT__
 let TextWidth = 0
@@ -24,6 +28,10 @@ let LetterSpacing = lineSize / 1.5
 let Point = { x: 0, y: 0, z: 0 }
 let cameraPos = { x: 0, y: 0, z: 0 }
 let cameraRot = { x: 0, y: 0, z: 0 }
+let cameraVel = { x: 0, y: 0 }
+let cameraHorizontalSpeed = 15
+let cameraDistRange = {min: 13, max: 19}
+let cameraDist = cameraDistRange.min
 let fov = 90
 let aspect_ratio = screenWidth / screenHeight
 let near_plane = 0
@@ -48,23 +56,43 @@ let playerSize = 2
 
 //__PLAYER_VARIABLES__
 let playerPos = { x: 0, y: 0, z: 0 }
-let playerVel = { x: 0, y: 0, z: 0 }
-let groundFrictionStill = 3
-let airFriction = 1.5
-let groundFrictionMoving = 2
-let airControlMult = 0.3
-let walkSpeed = 8
-let softWalkSpeedCap = 16
-let hardWalkSpeedCap = 24
-let onGround = true
-let gravity = -0.5
-let gravityJump = -0.375
-let gravityJumpingUp = -0.225
-let movedThisFrame = false
+let playerMoveDir = 0
+let playerSpeedVertical = 0
+let playerSpeedHorizontal = 0
+enum playerStates {
+  "idle",
+  "run",
+  "crouch",
+  "jump",
+  "long_jump",
+  "ground_pound",
+  "jump_fall",
+  "fell_off",
+}
+let playerState = playerStates.idle
+let upwards_velocities = {
+  singe_jump: 42,
+  double_jump: 52,
+  triple_jump: 69,
+  side_vault: 62,
+  backwards_vault: 62,
+  side: 20,
+  side_recover: 30,
+  long_kick: 12,
+  mid_air_kick: 20,
+  wallkick: 62,
+}
+
 let jumpingThisFrame = false
-let jumpStrength = 2
-let startedJumping = false
-let sneaking = false
+let onGround = true
+let movedThisFrame = false
+let airHandling = 0
+
+let groundsoftVelX = 32
+let groundhardVelX = 48
+
+let gravity = -4
+let maxVelY = -75
 
 let moveS = 0.25
 let rotS = 5
@@ -72,7 +100,7 @@ let rotS = 5
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
   clone.visible = true
-  wait(0.0833333334)
+  wait(0.07)
   clone.delete()
 })
 
@@ -88,8 +116,8 @@ forever(function () {
   wait(frameTime)
 })
 
+//__DRAWING THE GAME UI__
 function draw_ui() {
-  
   DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
     "L",
     "I",
@@ -110,26 +138,28 @@ function draw_ui() {
     " ",
     "" + coins,
   ])
+  DrawBigNumberInt(leftSide, 160, playerPos.x, 10, ["X", ":", " "], [])
+  DrawBigNumberInt(leftSide, 130, playerPos.y, 10, ["Y", ":", " "], [])
+  DrawBigNumberInt(leftSide, 100, playerPos.z, 10, ["Z", ":", " "], [])
 }
 
-
 function moveCam() {
-  let dist = 13
   let dirZ = Math.cos(cameraRot.y) * Math.cos(cameraRot.x)
   let dirY = Math.sin(cameraRot.x)
   let dirX = Math.sin(cameraRot.y) * Math.cos(cameraRot.x)
 
-  cameraPos.x = playerPos.x + dirX * dist
-  cameraPos.y = playerPos.y - dirY * dist
-  cameraPos.z = playerPos.z - dirZ * dist
+  cameraPos.x = playerPos.x + dirX * cameraDist
+  cameraPos.y = playerPos.y + playerSize - dirY * cameraDist
+  cameraPos.z = playerPos.z - dirZ * cameraDist
 }
 
 function movePlayer() {
-  let horizontalSpeed = Math.abs(playerVel.x) + Math.abs(playerVel.z)
-  playerPos.x += playerVel.x
-  playerPos.y += playerVel.y
-  playerPos.z += playerVel.z
-  if (onGround) {
+  //let horizontalSpeed = Math.abs(playerVel.x) + Math.abs(playerVel.z)
+  //playerPos.x += playerVel.x
+  playerPos.y += playerSpeedVertical
+  //playerPos.z += playerVel.z
+
+  /*if (onGround) {
     if (movedThisFrame) {
       playerVel.x = Math.round((playerVel.x / groundFrictionMoving) * 100) / 100
       playerVel.z = Math.round((playerVel.z / groundFrictionMoving) * 100) / 100
@@ -169,7 +199,7 @@ function movePlayer() {
     let reduceAmount = walkSpeed * 9
     playerVel.x = Math.round((playerVel.x / reduceAmount) * 100) / 100
     playerVel.z = Math.round((playerVel.x / reduceAmount) * 100) / 100
-  }
+  }*/
 }
 
 function inputs() {
@@ -179,46 +209,41 @@ function inputs() {
   let dirZ = Math.cos(cameraRot.y)
   let dirXR = -Math.sin(cameraRot.y + 90)
   let dirZR = Math.cos(cameraRot.y + 90)
-  let airMult = 1
+  let moveMult = 1
 
   if (!onGround) {
-    airMult = airControlMult
+    moveMult = airHandling
   }
-
+/*
   if (Keyboard.keyHeld(Key.W)) {
     movedThisFrame = true
-    playerVel.x += dirX * moveS * airMult
-    playerVel.z += dirZ * moveS * airMult
+    playerVel.x += dirX * moveS * moveMult
+    playerVel.z += dirZ * moveS * moveMult
   }
   if (Keyboard.keyHeld(Key.S)) {
     movedThisFrame = true
-    playerVel.x -= dirX * moveS * airMult
-    playerVel.z -= dirZ * moveS * airMult
+    playerVel.x -= dirX * moveS * moveMult
+    playerVel.z -= dirZ * moveS * moveMult
   }
   if (Keyboard.keyHeld(Key.A)) {
     movedThisFrame = true
-    playerPos.x += dirXR * moveS * airMult
-    playerPos.z += dirZR * moveS * airMult
+    playerPos.x += dirXR * moveS * moveMult
+    playerPos.z += dirZR * moveS * moveMult
   }
   if (Keyboard.keyHeld(Key.D)) {
     movedThisFrame = true
-    playerVel.x -= dirXR * moveS * airMult
-    playerVel.z -= dirZR * moveS * airMult
+    playerVel.x -= dirXR * moveS * moveMult
+    playerVel.z -= dirZR * moveS * moveMult
   }
 
   if (Keyboard.keyDown(Key.Space) && onGround) {
-    playerVel.y = jumpStrength
+    playerVel.y = upwards_velocities.singe_jump
     onGround = false
-    startedJumping = true
   }
 
   if (Keyboard.keyHeld(Key.Space)) {
     jumpingThisFrame = true
-  }
-
-  if (!jumpingThisFrame) {
-    startedJumping = false
-  }
+  }*/
 
   if (Keyboard.keyHeld(Key.ArrowLeft)) {
     cameraRot.y += rotS
@@ -244,7 +269,7 @@ function init() {
   cameraPos.x = 10
   cameraPos.y = 10
   cameraPos.z = -10
-  cameraRot.x = 0
+  cameraRot.x = -25
   cameraRot.y = 0
 }
 let xs = 0
@@ -348,31 +373,69 @@ function DrawLine(x1: number, y1: number, x2: number, y2: number) {
   sprite.x += vx * halfLineSize
   sprite.y -= vy * halfLineSize
   if (inBounds(sprite.x, sprite.y)) {
-  createClone()
+    createClone()
   }
-  
+
   linelength -= lineSize
   while (linelength > errorMargin) {
     sprite.x += vx * lineSize
     sprite.y -= vy * lineSize
     if (inBounds(sprite.x, sprite.y)) {
-    createClone()
+      createClone()
     }
     linelength -= lineSize
   }
 }
 
 function inBounds(x: number, y: number) {
-  let sW = screenWidth/2
-  let sH = screenHeight/2
+  let sW = screenWidth / 2
+  let sH = screenHeight / 2
   if (x < sW && x > -sW && y < sH && y > -sH) {
     return true
   }
   return false
 }
 
-function DrawBigNumber(RenderX: number, RenderY: number, Number: number) {
-  
+function DrawBigNumberInt(
+  RenderX: number,
+  RenderY: number,
+  number: number,
+  scale: number,
+  beforeText: string[],
+  afterText: string[],
+) {
+  let renderNumber = Math.round(number * scale)
+  let renderArray: string[] = beforeText
+
+  // Negativ-Zeichen hinzufügen, falls nötig
+  if (renderNumber < 0) {
+    renderArray.push("-")
+    renderNumber = -renderNumber
+  }
+
+  // Sonderfall: Zahl ist 0
+  if (renderNumber === 0) {
+    renderArray.push("0")
+  } else {
+    // Ziffern einzeln extrahieren (von hinten nach vorne)
+    let digits: string[] = []
+    while (renderNumber > 0) {
+      let digit = renderNumber % 10
+      digits.push("" + digit) // alternativ: digit + ""  ← das wandelt zur Not in Text
+      renderNumber = Math.floor(renderNumber / 10)
+    }
+
+    // Reihenfolge umdrehen (weil wir von hinten gelesen haben)
+    for (let i = digits.length - 1; i >= 0; i--) {
+      renderArray.push(digits[i])
+    }
+  }
+  if (afterText.length != 0) {
+    for (let i = 0; i < afterText.length; i++) {
+      renderArray.push(afterText[i])
+    }
+  }
+  DrawText(RenderX, RenderY, renderArray)
 }
 
 function DrawText(RenderX: number, RenderY: number, text: string[]) {
@@ -1017,8 +1080,8 @@ function DrawText(RenderX: number, RenderY: number, text: string[]) {
         DrawLine(
           DrawStartPos.x + lineSize,
           DrawStartPos.y,
-          DrawStartPos.x,
-          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + LetterWidth / 4,
+          DrawStartPos.y - LetterHeight + LetterHeight / 4,
         )
         DrawLine(
           DrawStartPos.x,
@@ -1309,6 +1372,22 @@ function DrawText(RenderX: number, RenderY: number, text: string[]) {
           DrawStartPos.y - LetterHeight / 2 - LetterHeight / 5,
           DrawStartPos.x + lineSize,
           DrawStartPos.y - LetterHeight / 2 - LetterHeight / 5,
+        )
+        break
+      case "-":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        break
+      case "_":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
         )
         break
     }
