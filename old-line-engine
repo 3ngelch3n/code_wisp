@@ -29,7 +29,6 @@ let aspect_ratio = screenWidth / screenHeight
 let near_plane = 0
 let FL = 0
 let zBuffer = 0
-
 let sinX = 0
 let sinY = 0
 let cosX = 0
@@ -50,6 +49,18 @@ let playerSize = 2
 //__PLAYER_VARIABLES__
 let playerPos = { x: 0, y: 0, z: 0 }
 let playerVel = { x: 0, y: 0, z: 0 }
+let groundFrictionStill = 3
+let groundFrictionMoving = 2
+let airControlMult = 0.3
+let walkSpeed = 0.4
+let softWalkSpeedCap = 3.2
+let hardWalkSpeedCap = 4.8
+let onGround = true
+let gravity = -0.5
+let gravityJump = -0.3
+let movedThisFrame = false
+let jumpingThisFrame = false
+let jumpStrength = 4
 
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
@@ -66,15 +77,16 @@ let rotS = 5
 
 //__MAIN_LOOP__
 forever(function () {
+  inputs()
+  movePlayer()
+  moveCam()
   draw()
   draw_ui()
-  inputs()
-  moveCam()
   wait(frameTime)
 })
 
 function draw_ui() {
-  /*DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
+  DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
     "L",
     "I",
     "V",
@@ -93,8 +105,7 @@ function draw_ui() {
     "S",
     " ",
     "" + coins,
-  ])*/
-
+  ])
 }
 
 function DrawLine(x1: number, y1: number, x2: number, y2: number) {
@@ -141,33 +152,78 @@ function moveCam() {
   cameraPos.z = playerPos.z - dirZ * dist
 }
 
+function movePlayer() {
+  let horizontalSpeed = Math.abs(playerVel.x) + Math.abs(playerVel.z)
+  playerPos.x += playerVel.x
+  playerPos.y += playerVel.y
+  playerPos.z += playerVel.z
+  if (movedThisFrame) {
+    playerVel.x = Math.round((playerVel.x / groundFrictionMoving) * 100) / 100
+    playerVel.z = Math.round((playerVel.z / groundFrictionMoving) * 100) / 100
+  } else {
+    playerVel.x = Math.round((playerVel.x / groundFrictionStill) * 100) / 100
+    playerVel.z = Math.round((playerVel.z / groundFrictionStill) * 100) / 100
+  }
+
+  if (playerPos.y < 0) {
+    onGround = true
+    playerPos.y = 0
+    playerVel.y = 0
+  }
+  sprite.layer = playerVel.y
+  if (!onGround) {
+    if (jumpingThisFrame) {
+      playerVel.y += gravityJump
+    } else {
+      playerVel.y += gravity
+    }
+  }
+
+  if (horizontalSpeed > softWalkSpeedCap) {
+    let reduceAmount = walkSpeed * 6
+    playerVel.x = Math.round((playerVel.x / reduceAmount) * 100) / 100
+    playerVel.z = Math.round((playerVel.x / reduceAmount) * 100) / 100
+  }
+}
+
 function inputs() {
-  let dirX =  -Math.sin(cameraRot.y)
-  let dirZ =   Math.cos(cameraRot.y)
-  let dirXR = -Math.sin(cameraRot.y+90)
-  let dirZR =  Math.cos(cameraRot.y+90)
-  
+  jumpingThisFrame = false
+  movedThisFrame = false
+  let dirX = -Math.sin(cameraRot.y)
+  let dirZ = Math.cos(cameraRot.y)
+  let dirXR = -Math.sin(cameraRot.y + 90)
+  let dirZR = Math.cos(cameraRot.y + 90)
+
   if (Keyboard.keyHeld(Key.W)) {
-  playerPos.x += dirX * moveS
-  playerPos.z += dirZ * moveS
+    movedThisFrame = true
+    playerVel.x += dirX * moveS
+    playerVel.z += dirZ * moveS
   }
   if (Keyboard.keyHeld(Key.S)) {
-  playerPos.x -= dirX * moveS
-  playerPos.z -= dirZ * moveS
+    movedThisFrame = true
+    playerVel.x -= dirX * moveS
+    playerVel.z -= dirZ * moveS
   }
   if (Keyboard.keyHeld(Key.A)) {
-  playerPos.x += dirXR * moveS
-  playerPos.z += dirZR * moveS
+    movedThisFrame = true
+    playerPos.x += dirXR * moveS
+    playerPos.z += dirZR * moveS
   }
   if (Keyboard.keyHeld(Key.D)) {
-  playerPos.x -= dirXR * moveS
-  playerPos.z -= dirZR * moveS
+    movedThisFrame = true
+    playerVel.x -= dirXR * moveS
+    playerVel.z -= dirZR * moveS
   }
-  
-  /*
+
+  if (Keyboard.keyDown(Key.Space) && onGround) {
+    playerVel.y = jumpStrength
+    onGround = false
+  }
+
   if (Keyboard.keyHeld(Key.Space)) {
-    cameraPos.y += 1 * moveS
+    jumpingThisFrame = true
   }
+  /*
   if (Keyboard.keyHeld(Key.Shift)) {
     cameraPos.y -= 1 * moveS
   }*/
@@ -225,9 +281,9 @@ function draw() {
   Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z, 0.1)
   Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z, 0.1)
 
-  Draw3dLine(0, -s + y, -12, 0, -s + y, 12, 0.1)
-  Draw3dLine(-12, -s + y, 0, 12, -s + y, 0, 0.1)
-  
+  Draw3dLine(0, -s, -12, 0, -s, 12, 0.1)
+  Draw3dLine(-12, -s, 0, 12, -s, 0, 0.1)
+
   //Draw3dLine(-1, 0, 3, -1, 0, 4, 0.1)
   //Draw3dLine(-1, 0, 3, -1, 1, 3, 0.1)
 }
