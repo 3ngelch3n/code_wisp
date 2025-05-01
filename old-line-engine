@@ -10,7 +10,7 @@ let errorMargin = 1.5
 
 //__GAME_SETTINGS__
 let frameTime = 0.0166666667
-frameTime *= 3
+frameTime *= 2
 let screenWidth = 640
 let screenHeight = 480
 
@@ -50,17 +50,21 @@ let playerSize = 2
 let playerPos = { x: 0, y: 0, z: 0 }
 let playerVel = { x: 0, y: 0, z: 0 }
 let groundFrictionStill = 3
+let airFriction = 1.5
 let groundFrictionMoving = 2
 let airControlMult = 0.3
-let walkSpeed = 0.4
-let softWalkSpeedCap = 3.2
-let hardWalkSpeedCap = 4.8
+let walkSpeed = 8
+let softWalkSpeedCap = 16
+let hardWalkSpeedCap = 24
 let onGround = true
 let gravity = -0.5
-let gravityJump = -0.3
+let gravityJump = -0.375
+let gravityJumpingUp = -0.225
 let movedThisFrame = false
 let jumpingThisFrame = false
-let jumpStrength = 4
+let jumpStrength = 2
+let startedJumping = false
+let sneaking = false
 
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
@@ -86,6 +90,7 @@ forever(function () {
 })
 
 function draw_ui() {
+  /*
   DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
     "L",
     "I",
@@ -105,11 +110,11 @@ function draw_ui() {
     "S",
     " ",
     "" + coins,
-  ])
+  ])*/
 }
 
 function DrawLine(x1: number, y1: number, x2: number, y2: number) {
-  if (
+  /*if (
     (x1 > screenWidth / 2 && x2 > screenWidth) ||
     (x1 < -screenWidth / 2 && x2 < -screenWidth / 2)
   ) {
@@ -120,7 +125,7 @@ function DrawLine(x1: number, y1: number, x2: number, y2: number) {
     (y1 < -screenHeight / 2 && y2 < -screenHeight / 2)
   ) {
     return
-  }
+  }*/
   sprite.x = x1
   sprite.y = y1
   sprite.pointTowards(x2, y2)
@@ -157,12 +162,17 @@ function movePlayer() {
   playerPos.x += playerVel.x
   playerPos.y += playerVel.y
   playerPos.z += playerVel.z
-  if (movedThisFrame) {
-    playerVel.x = Math.round((playerVel.x / groundFrictionMoving) * 100) / 100
-    playerVel.z = Math.round((playerVel.z / groundFrictionMoving) * 100) / 100
+  if (onGround) {
+    if (movedThisFrame) {
+      playerVel.x = Math.round((playerVel.x / groundFrictionMoving) * 100) / 100
+      playerVel.z = Math.round((playerVel.z / groundFrictionMoving) * 100) / 100
+    } else {
+      playerVel.x = Math.round((playerVel.x / groundFrictionStill) * 100) / 100
+      playerVel.z = Math.round((playerVel.z / groundFrictionStill) * 100) / 100
+    }
   } else {
-    playerVel.x = Math.round((playerVel.x / groundFrictionStill) * 100) / 100
-    playerVel.z = Math.round((playerVel.z / groundFrictionStill) * 100) / 100
+    playerVel.x = Math.round((playerVel.x / airFriction) * 100) / 100
+    playerVel.z = Math.round((playerVel.z / airFriction) * 100) / 100
   }
 
   if (playerPos.y < 0) {
@@ -170,10 +180,14 @@ function movePlayer() {
     playerPos.y = 0
     playerVel.y = 0
   }
-  sprite.layer = playerVel.y
+
   if (!onGround) {
     if (jumpingThisFrame) {
-      playerVel.y += gravityJump
+      if (startedJumping && playerVel.y > 0) {
+        playerVel.y += gravityJumpingUp
+      } else {
+        playerVel.y += gravityJump
+      }
     } else {
       playerVel.y += gravity
     }
@@ -181,6 +195,11 @@ function movePlayer() {
 
   if (horizontalSpeed > softWalkSpeedCap) {
     let reduceAmount = walkSpeed * 6
+    playerVel.x = Math.round((playerVel.x / reduceAmount) * 100) / 100
+    playerVel.z = Math.round((playerVel.x / reduceAmount) * 100) / 100
+  }
+  if (horizontalSpeed > hardWalkSpeedCap) {
+    let reduceAmount = walkSpeed * 9
     playerVel.x = Math.round((playerVel.x / reduceAmount) * 100) / 100
     playerVel.z = Math.round((playerVel.x / reduceAmount) * 100) / 100
   }
@@ -193,40 +212,47 @@ function inputs() {
   let dirZ = Math.cos(cameraRot.y)
   let dirXR = -Math.sin(cameraRot.y + 90)
   let dirZR = Math.cos(cameraRot.y + 90)
+  let airMult = 1
+
+  if (!onGround) {
+    airMult = airControlMult
+  }
 
   if (Keyboard.keyHeld(Key.W)) {
     movedThisFrame = true
-    playerVel.x += dirX * moveS
-    playerVel.z += dirZ * moveS
+    playerVel.x += dirX * moveS * airMult
+    playerVel.z += dirZ * moveS * airMult
   }
   if (Keyboard.keyHeld(Key.S)) {
     movedThisFrame = true
-    playerVel.x -= dirX * moveS
-    playerVel.z -= dirZ * moveS
+    playerVel.x -= dirX * moveS * airMult
+    playerVel.z -= dirZ * moveS * airMult
   }
   if (Keyboard.keyHeld(Key.A)) {
     movedThisFrame = true
-    playerPos.x += dirXR * moveS
-    playerPos.z += dirZR * moveS
+    playerPos.x += dirXR * moveS * airMult
+    playerPos.z += dirZR * moveS * airMult
   }
   if (Keyboard.keyHeld(Key.D)) {
     movedThisFrame = true
-    playerVel.x -= dirXR * moveS
-    playerVel.z -= dirZR * moveS
+    playerVel.x -= dirXR * moveS * airMult
+    playerVel.z -= dirZR * moveS * airMult
   }
 
   if (Keyboard.keyDown(Key.Space) && onGround) {
     playerVel.y = jumpStrength
     onGround = false
+    startedJumping = true
   }
 
   if (Keyboard.keyHeld(Key.Space)) {
     jumpingThisFrame = true
   }
-  /*
-  if (Keyboard.keyHeld(Key.Shift)) {
-    cameraPos.y -= 1 * moveS
-  }*/
+
+  if (!jumpingThisFrame) {
+    startedJumping = false
+  }
+
   if (Keyboard.keyHeld(Key.ArrowLeft)) {
     cameraRot.y += rotS
   }
@@ -281,8 +307,11 @@ function draw() {
   Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z, 0.1)
   Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z, 0.1)
 
-  Draw3dLine(0, -s, -12, 0, -s, 12, 0.1)
-  Draw3dLine(-12, -s, 0, 12, -s, 0, 0.1)
+  Draw3dLine(0, -s, -24, 0, -s, 24, 0.1)
+  Draw3dLine(-24, -s, 0, 24, -s, 0, 0.1)
+
+  //Draw3dLine(0, -s, -24, 0, -s, 24, 0.1)
+  //Draw3dLine(-24, -s, 0, 24, -s, 0, 0.1)
 
   //Draw3dLine(-1, 0, 3, -1, 0, 4, 0.1)
   //Draw3dLine(-1, 0, 3, -1, 1, 3, 0.1)
