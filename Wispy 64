@@ -1,4 +1,7 @@
-const camera = {
+let resolutionScale = 2
+//This can be any number bigger than 1 - 1 is the highest resolution
+
+let camera = {
   x: 0,
 
   y: 7,
@@ -8,6 +11,18 @@ const camera = {
   yaw: 0,
 
   pitch: 0,
+
+  yawVel: 0,
+
+  pitchVel: 0,
+
+  turningYaw: false,
+  
+  targetYaw: 0,
+
+  stepAngle: 22.5,
+
+  turningSpeedYaw: 200
 }
 
 const light = {
@@ -21,13 +36,26 @@ let playerRotation = 0
 
 const moveSpeed = 0.1
 
-const enable_outlines = false
+const enable_outlines = true
 
 const rotationSpeed = -2
 
 const projectionDistance = 1
 
 let lightDir: Vector3
+
+let playerIsAnimRunning: boolean = false
+
+enum animations {
+  start_jumping,
+  jumping_fall,
+  running,
+  idle,
+}
+
+let currentAnimation = animations.idle
+
+resolutionScale = Math.max(resolutionScale, 1)
 
 if (document.querySelectorAll("canvas").length > 1) {
   document.querySelectorAll("canvas")[0].parentElement.children[1].remove()
@@ -64,13 +92,13 @@ let fps = 0
 let smoothFPS = 0
 
 const screenDimensions = {
-  width: 480,
+  width: 480 / resolutionScale,
 
-  height: 360,
+  height: 360 / resolutionScale,
 
-  halfwidth: 240,
+  halfwidth: 240 / resolutionScale,
 
-  halfheight: 180,
+  halfheight: 180 / resolutionScale,
 }
 
 let zBuffer = new Float32Array(screenDimensions.width * screenDimensions.height)
@@ -108,7 +136,7 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   worldY = rotatedY
   worldZ = rotatedZ2 // Vermeide Division durch Null und Clipping von Punkten sehr nah an der Kamera
 
-  if (worldZ <= 0.95) {
+  if (worldZ <= 1) {
     return null
   } // Perspektivische Division
 
@@ -188,6 +216,17 @@ function drawLine(
   }
 }
 
+class rotation {
+  pitch: number
+  yaw: number
+  roll: number
+  constructor(yaw: number, pitch: number, roll: number) {
+    this.pitch = pitch
+    this.yaw = yaw
+    this.roll = roll
+  }
+}
+
 class Vector3 {
   x: number
   y: number
@@ -200,9 +239,9 @@ class Vector3 {
   }
 
   add(other: Vector3): Vector3 {
-      return new Vector3(this.x + other.x, this.y + other.y, this.z + other.z);
+    return new Vector3(this.x + other.x, this.y + other.y, this.z + other.z)
   }
-  
+
   subtract(other: Vector3): Vector3 {
     return new Vector3(this.x - other.x, this.y - other.y, this.z - other.z)
   }
@@ -232,6 +271,24 @@ class Vector3 {
   }
 }
 
+let player = {
+  position: new Vector3(0, 0, 0),
+  yaw: 0,
+  pitch: 0,
+}
+
+class AnimatableObject {
+  position: Vector3
+  rotation: rotation
+  model: Triangle[]
+
+  constructor(position: Vector3, rotation: rotation, model: Triangle[]) {
+    this.position = position
+    this.rotation = rotation
+    this.model = model
+  }
+}
+
 function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
   const edge1 = v2.subtract(v1)
   const edge2 = v3.subtract(v1)
@@ -240,18 +297,17 @@ function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
 }
 
 function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
-    // Vektor vom Mittelpunkt zum Vertex
-    const diff = vec.subtract(center);
-    // Skalierten Vektor berechnen
-    const scaledDiff = new Vector3(
-        diff.x * factor,
-        diff.y * factor,
-        diff.z * factor
-    );
-    // Neue Position = Mittelpunkt + skalierter Vektor
-    return center.add(scaledDiff); // <-- Füge eine Add-Methode zur Vector3-Klasse hinzu, falls noch nicht vorhanden
+  // Vektor vom Mittelpunkt zum Vertex
+  const diff = vec.subtract(center)
+  // Skalierten Vektor berechnen
+  const scaledDiff = new Vector3(
+    diff.x * factor,
+    diff.y * factor,
+    diff.z * factor,
+  )
+  // Neue Position = Mittelpunkt + skalierter Vektor
+  return center.add(scaledDiff) // <-- Füge eine Add-Methode zur Vector3-Klasse hinzu, falls noch nicht vorhanden
 }
-
 
 function fillTriangleProjected(triangle: Triangle) {
   const projectedVertices = triangle.vertices.map(project)
@@ -327,30 +383,30 @@ function fillTriangleProjected(triangle: Triangle) {
 }
 
 class Triangle {
-    vertices: [Vector3, Vector3, Vector3];
-    color: string;
-    normal: Vector3;
-    bakedLight: boolean;
-    isPlayer: boolean;
-    applyZBias: boolean; // <-- Neu hinzugefügt
+  vertices: [Vector3, Vector3, Vector3]
+  color: string
+  normal: Vector3
+  bakedLight: boolean
+  isPlayer: boolean
+  applyZBias: boolean
 
-    constructor(
-        v1: Vector3,
-        v2: Vector3,
-        v3: Vector3,
-        color: string = "white",
-        normal: Vector3,
-        bakedLight: boolean,
-        isPlayer: boolean = false,
-        applyZBias: boolean = false // <-- Standardwert ist false
-    ) {
-        this.vertices = [v1, v2, v3];
-        this.color = color;
-        this.normal = normal;
-        this.bakedLight = bakedLight;
-        this.isPlayer = isPlayer;
-        this.applyZBias = applyZBias; // <-- Weisen den Wert zu
-    }
+  constructor(
+    v1: Vector3,
+    v2: Vector3,
+    v3: Vector3,
+    color: string = "white",
+    normal: Vector3,
+    bakedLight: boolean,
+    isPlayer: boolean = false,
+    applyZBias: boolean = false,
+  ) {
+    this.vertices = [v1, v2, v3]
+    this.color = color
+    this.normal = normal
+    this.bakedLight = bakedLight
+    this.isPlayer = isPlayer
+    this.applyZBias = applyZBias
+  }
 }
 
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
@@ -390,88 +446,41 @@ function getRandomColor() {
   return color
 }
 
-const scene: Triangle[] = []
+let playerObj: {
+  leftArm: AnimatableObject
+  rightArm: AnimatableObject
+  Head: AnimatableObject
+  Body: AnimatableObject
+  leftLeg: AnimatableObject
+  rightLeg: AnimatableObject
+} = {
+  leftArm: resetAnimatableObject(), // Initialisiere direkt
+  rightArm: resetAnimatableObject(), // Initialisiere direkt
+  Head: resetAnimatableObject(), // Initialisiere direkt
+  Body: resetAnimatableObject(), // Initialisiere direkt
+  leftLeg: resetAnimatableObject(), // Initialisiere direkt
+  rightLeg: resetAnimatableObject(), // Initialisiere direkt
+}
+
+let scene: Triangle[] = []
 
 //__ Fetch Model Data __
-let mario_model =
+const mario_model =
   "https://api.jsonsilo.com/public/7cd9822c-f656-466c-aab5-dfc9e4cfb5eb"
-let cube_test =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/cube_with_texture.json"
-let this_will_crash =
+const wispy =
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
+const this_will_crash =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/bob"
-let textured =
+const textured =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/cube_textured"
-let mario_test =
+const mario_test =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/mario_wisp_test"
+const wisp_model_01 =
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_model_01"
+let playerCenter = new Vector3(0, 0, 0)
+let playerCount = 0
 
-let playerCenter = new Vector3(0, 0, 0);
-let playerCount = 0;
-
-fetch(mario_test)
-  .then((response) => {
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    return response.json()
-  })
-  .then((data) => {
-    const vertices = data.vertices
-    const faces = data.faces
-
-    let sumX = 0, sumY = 0, sumZ = 0;
-    playerCount = vertices.length;
-    for (const vert of vertices) {
-      sumX += vert[0];
-      sumY += vert[1];
-      sumZ += vert[2];
-    }
-    if (playerCount > 0) {
-      playerCenter = new Vector3(sumX / playerCount, sumY / playerCount, sumZ / playerCount);
-    }
-    for (const face of faces) {
-      const faceIndic = face[0]
-      const faceColor = face[1]
-      if (faceIndic.length === 3) {
-        const v1_3D = new Vector3(...vertices[faceIndic[0]])
-        const v2_3D = new Vector3(...vertices[faceIndic[1]])
-        const v3_3D = new Vector3(...vertices[faceIndic[2]])
-
-        const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
-
-        /*const r = (normal.x + 1) / 2
-        const g = (normal.y + 1) / 2
-        const b = (normal.z + 1) / 2
-        const faceColor = rgbToHex(r, g, b)*/
-        if (enable_outlines) {
-        const triangle = new Triangle(
-          v1_3D,
-          v2_3D,
-          v3_3D,
-          faceColor,
-          normal,
-          false,
-          true
-        )
-        scene.push(triangle)
-        }
-        else {
-          const triangle = new Triangle(
-          v1_3D,
-          v2_3D,
-          v3_3D,
-          faceColor,
-          normal,
-          false,
-          false
-        )
-        scene.push(triangle)
-        }
-      }
-    }
-  })
-  .catch((error) => {
-    console.error("fehler beim laden der modeldata:", error)
-  })
+importPlayer()
 
 function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
   const ir = Math.floor(Math.max(0.0, Math.min(1.0, r)) * 255 + 0.5)
@@ -525,6 +534,10 @@ function hexToRgb(
   return { r: rFloat, g: gFloat, b: bFloat }
 }
 
+function resetAnimatableObject() {
+  return new AnimatableObject(new Vector3(0, 0, 0), new rotation(0, 0, 0), [])
+}
+
 forever(function () {
   gameLoop()
 })
@@ -535,48 +548,169 @@ function drawFrame() {
     zBuffer[i] = Infinity
   }
 
-  scene.filter(triangle => !triangle.isPlayer).forEach((triangle) => {
-    fillTriangleProjected(triangle)
-  })
-  
+  scene
+    .filter((triangle) => !triangle.isPlayer)
+    .forEach((triangle) => {
+      fillTriangleProjected(triangle)
+    })
+
   const outlineScaleFactor = 1.1
   const outlineColor = "#333333"
-  scene.filter(triangle => triangle.isPlayer).forEach((triangle) => {
-    const scaledV1 = scaleVector3(triangle.vertices[0], playerCenter, outlineScaleFactor);
-    const scaledV2 = scaleVector3(triangle.vertices[1], playerCenter, outlineScaleFactor);
-    const scaledV3 = scaleVector3(triangle.vertices[2], playerCenter, outlineScaleFactor);
+  scene
+    .filter((triangle) => triangle.isPlayer)
+    .forEach((triangle) => {
+      const scaledV1 = scaleVector3(
+        triangle.vertices[0],
+        playerCenter,
+        outlineScaleFactor,
+      )
+      const scaledV2 = scaleVector3(
+        triangle.vertices[1],
+        playerCenter,
+        outlineScaleFactor,
+      )
+      const scaledV3 = scaleVector3(
+        triangle.vertices[2],
+        playerCenter,
+        outlineScaleFactor,
+      )
 
       const outlineTriangle = new Triangle(
-          scaledV1,
-          scaledV2,
-          scaledV3,
-          outlineColor,
-          new Vector3(0,0,0),
-          true,
-          true,
-          true
-      );
+        scaledV1,
+        scaledV2,
+        scaledV3,
+        outlineColor,
+        new Vector3(0, 0, 0),
+        true,
+        true,
+        true,
+      )
 
-      
-    fillTriangleProjected(outlineTriangle);
-  })
-  scene.filter(triangle => triangle.isPlayer).forEach((triangle) => {
+      fillTriangleProjected(outlineTriangle)
+    })
+  scene
+    .filter((triangle) => triangle.isPlayer)
+    .forEach((triangle) => {
       // Beleuchtung wird in fillTriangleProjected angewendet, da bakedLight false ist
-      fillTriangleProjected(triangle);
-  });
+      fillTriangleProjected(triangle)
+    })
 
   drawFPS()
+
+  scene
+    .filter((triangle) => triangle.isPlayer)
+    .forEach((triangle) => {
+      scene.pop(triangle)
+    })
 }
 
 function gameLoop() {
+  inputs()
   updateCamera()
   updateLight()
+  updateAnimations()
   drawFrame()
   //requestAnimationFrame(gameLoop);
 }
 
 function updateLight() {
   lightDir = calculateLightDirection(light.yaw, light.pitch)
+}
+
+let animationTimer = 0
+let animationTime = 0
+let animTime = 0
+let animTime2 = 0
+let speed = 0
+function updateAnimations() {
+  const animatedBodyTriangles = setAnimationTypePositionsRotations(
+    playerObj.Body,
+  )
+  const animatedHeadTriangles = setAnimationTypePositionsRotations(
+    playerObj.Head,
+  )
+  const animatedLeftArmTriangles = setAnimationTypePositionsRotations(
+    playerObj.leftArm,
+  )
+  const animatedRightArmTriangles = setAnimationTypePositionsRotations(
+    playerObj.rightArm,
+  )
+  const animatedLeftLegTriangles = setAnimationTypePositionsRotations(
+    playerObj.leftLeg,
+  )
+  const animatedRightLegTriangles = setAnimationTypePositionsRotations(
+    playerObj.rightLeg,
+  )
+
+  scene = scene.concat(
+    animatedBodyTriangles,
+    animatedHeadTriangles,
+    animatedLeftArmTriangles,
+    animatedRightArmTriangles,
+    animatedLeftLegTriangles,
+    animatedRightLegTriangles,
+  )
+}
+
+function setAnimationTypePositionsRotations(
+  anim: AnimatableObject,
+): Triangle[] {
+  const endModel: Triangle[] = []
+
+  anim.model?.forEach((triangle) => {
+    const transformedVerts: Vector3[] = triangle.vertices.map((v) => {
+      const rotated = applyRotation(v, anim.rotation)
+      return rotated.add(anim.position.add(player.position))
+    })
+
+    // Neues Dreieck erstellen mit transformierten Punkten
+    const transformedTriangle = new Triangle(
+      transformedVerts[0],
+      transformedVerts[1],
+      transformedVerts[2],
+      triangle.color,
+      triangle.normal, // normal evtl. auch transformieren?
+      triangle.bakedLight,
+      triangle.isPlayer,
+      triangle.applyZBias,
+    )
+
+    endModel.push(transformedTriangle)
+  })
+
+  return endModel
+}
+
+function applyRotation(vec: Vector3, rot: rotation): Vector3 {
+  // einfache Rotation um X, Y, Z – in Radiant umrechnen!
+  const rx = rot.pitch
+  const ry = rot.yaw
+  const rz = rot.roll
+
+  let v = new Vector3(vec.x, vec.y, vec.z)
+
+  // Rotation um X (Pitch)
+  v = new Vector3(
+    v.x,
+    v.y * Math.cos(rx) - v.z * Math.sin(rx),
+    v.y * Math.sin(rx) + v.z * Math.cos(rx),
+  )
+
+  // Rotation um Y (Yaw)
+  v = new Vector3(
+    v.x * Math.cos(ry) + v.z * Math.sin(ry),
+    v.y,
+    -v.x * Math.sin(ry) + v.z * Math.cos(ry),
+  )
+
+  // Rotation um Z (Roll)
+  v = new Vector3(
+    v.x * Math.cos(rz) - v.y * Math.sin(rz),
+    v.x * Math.sin(rz) + v.y * Math.cos(rz),
+    v.z,
+  )
+
+  return v
 }
 
 function drawSkyBox() {
@@ -590,27 +724,37 @@ function drawSkyBox() {
   )
 }
 
-function setPixel(x: number, y: number, z: number, color: string, applyZBias: boolean) {
-    // Runde Koordinaten, um sicherzustellen, dass sie Ganzzahlen sind
-    const ix = Math.round(x);
-    const iy = Math.round(y);
+function setPixel(
+  x: number,
+  y: number,
+  z: number,
+  color: string,
+  applyZBias: boolean,
+) {
+  const ix = Math.round(x)
+  const iy = Math.round(y)
 
-    if (
-        ix < 0 ||
-        iy < 0 ||
-        ix >= screenDimensions.width ||
-        iy >= screenDimensions.height
+  if (
+    ix < 0 ||
+    iy < 0 ||
+    ix >= screenDimensions.width ||
+    iy >= screenDimensions.height
+  )
+    return
+
+  const index = iy * screenDimensions.width + ix
+  const bias = applyZBias ? 100 : 0
+  const biasedZ = z + bias
+  if (biasedZ < zBuffer[index]) {
+    zBuffer[index] = biasedZ
+    ctx.fillStyle = color
+    ctx.fillRect(
+      ix * resolutionScale,
+      iy * resolutionScale,
+      1 * resolutionScale,
+      1 * resolutionScale,
     )
-        return;
-
-    const index = iy * screenDimensions.width + ix;
-    const bias = applyZBias ? 100 : 0; 
-    const biasedZ = z + bias;
-    if (biasedZ < zBuffer[index]) {
-        zBuffer[index] = biasedZ;
-        ctx.fillStyle = color;
-        ctx.fillRect(ix, iy, 1, 1);
-    }
+  }
 }
 
 function drawFPS() {
@@ -638,9 +782,93 @@ function updateSkyBox() {
   }
 }
 
-function updateCamera() {
-  horizontalSpeed = 0
+function rotateTowardsAngleDegrees(
+  currentAngle: number,
+  targetAngle: number,
+  rotationSpeed: number, // Maximale Drehgeschwindigkeit pro Update in Grad
+): number {
+  let angleDifference = targetAngle - currentAngle
 
+  // Passt die Differenz so an, dass sie im Bereich (-180, 180] Grad liegt
+  // Findet den kürzesten Drehweg
+  while (angleDifference > 180) {
+    angleDifference -= 360
+  }
+  while (angleDifference <= -180) {
+    angleDifference += 360
+  }
+
+  // Berechnet den tatsächlichen Drehbetrag, begrenzt durch rotationSpeed
+  const rotateAmount =
+    Math.sign(angleDifference) *
+    Math.min(Math.abs(angleDifference), rotationSpeed)
+
+  // Berechnet den neuen Winkel
+  let newAngle = currentAngle + rotateAmount
+
+  while (newAngle <= -180) {
+    newAngle += 360
+  }
+  while (newAngle > 180) {
+    newAngle -= 360
+  }
+
+  return newAngle
+}
+
+
+
+function inputs() {
+  if (!camera.turningYaw) {
+    if (Keyboard.keyDown(Key.ArrowRight)) {
+      camera.targetYaw = camera.targetYaw - camera.stepAngle;
+      camera.targetYaw = (camera.targetYaw % 360 + 360) % 360;
+      camera.turningYaw = true;
+    }
+    if (Keyboard.keyDown(Key.ArrowLeft)) {
+      camera.targetYaw = camera.targetYaw + camera.stepAngle;
+      camera.targetYaw = (camera.targetYaw % 360 + 360) % 360;
+      camera.turningYaw = true;
+    }
+  }
+  if (Keyboard.keyHeld(Key.W)) {
+    
+  }
+}
+
+function updateCamera() {
+  const cameraDist = 15
+  const cameraHeightOffset = 10
+  const cameraPitchAngle = -10
+
+  if (camera.turningYaw) {
+    let diff = camera.targetYaw - camera.yaw;
+    diff = (diff % 360 + 360) % 360;
+    if (diff > 180) {
+      diff -= 360;
+    }
+
+    if (Math.abs(diff) <= 0.1) {
+      camera.yaw = camera.targetYaw;
+      camera.turningYaw = false;
+    } else {
+      camera.yaw +=
+        Math.sign(diff) *
+        Math.min(Math.abs(diff), camera.turningSpeedYaw * (1 / 60));
+    }
+  }
+
+  camera.yaw = (camera.yaw % 360 + 360) % 360;
+  let dirZ = Math.cos(camera.yaw) * Math.cos(camera.pitch)
+  let dirY = Math.sin(camera.pitch)
+  let dirX = Math.sin(camera.yaw) * Math.cos(camera.pitch)
+
+  camera.x = player.position.x + dirX * cameraDist
+  camera.y = player.position.y + cameraHeightOffset - dirY * cameraDist
+  camera.z = player.position.z - dirZ * cameraDist
+}
+
+/*
   if (Keyboard.keyHeld(Key.Space)) {
     camera.y += moveSpeed
   }
@@ -699,5 +927,252 @@ function updateCamera() {
 
   camera.z += dirZ * horizontalSpeed
 
-  camera.pitch = Math.max(-89, Math.min(89, camera.pitch))
+  camera.pitch = Math.max(-89, Math.min(89, camera.pitch))*/
+
+function loadModel(model: Triangle[], modelUrl: string) {
+  fetch(modelUrl)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return response.json()
+    })
+    .then((data) => {
+      const vertices = data.vertices
+      const faces = data.faces
+      let sumX = 0,
+        sumY = 0,
+        sumZ = 0
+      playerCount = vertices.length
+      for (const vert of vertices) {
+        sumX += vert[0]
+        sumY += vert[1]
+        sumZ += vert[2]
+      }
+      if (playerCount > 0) {
+        playerCenter = new Vector3(
+          sumX / playerCount,
+          sumY / playerCount,
+          sumZ / playerCount,
+        )
+      }
+      for (const face of faces) {
+        const faceIndic = face[0]
+        const faceColor = face[1]
+        if (faceIndic.length === 3) {
+          const v1_3D = new Vector3(...vertices[faceIndic[0]])
+          const v2_3D = new Vector3(...vertices[faceIndic[1]])
+          const v3_3D = new Vector3(...vertices[faceIndic[2]])
+
+          const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
+
+          if (enable_outlines) {
+            const triangle = new Triangle(
+              v1_3D,
+              v2_3D,
+              v3_3D,
+              faceColor,
+              normal,
+              false,
+              true,
+            )
+            model.push(triangle)
+          } else {
+            const triangle = new Triangle(
+              v1_3D,
+              v2_3D,
+              v3_3D,
+              faceColor,
+              normal,
+              false,
+              false,
+            )
+            model.push(triangle)
+          }
+        }
+      }
+    })
+    .catch((error) => {
+      console.error("fehler beim laden der modeldata:", error)
+    })
+}
+
+function importPlayer() {
+  fetch(wispy)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return response.json()
+    })
+    .then((data) => {
+      const vertices = data.vertices
+      const faces = data.faces
+      let sumX = 0,
+        sumY = 0,
+        sumZ = 0
+      playerCount = vertices.length
+      for (const vert of vertices) {
+        sumX += vert[0]
+        sumY += vert[1]
+        sumZ += vert[2]
+      }
+      if (playerCount > 0) {
+        playerCenter = new Vector3(
+          sumX / playerCount,
+          sumY / playerCount,
+          sumZ / playerCount,
+        )
+      }
+      for (const face of faces) {
+        const faceIndic = face[0]
+        const faceColor = face[1]
+        let appendTo = playerObj.Body.model
+        if (face[2] != null) {
+          switch (face[2]) {
+            case "Body":
+              break
+            case "LeftArm":
+              appendTo = playerObj.leftArm.model
+              break
+            case "RightArm":
+              appendTo = playerObj.rightArm.model
+              break
+            case "Head":
+              appendTo = playerObj.Head.model
+              break
+            case "LeftLeg":
+              appendTo = playerObj.leftLeg.model
+              break
+            case "RightLeg":
+              appendTo = playerObj.rightLeg.model
+              break
+          }
+        }
+        if (faceIndic.length === 3) {
+          const v1_3D = new Vector3(...vertices[faceIndic[0]])
+          const v2_3D = new Vector3(...vertices[faceIndic[1]])
+          const v3_3D = new Vector3(...vertices[faceIndic[2]])
+
+          const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
+
+          if (enable_outlines) {
+            const triangle = new Triangle(
+              v1_3D,
+              v2_3D,
+              v3_3D,
+              faceColor,
+              normal,
+              false,
+              true,
+            )
+            appendTo.push(triangle)
+          } else {
+            const triangle = new Triangle(
+              v1_3D,
+              v2_3D,
+              v3_3D,
+              faceColor,
+              normal,
+              false,
+              false,
+            )
+            appendTo.push(triangle)
+          }
+        }
+      }
+    })
+    .catch((error) => {
+      console.error("fehler beim laden der modeldata:", error)
+    })
+}
+
+function playerAnimStart() {
+  animationTimer = 0
+  switch (currentAnimation) {
+    case animations.idle:
+      break
+  }
+}
+
+function playerAnimRunning(runSpeed: number) {
+  const timeSin = Math.sin(animTime)
+  const timeSin2 = Math.sin(animTime2)
+  playerObj.rightArm.rotation = new rotation(
+    timeSin2 * 32 - 10,
+    40 + timeSin2,
+    0,
+  )
+  playerObj.rightArm.position = new Vector3(-timeSin2 * 1.3, -0.5, -3)
+  playerObj.leftArm.rotation = new rotation(timeSin * 32 + 10, -40 - timeSin, 0)
+  playerObj.leftArm.position = new Vector3(timeSin * 1.3, -0.5, 3)
+
+  playerObj.leftLeg.rotation = new rotation(0, 0, timeSin2 * 60)
+  playerObj.leftLeg.position = new Vector3(
+    timeSin2 * 1.4,
+    Math.abs(timeSin2),
+    0,
+  )
+  playerObj.rightLeg.rotation = new rotation(0, 0, -timeSin * 60)
+  playerObj.rightLeg.position = new Vector3(
+    -timeSin * 1.4,
+    Math.abs(timeSin),
+    0,
+  )
+
+  playerObj.Body.rotation = new rotation(timeSin * 3, 0, 0)
+  playerObj.Body.position = new Vector3(-0.2, timeSin2 / 8, 0)
+  playerObj.Head.rotation = new rotation(-timeSin2 * 7, 0, 7 - timeSin)
+  playerObj.Head.position = new Vector3(0.2, timeSin2 / 7, 0)
+  const diff = Math.random(-0.3, 0.3)
+  animTime += runSpeed + diff
+  animTime2 += runSpeed - diff
+}
+
+function playerAnimIdle() {
+  const timeSin = Math.sin(animTime)
+  const timeSinAbs = Math.abs(timeSin)
+  const timeSinAbs4 = Math.abs(timeSin) / 4
+  const timeSin2 = Math.sin(animTime2)
+  playerObj.rightArm.rotation = new rotation(0, timeSin, -timeSinAbs)
+  playerObj.rightArm.position = new Vector3(0, -timeSinAbs4, 0)
+  playerObj.leftArm.rotation = new rotation(0, timeSin, -timeSinAbs)
+  playerObj.leftArm.position = new Vector3(0, -timeSinAbs4, 0)
+
+  playerObj.leftLeg.rotation = new rotation(0, 0, -timeSin * 3)
+  playerObj.leftLeg.position = new Vector3(0, 0, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, timeSin2 * 3)
+  playerObj.rightLeg.position = new Vector3(0, 0, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 0)
+  playerObj.Body.position = new Vector3(0, -timeSinAbs4, 0)
+  playerObj.Head.rotation = new rotation(timeSin2 * 28, 0, timeSinAbs)
+  playerObj.Head.position = new Vector3(0, -timeSinAbs4, 0)
+  const diff = Math.random(-0.3, 0.3)
+  animTime += 3 + diff
+  animTime2 += 2 - diff
+}
+
+function playerAnimJumpStart() {
+  if (animationTimer == 0) {
+    animationTimer = 0
+    animationTime = 30
+  }
+  playerObj.rightArm.rotation = new rotation(0, 0, 0)
+  playerObj.rightArm.position = new Vector3(0, 0, 0)
+  playerObj.leftArm.rotation = new rotation(0, 0, 0)
+  playerObj.leftArm.position = new Vector3(0, 0, 0)
+
+  playerObj.leftLeg.rotation = new rotation(0, 0, 0)
+  playerObj.leftLeg.position = new Vector3(0, 0, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, 0)
+  playerObj.rightLeg.position = new Vector3(0, 0, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 0)
+  playerObj.Body.position = new Vector3(0, 0, 0)
+  playerObj.Head.rotation = new rotation(0, 0, 0)
+  playerObj.Head.position = new Vector3(0, 0 + animationTimer, 0)
+
+  if (animationTimer < animationTime) animationTimer++
+  if (animationTimer == animationTime) currentAnimation = animations.idle
 }
