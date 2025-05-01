@@ -66,18 +66,17 @@ let jumpStrength = 2
 let startedJumping = false
 let sneaking = false
 
+let moveS = 0.25
+let rotS = 5
+
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
   clone.visible = true
-  wait(frameTime * 2)
-  clone.visible = false
-  deleteClone()
+  wait(0.0833333334)
+  clone.delete()
 })
 
 init()
-
-let moveS = 0.25
-let rotS = 5
 
 //__MAIN_LOOP__
 forever(function () {
@@ -90,7 +89,7 @@ forever(function () {
 })
 
 function draw_ui() {
-  /*
+  
   DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
     "L",
     "I",
@@ -110,41 +109,9 @@ function draw_ui() {
     "S",
     " ",
     "" + coins,
-  ])*/
+  ])
 }
 
-function DrawLine(x1: number, y1: number, x2: number, y2: number) {
-  /*if (
-    (x1 > screenWidth / 2 && x2 > screenWidth) ||
-    (x1 < -screenWidth / 2 && x2 < -screenWidth / 2)
-  ) {
-    return
-  }
-  if (
-    (y1 > screenHeight / 2 && y1 > screenHeight) ||
-    (y1 < -screenHeight / 2 && y2 < -screenHeight / 2)
-  ) {
-    return
-  }*/
-  sprite.x = x1
-  sprite.y = y1
-  sprite.pointTowards(x2, y2)
-  let vx = Math.cos(sprite.rotation)
-  let vy = Math.sin(sprite.rotation)
-  sprite.rotation += 90
-  let linelength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
-  sprite.x += vx * halfLineSize
-  sprite.y -= vy * halfLineSize
-  createClone()
-
-  linelength -= lineSize
-  while (linelength > errorMargin) {
-    sprite.x += vx * lineSize
-    sprite.y -= vy * lineSize
-    createClone()
-    linelength -= lineSize
-  }
-}
 
 function moveCam() {
   let dist = 13
@@ -368,6 +335,44 @@ function Draw3dLine(
     ZClipping()
     DrawLine((x1 / z1) * FL, (y1 / z1) * FL, (x2 / z2) * FL, (y2 / z2) * FL)
   }
+}
+
+function DrawLine(x1: number, y1: number, x2: number, y2: number) {
+  sprite.x = x1
+  sprite.y = y1
+  sprite.pointTowards(x2, y2)
+  let vx = Math.cos(sprite.rotation)
+  let vy = Math.sin(sprite.rotation)
+  sprite.rotation += 90
+  let linelength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
+  sprite.x += vx * halfLineSize
+  sprite.y -= vy * halfLineSize
+  if (inBounds(sprite.x, sprite.y)) {
+  createClone()
+  }
+  
+  linelength -= lineSize
+  while (linelength > errorMargin) {
+    sprite.x += vx * lineSize
+    sprite.y -= vy * lineSize
+    if (inBounds(sprite.x, sprite.y)) {
+    createClone()
+    }
+    linelength -= lineSize
+  }
+}
+
+function inBounds(x: number, y: number) {
+  let sW = screenWidth/2
+  let sH = screenHeight/2
+  if (x < sW && x > -sW && y < sH && y > -sH) {
+    return true
+  }
+  return false
+}
+
+function DrawBigNumber(RenderX: number, RenderY: number, Number: number) {
+  
 }
 
 function DrawText(RenderX: number, RenderY: number, text: string[]) {
