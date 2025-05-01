@@ -544,6 +544,19 @@ const collisionTriangles: collisionTriangle[] = [
 ]
 initCollisions()
 
+function initCollisions() {
+  collisionTriangles.forEach((triangle) => {
+    if (triangle.normal.y > 0.01) {
+      triangle.collisionType = collisionTypes.floor
+    } else if (triangle.normal.y < -0.01) {
+      triangle.collisionType = collisionTypes.ceiling
+    } else {
+      triangle.collisionType = collisionTypes.wall
+    }
+    triangle.originOffset = -triangle.normal.dot(triangle.vertices[0])
+  })
+}
+
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   let dir = new Vector3(0, 0, 1)
 
@@ -1164,17 +1177,7 @@ function loadModel(model: Triangle[], modelUrl: string) {
     })
 }
 
-function initCollisions() {
-  collisionTriangles.forEach((triangle) => {
-    if (triangle.normal.y > 0.01) {
-      triangle.collisionType = collisionTypes.floor
-    } else if (triangle.normal.y < -0.01) {
-      triangle.collisionType = collisionTypes.ceiling
-    } else {
-      triangle.collisionType = collisionTypes.wall
-    }
-  })
-}
+
 
 function updatePlayer() {
   const isIdle = player.forwardVel == 0
@@ -1442,4 +1445,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO
+//LATESTBACKUO 16:57
