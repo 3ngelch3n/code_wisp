@@ -6,6 +6,8 @@ let gamecan = document.querySelector("canvas")
 
 let canvas = document.createElement("canvas")
 
+let shouldStart = false
+
 canvas.height = gamecan.height
 
 canvas.width = gamecan.width
@@ -88,102 +90,107 @@ const rotationSpeed = -2
 const projectionDistance = 1
 
 class Vector3 {
-    x: number
-    y: number
-    z: number
-    constructor(x = 0, y = 0, z = 0) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
-    subtract(v: any) {
-        return new Vector3(this.x - v.x, this.y - v.y, this.z - v.z);
-    }
-    cross(v: any) {
-        return new Vector3(
-            this.y * v.z - this.z * v.y,
-            this.z * v.x - this.x * v.z,
-            this.x * v.y - this.y * v.x
-        );
-    }
-    magnitude() {
-        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-    }
-    normalize() {
-        const mag = this.magnitude();
-        return mag === 0 ? new Vector3(0, 0, 0) : new Vector3(this.x / mag, this.y / mag, this.z / mag);
-    }
+  x: number
+  y: number
+  z: number
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = x
+    this.y = y
+    this.z = z
+  }
+  subtract(v: any) {
+    return new Vector3(this.x - v.x, this.y - v.y, this.z - v.z)
+  }
+  cross(v: any) {
+    return new Vector3(
+      this.y * v.z - this.z * v.y,
+      this.z * v.x - this.x * v.z,
+      this.x * v.y - this.y * v.x,
+    )
+  }
+  magnitude() {
+    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z)
+  }
+  normalize() {
+    const mag = this.magnitude()
+    return mag === 0
+      ? new Vector3(0, 0, 0)
+      : new Vector3(this.x / mag, this.y / mag, this.z / mag)
+  }
 }
 
 console.log("118")
 
 // Hilfsfunktion zur Normalenberechnung (angenommen, diese existiert)
 function calculateNormal(v1: any, v2: any, v3: any) {
-    const edge1 = v2.subtract(v1);
-    const edge2 = v3.subtract(v1);
-    return edge1.cross(edge2).normalize();
+  const edge1 = v2.subtract(v1)
+  const edge2 = v3.subtract(v1)
+  return edge1.cross(edge2).normalize()
 }
 
 // RGB (0-1) zu Hex String Konverter (angenommen, diese existiert)
 function rgbToHex(r: any, g: any, b: any) {
-    const toHex = (c: any) => {
-        const hex = Math.floor(c * 255).toString(16);
-        return hex.length === 1 ? "0" + hex : hex;
-    };
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  const toHex = (c: any) => {
+    const hex = Math.floor(c * 255).toString(16)
+    return hex.length === 1 ? "0" + hex : hex
+  }
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
 // Alpha (0-1) zu Hex String Konverter für RGBA (optional, falls setPixel das verarbeiten kann)
 function rgbaToHex(r: any, g: any, b: any, a: any) {
-     const toHex = (c: any) => {
-        const hex = Math.floor(c * 255).toString(16);
-        return hex.length === 1 ? "0" + hex : hex;
-     };
-     const toAlphaHex = (a: any) => {
-         const hex = Math.floor(a * 255).toString(16);
-         return hex.length === 1 ? "0" + hex : hex;
-     }
-     // RGBA im Format #RRGGBBAA ist weniger verbreitet im Web als rgba()
-     // Rückgabe als RGBA-String für Canvas fillStyle ist einfacher
-     return `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, ${a})`;
+  const toHex = (c: any) => {
+    const hex = Math.floor(c * 255).toString(16)
+    return hex.length === 1 ? "0" + hex : hex
+  }
+  const toAlphaHex = (a: any) => {
+    const hex = Math.floor(a * 255).toString(16)
+    return hex.length === 1 ? "0" + hex : hex
+  }
+  // RGBA im Format #RRGGBBAA ist weniger verbreitet im Web als rgba()
+  // Rückgabe als RGBA-String für Canvas fillStyle ist einfacher
+  return `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, ${a})`
 }
-
 
 // Interface für UV Koordinaten
 interface UV {
-    u: number;
-    v: number;
+  u: number
+  v: number
 }
 
 // Struktur zum Speichern von Pixeldaten einer Textur
 interface TextureData {
-    width: number;
-    height: number;
-    data: Uint8ClampedArray; // Pixeldaten (R, G, B, A für jeden Pixel)
+  width: number
+  height: number
+  data: Uint8ClampedArray // Pixeldaten (R, G, B, A für jeden Pixel)
 }
 
 class Triangle {
-    vertices: [Vector3, Vector3, Vector3]; // Original 3D vertices
-    uvs: [UV | null, UV | null, UV | null]; // Original UV coordinates
-    color: string; // Solide Farbe (Fallback)
-    normal: Vector3; // Normale
-    texture: TextureData | undefined; // Referenz zu den geladenen Texturdaten
-    materialAlpha: number; // Material Dissolve/Alpha Wert (d)
+  vertices: [Vector3, Vector3, Vector3] // Original 3D vertices
+  uvs: [UV | null, UV | null, UV | null] // Original UV coordinates
+  color: string // Solide Farbe (Fallback)
+  normal: Vector3 // Normale
+  texture: TextureData | undefined // Referenz zu den geladenen Texturdaten
+  materialAlpha: number // Material Dissolve/Alpha Wert (d)
 
-    constructor(
-      v1: Vector3, v2: Vector3, v3: Vector3,
-      uv1: UV | null = null, uv2: UV | null = null, uv3: UV | null = null,
-      color: string = "white",
-      textureData: TextureData | undefined = undefined,
-      materialAlpha: number = 1.0 // Füge Material Alpha hinzu
-    ) {
-        this.vertices = [v1, v2, v3];
-        this.uvs = [uv1, uv2, uv3];
-        this.color = color;
-        this.normal = calculateNormal(v1, v2, v3);
-        this.texture = textureData;
-        this.materialAlpha = materialAlpha; // Speichere Material Alpha
-    }
+  constructor(
+    v1: Vector3,
+    v2: Vector3,
+    v3: Vector3,
+    uv1: UV | null = null,
+    uv2: UV | null = null,
+    uv3: UV | null = null,
+    color: string = "white",
+    textureData: TextureData | undefined = undefined,
+    materialAlpha: number = 1.0, // Füge Material Alpha hinzu
+  ) {
+    this.vertices = [v1, v2, v3]
+    this.uvs = [uv1, uv2, uv3]
+    this.color = color
+    this.normal = calculateNormal(v1, v2, v3)
+    this.texture = textureData
+    this.materialAlpha = materialAlpha // Speichere Material Alpha
+  }
 }
 
 function setPixel(x: any, y: any, z: any, color: any) {
@@ -202,116 +209,129 @@ function setPixel(x: any, y: any, z: any, color: any) {
   }
 }
 
-const loadedTextures: { [key: string]: TextureData } = {};
+const loadedTextures: { [key: string]: TextureData } = {}
 
 // Funktion zum asynchronen Laden einer Textur und Lesen ihrer Pixeldaten
 function loadTexture(url: string): Promise<TextureData> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            // Zeichne das Bild in ein temporäres Canvas, um Pixeldaten zu extrahieren
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            if (!tempCtx) {
-                 reject("Could not get 2D context from temporary canvas.");
-                 return;
-            }
-            tempCanvas.width = img.width;
-            tempCanvas.height = img.height;
-            tempCtx.drawImage(img, 0, 0);
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      // Zeichne das Bild in ein temporäres Canvas, um Pixeldaten zu extrahieren
+      const tempCanvas = document.createElement("canvas")
+      const tempCtx = tempCanvas.getContext("2d")
+      if (!tempCtx) {
+        reject("Could not get 2D context from temporary canvas.")
+        return
+      }
+      tempCanvas.width = img.width
+      tempCanvas.height = img.height
+      tempCtx.drawImage(img, 0, 0)
 
-            try {
-                const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
-                const textureData: TextureData = {
-                    width: img.width,
-                    height: img.height,
-                    data: imageData.data
-                };
-                loadedTextures[url] = textureData; // Speichere die extrahierten Daten
-                resolve(textureData);
-            } catch (e) {
-                console.error("Fehler beim Extrahieren der Texturdaten:", url, e);
-                reject(e);
-            }
-        };
-        img.onerror = (err) => {
-            console.error("Fehler beim Laden der Texturdatei:", url, err);
-            reject(err);
-        };
-        img.crossOrigin = ''; // Wichtig für CORS, wenn Texturen von anderer Domain geladen werden
-        img.src = url;
-    });
+      try {
+        const imageData = tempCtx.getImageData(0, 0, img.width, img.height)
+        const textureData: TextureData = {
+          width: img.width,
+          height: img.height,
+          data: imageData.data,
+        }
+        loadedTextures[url] = textureData // Speichere die extrahierten Daten
+        resolve(textureData)
+      } catch (e) {
+        console.error("Fehler beim Extrahieren der Texturdaten:", url, e)
+        reject(e)
+      }
+    }
+    img.onerror = (err) => {
+      console.error("Fehler beim Laden der Texturdatei:", url, err)
+      reject(err)
+    }
+    img.crossOrigin = "" // Wichtig für CORS, wenn Texturen von anderer Domain geladen werden
+    img.src = url
+  })
 }
 
-function getPixelColorFromData(textureData: TextureData, u: number, v: number): { r: number; g: number; b: number; a: number } {
-    // Klemme U,V an den Bereich [0, 1]
-    const clampedU = Math.max(0, Math.min(1, u));
-    const clampedV = Math.max(0, Math.min(1, v));
+function getPixelColorFromData(
+  textureData: TextureData,
+  u: number,
+  v: number,
+): { r: number; g: number; b: number; a: number } {
+  // Klemme U,V an den Bereich [0, 1]
+  const clampedU = Math.max(0, Math.min(1, u))
+  const clampedV = Math.max(0, Math.min(1, v))
 
-    // Konvertiere UV [0, 1] zu Pixelkoordinaten [0, width/height - 1]
-    // Math.floor ist wichtig, um zu einem spezifischen Pixel zu kommen
-    const textureX = Math.floor(clampedU * (textureData.width - 1));
-    const textureY = Math.floor(clampedV * (textureData.height - 1));
+  // Konvertiere UV [0, 1] zu Pixelkoordinaten [0, width/height - 1]
+  // Math.floor ist wichtig, um zu einem spezifischen Pixel zu kommen
+  const textureX = Math.floor(clampedU * (textureData.width - 1))
+  const textureY = Math.floor(clampedV * (textureData.height - 1))
 
-    // Berechne den Index im 1D Array (RGBA)
-    const index = (textureY * textureData.width + textureX) * 4;
+  // Berechne den Index im 1D Array (RGBA)
+  const index = (textureY * textureData.width + textureX) * 4
 
-    // Stelle sicher, dass der Index gültig ist
-    if (index < 0 || index >= textureData.data.length) {
-         console.warn("Ungültiger Texturdaten-Index:", index, "für UV:", u, v);
-         return { r: 0, g: 0, b: 0, a: 0 }; // Schwarzes transparentes Pixel bei Fehler
-    }
+  // Stelle sicher, dass der Index gültig ist
+  if (index < 0 || index >= textureData.data.length) {
+    console.warn("Ungültiger Texturdaten-Index:", index, "für UV:", u, v)
+    return { r: 0, g: 0, b: 0, a: 0 } // Schwarzes transparentes Pixel bei Fehler
+  }
 
-    return {
-        r: textureData.data[index],
-        g: textureData.data[index + 1],
-        b: textureData.data[index + 2],
-        a: textureData.data[index + 3] // Alpha Wert (0-255)
-    };
+  return {
+    r: textureData.data[index],
+    g: textureData.data[index + 1],
+    b: textureData.data[index + 2],
+    a: textureData.data[index + 3], // Alpha Wert (0-255)
+  }
 }
 
 console.log("273")
 
-function project(vertex: Vector3, originalUv: UV | null = null): { x: number; y: number; z: number; u: number | null; v: number | null } | null {
-   let worldX = vertex.x - camera.x;
-   let worldY = vertex.y - camera.y;
-   let worldZ = vertex.z - camera.z;
+function project(
+  vertex: Vector3,
+  originalUv: UV | null = null,
+): {
+  x: number
+  y: number
+  z: number
+  u: number | null
+  v: number | null
+} | null {
+  let worldX = vertex.x - camera.x
+  let worldY = vertex.y - camera.y
+  let worldZ = vertex.z - camera.z
 
-    const yawInRadians = camera.yaw;
-    const cosYaw = Math.cos(yawInRadians);
-    const sinYaw = Math.sin(yawInRadians);
-    const rotatedX = cosYaw * worldX + sinYaw * worldZ;
-    const rotatedZ = -sinYaw * worldX + cosYaw * worldZ;
-    worldX = rotatedX;
-    worldZ = rotatedZ;
+  const yawInRadians = camera.yaw
+  const cosYaw = Math.cos(yawInRadians)
+  const sinYaw = Math.sin(yawInRadians)
+  const rotatedX = cosYaw * worldX + sinYaw * worldZ
+  const rotatedZ = -sinYaw * worldX + cosYaw * worldZ
+  worldX = rotatedX
+  worldZ = rotatedZ
 
-    const pitchInRadians = camera.pitch;
-    const cosPitch = Math.cos(pitchInRadians);
-    const sinPitch = Math.sin(pitchInRadians);
-    const rotatedY = cosPitch * worldY - sinPitch * worldZ;
-    const rotatedZ2 = sinPitch * worldY + cosPitch * worldZ;
-    worldY = rotatedY;
-    worldZ = rotatedZ2;
+  const pitchInRadians = camera.pitch
+  const cosPitch = Math.cos(pitchInRadians)
+  const sinPitch = Math.sin(pitchInRadians)
+  const rotatedY = cosPitch * worldY - sinPitch * worldZ
+  const rotatedZ2 = sinPitch * worldY + cosPitch * worldZ
+  worldY = rotatedY
+  worldZ = rotatedZ2
 
+  if (worldZ <= 0.95) {
+    return null
+  }
 
-   if (worldZ <= 0.95) {
-       return null;
-   }
+  const screenX = (projectionDistance * worldX) / worldZ
+  const screenY = (projectionDistance * worldY) / worldZ
 
-   const screenX = (projectionDistance * worldX) / worldZ;
-   const screenY = (projectionDistance * worldY) / worldZ;
+  const aspectRatio = canvas.width / canvas.height
+  const canvasX = canvas.width / 2 + (screenX * canvas.width) / 2
+  const canvasY =
+    canvas.height / 2 - ((screenY * canvas.height) / 2) * aspectRatio
 
-   const aspectRatio = canvas.width / canvas.height;
-   const canvasX = canvas.width / 2 + screenX * canvas.width / 2;
-   const canvasY = canvas.height / 2 - screenY * canvas.height / 2 * aspectRatio;
-
-   return {
-       x: canvasX,
-       y: canvasY,
-       z: worldZ,
-       u: originalUv ? originalUv.u : null,
-       v: originalUv ? originalUv.v : null
-   };
+  return {
+    x: canvasX,
+    y: canvasY,
+    z: worldZ,
+    u: originalUv ? originalUv.u : null,
+    v: originalUv ? originalUv.v : null,
+  }
 }
 console.log("316")
 function drawTriangleProjected(triangle: Triangle) {
@@ -375,37 +395,36 @@ console.log("374")
 function interpolate(
   y: number,
   vA: { x: number; y: number; z: number; u: number | null; v: number | null },
-  vB: { x: number; y: number; z: number; u: number | null; v: number | null }
+  vB: { x: number; y: number; z: number; u: number | null; v: number | null },
 ): { x: number; z: number; u: number | null; v: number | null } | null {
-
-  const epsilon = 1e-6;
+  const epsilon = 1e-6
   if (Math.abs(y - vB.y) < epsilon) {
-      return { x: vB.x, z: vB.z, u: vB.u, v: vB.v };
+    return { x: vB.x, z: vB.z, u: vB.u, v: vB.v }
   }
   if (Math.abs(y - vA.y) < epsilon) {
-       return { x: vA.x, z: vA.z, u: vA.u, v: vA.v };
+    return { x: vA.x, z: vA.z, u: vA.u, v: vA.v }
   }
   if (Math.abs(vA.y - vB.y) < epsilon) {
-       return null;
+    return null
   }
 
-  const t = (y - vA.y) / (vB.y - vA.y);
+  const t = (y - vA.y) / (vB.y - vA.y)
 
-  if (t < -epsilon || t > 1 + epsilon) return null;
+  if (t < -epsilon || t > 1 + epsilon) return null
 
-  const x = vA.x + t * (vB.x - vA.x);
-  const z = vA.z + t * (vB.z - vA.z);
+  const x = vA.x + t * (vB.x - vA.x)
+  const z = vA.z + t * (vB.z - vA.z)
 
-  let u = null;
-  let v = null;
+  let u = null
+  let v = null
 
   if (vA.u !== null && vA.v !== null && vB.u !== null && vB.v !== null) {
-       u = vA.u + t * (vB.u - vA.u);
-       v = vA.v + t * (vB.v - vA.v);
-       // Hier wäre die Stelle für perspektivisch korrekte Interpolation (U/W, V/W, 1/W)
+    u = vA.u + t * (vB.u - vA.u)
+    v = vA.v + t * (vB.v - vA.v)
+    // Hier wäre die Stelle für perspektivisch korrekte Interpolation (U/W, V/W, 1/W)
   }
 
-  return { x, z, u, v };
+  return { x, z, u, v }
 }
 console.log("410")
 // fillScanline anpassen (Textur-Sampling und Alpha Blending)
@@ -415,156 +434,204 @@ function fillScanline(
   p2_edge: { x: number; z: number; u: number | null; v: number | null },
   color: string, // Fallback Farbe
   textureData: TextureData | undefined, // Texturdaten
-  materialAlpha: number // Material Alpha Wert
+  materialAlpha: number, // Material Alpha Wert
 ) {
-    const [left_edge, right_edge] = p1_edge.x < p2_edge.x ? [p1_edge, p2_edge] : [p2_edge, p1_edge];
+  const [left_edge, right_edge] =
+    p1_edge.x < p2_edge.x ? [p1_edge, p2_edge] : [p2_edge, p1_edge]
 
-    const startX = Math.floor(left_edge.x);
-    const endX = Math.floor(right_edge.x);
+  const startX = Math.floor(left_edge.x)
+  const endX = Math.floor(right_edge.x)
 
-    const totalStepsX = right_edge.x - left_edge.x;
+  const totalStepsX = right_edge.x - left_edge.x
 
-    const useTexture = textureData && left_edge.u !== null && left_edge.v !== null && right_edge.u !== null && right_edge.v !== null;
+  const useTexture =
+    textureData &&
+    left_edge.u !== null &&
+    left_edge.v !== null &&
+    right_edge.u !== null &&
+    right_edge.v !== null
 
-    for (let x = startX; x <= endX; x++) {
-      const t_horizontal = (totalStepsX === 0) ? 0.0 : (x - left_edge.x) / totalStepsX;
-      const clamped_t_horizontal = Math.max(0, Math.min(1, t_horizontal));
+  for (let x = startX; x <= endX; x++) {
+    const t_horizontal =
+      totalStepsX === 0 ? 0.0 : (x - left_edge.x) / totalStepsX
+    const clamped_t_horizontal = Math.max(0, Math.min(1, t_horizontal))
 
-      const z = left_edge.z + clamped_t_horizontal * (right_edge.z - left_edge.z);
+    const z = left_edge.z + clamped_t_horizontal * (right_edge.z - left_edge.z)
 
-      const bufferIndex = Math.floor(y) * canvas.width + Math.floor(x);
-      if (z < zBuffer[bufferIndex]) {
-          zBuffer[bufferIndex] = z;
+    const bufferIndex = Math.floor(y) * canvas.width + Math.floor(x)
+    if (z < zBuffer[bufferIndex]) {
+      zBuffer[bufferIndex] = z
 
-          let finalColor = color;
-          let finalAlpha = materialAlpha; // Beginne mit Material Alpha
+      let finalColor = color
+      let finalAlpha = materialAlpha // Beginne mit Material Alpha
 
-          if (useTexture) {
-              const u_pixel = left_edge.u! + clamped_t_horizontal * (right_edge.u! - left_edge.u!);
-              const v_pixel = left_edge.v! + clamped_t_horizontal * (right_edge.v! - left_edge.v!);
+      if (useTexture) {
+        const u_pixel =
+          left_edge.u! + clamped_t_horizontal * (right_edge.u! - left_edge.u!)
+        const v_pixel =
+          left_edge.v! + clamped_t_horizontal * (right_edge.v! - left_edge.v!)
 
-              // Hole Farbe und Alpha aus den Texturdaten
-              const texturePixel = getPixelColorFromData(textureData!, u_pixel, v_pixel);
+        // Hole Farbe und Alpha aus den Texturdaten
+        const texturePixel = getPixelColorFromData(
+          textureData!,
+          u_pixel,
+          v_pixel,
+        )
 
-              // Kombiniere Textur-Alpha mit Material-Alpha
-              finalAlpha = (texturePixel.a / 255.0) * materialAlpha;
+        // Kombiniere Textur-Alpha mit Material-Alpha
+        finalAlpha = (texturePixel.a / 255.0) * materialAlpha
 
-              // Wenn das Pixel nicht komplett transparent ist (nach Alpha-Kombination)
-              if (finalAlpha > 0) {
-                   // Wandle gesampelte RGB Farbe in einen Canvas Style
-                   // Für einfache Darstellung erstmal nur die Texturfarbe, ohne Blending
-                   finalColor = `rgb(${texturePixel.r},${texturePixel.g},${texturePixel.b})`;
-                   // Wenn Alpha < 1, setze RGBA Style
-                   if (finalAlpha < 1.0) {
-                       finalColor = `rgba(${texturePixel.r},${texturePixel.g},${texturePixel.b},${finalAlpha})`;
-                        // *** WICHTIG ***
-                        // Korrektes Alpha-Blending erfordert das Mischen mit dem HINTERGRUND-Pixel.
-                        // setPixel müsste das können, oder du setzt ctx.fillStyle und füllst direkt
-                        // Das Zeichnen von transparenten Objekten muss nach opaken Objekten und
-                        // von hinten nach vorne erfolgen, damit Blending korrekt aussieht.
-                        // Dieses einfache `fillStyle` setzt nur die Farbe mit Alpha, was bei Überlappungen
-                        // von transparenten Objekten falsch aussehen kann.
-                        // Für dieses Beispiel setzen wir es erstmal so, um zu sehen, dass Alpha ankommt.
-                   }
-              } else {
-                  // Wenn komplett transparent, zeichne nichts
-                  continue; // Springe zum nächsten Pixel
-              }
-
-          } else {
-              // Wenn keine Textur oder UVs, benutze die Material/Fallback Farbe
-               if (materialAlpha < 1.0) {
-                    finalColor = `rgba(${parseInt(color.substring(1,3), 16)},${parseInt(color.substring(3,5), 16)},${parseInt(color.substring(5,7), 16)},${materialAlpha})`;
-                     // Siehe WICHTIG oben bezüglich Blending/Zeichenreihenfolge
-               }
+        // Wenn das Pixel nicht komplett transparent ist (nach Alpha-Kombination)
+        if (finalAlpha > 0) {
+          // Wandle gesampelte RGB Farbe in einen Canvas Style
+          // Für einfache Darstellung erstmal nur die Texturfarbe, ohne Blending
+          finalColor = `rgb(${texturePixel.r},${texturePixel.g},${texturePixel.b})`
+          // Wenn Alpha < 1, setze RGBA Style
+          if (finalAlpha < 1.0) {
+            finalColor = `rgba(${texturePixel.r},${texturePixel.g},${texturePixel.b},${finalAlpha})`
+            // *** WICHTIG ***
+            // Korrektes Alpha-Blending erfordert das Mischen mit dem HINTERGRUND-Pixel.
+            // setPixel müsste das können, oder du setzt ctx.fillStyle und füllst direkt
+            // Das Zeichnen von transparenten Objekten muss nach opaken Objekten und
+            // von hinten nach vorne erfolgen, damit Blending korrekt aussieht.
+            // Dieses einfache `fillStyle` setzt nur die Farbe mit Alpha, was bei Überlappungen
+            // von transparenten Objekten falsch aussehen kann.
+            // Für dieses Beispiel setzen wir es erstmal so, um zu sehen, dass Alpha ankommt.
           }
-
-
-          // Setze das Pixel (deine setPixel Funktion oder direkt mit ctx)
-          // setPixel muss Z-Buffer berücksichtigen, was wir oben schon gemacht haben.
-          // Setze die Farbe. Wenn finalAlpha < 1.0, wird der RGBA Style verwendet.
-          // Wenn setPixel nur Hex kann, musst du hier RGB/Alpha in Hex umwandeln oder
-          // setPixel so anpassen, dass es RGBA verarbeiten kann.
-           ctx.fillStyle = finalColor;
-           ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1); // Benutze Canvas fillRect
+        } else {
+          // Wenn komplett transparent, zeichne nichts
+          continue // Springe zum nächsten Pixel
+        }
+      } else {
+        // Wenn keine Textur oder UVs, benutze die Material/Fallback Farbe
+        if (materialAlpha < 1.0) {
+          finalColor = `rgba(${parseInt(color.substring(1, 3), 16)},${parseInt(color.substring(3, 5), 16)},${parseInt(color.substring(5, 7), 16)},${materialAlpha})`
+          // Siehe WICHTIG oben bezüglich Blending/Zeichenreihenfolge
+        }
       }
+
+      // Setze das Pixel (deine setPixel Funktion oder direkt mit ctx)
+      // setPixel muss Z-Buffer berücksichtigen, was wir oben schon gemacht haben.
+      // Setze die Farbe. Wenn finalAlpha < 1.0, wird der RGBA Style verwendet.
+      // Wenn setPixel nur Hex kann, musst du hier RGB/Alpha in Hex umwandeln oder
+      // setPixel so anpassen, dass es RGBA verarbeiten kann.
+      ctx.fillStyle = finalColor
+      ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1) // Benutze Canvas fillRect
     }
+  }
 }
 
 function fillTriangleProjected(triangle: Triangle) {
-    // Projekte die Eckpunkte des Dreiecks und speichere original UVs
-    const projectedVertices = triangle.vertices.map((vertex, index) =>
-        project(vertex, triangle.uvs[index])
-    ).filter(pv => pv !== null); // Entferne Punkte, die hinter der Kamera sind
+  // Projekte die Eckpunkte des Dreiecks und speichere original UVs
+  // Stelle sicher, dass deine project Funktion das original UV zurückgibt
+  const projectedVertices = triangle.vertices
+    .map((vertex, index) => project(vertex, triangle.uvs[index]))
+    .filter((pv) => pv !== null) // Entferne Punkte, die hinter der Kamera sind
 
-    // Mindestens 3 projizierte Punkte für ein Dreieck
-    if (projectedVertices.length < 3) {
-        return;
-    }
+  // Mindestens 3 projizierte Punkte für ein Dreieck
+  if (projectedVertices.length < 3) {
+    return
+  }
 
-    // Sortiere Eckpunkte nach ihrer Y-Koordinate auf dem Bildschirm
-    projectedVertices.sort((a, b) => a.y - b.y);
+  // Sortiere Eckpunkte nach ihrer Y-Koordinate auf dem Bildschirm
+  projectedVertices.sort((a, b) => a.y - b.y)
 
-    const p1 = projectedVertices[0]; // Oberster Punkt
-    const p2 = projectedVertices[1]; // Mittlerer Punkt
-    const p3 = projectedVertices[2]; // Unterster Punkt
+  const p1 = projectedVertices[0] // Oberster Punkt
+  const p2 = projectedVertices[1] // Mittlerer Punkt
+  const p3 = projectedVertices[2] // Unterster Punkt
 
-    // Behandle den Fall, dass der mittlere Punkt nicht auf der horizontalen Linie von p1 liegt
-    if (Math.abs(p2.y - p1.y) > 1.0) { // Toleranz für Floating Point
-         // Finde den Punkt p4 auf der Kante p1-p3 mit derselben Y-Koordinate wie p2
-         const p4 = interpolate(p2.y, p1, p3);
+  // Behandle den Fall, dass der mittlere Punkt nicht auf der horizontalen Linie von p1 liegt
+  // (Splitting des Dreiecks)
+  // Toleranz für Floating Point Vergleiche bei Y-Koordinaten
+  const epsilonY = 1.0; // Vergleiche auf Pixelebene
+  if (Math.abs(p2.y - p1.y) >= epsilonY && Math.abs(p2.y - p3.y) >= epsilonY) {
+    // Finde den Punkt p4 auf der Kante p1-p3 mit derselben Y-Koordinate wie p2
+    const p4 = interpolate(p2.y, p1, p3)
 
-         if (p4) {
-              // Obere Hälfte des Dreiecks (von p1 zu p2 und p4)
-              for (let y = Math.ceil(p1.y); y < Math.floor(p2.y); y++) {
-                   if (y < 0 || y >= canvas.height) continue;
-                   const p_left = interpolate(y, p1, p2);
-                   const p_right = interpolate(y, p1, p4);
-                   if (p_left && p_right) {
-                       fillScanline(y, p_left, p_right, triangle.color, triangle.texture, triangle.materialAlpha);
-                   }
-              }
-              // Untere Hälfte des Dreiecks (von p2 und p4 zu p3)
-               for (let y = Math.ceil(p2.y); y <= Math.floor(p3.y); y++) {
-                   if (y < 0 || y >= canvas.height) continue;
-                   const p_left = interpolate(y, p2, p3);
-                   const p_right = interpolate(y, p4, p3);
-                   if (p_left && p_right) {
-                       fillScanline(y, p_left, p_right, triangle.color, triangle.texture, triangle.materialAlpha);
-                   }
-              }
-         } else {
-             // Fallback: Dreieck als ganzes füllen, wenn p4 nicht gefunden wurde
-              console.warn("Could not find split point p4 for triangle.");
-               for (let y = Math.ceil(p1.y); y <= Math.floor(p3.y); y++) {
-                   if (y < 0 || y >= canvas.height) continue;
-                   const p_left = interpolate(y, p1, p3); // Kante p1-p3
-                   let edgePoints = [interpolate(y, p1, p2), interpolate(y, p2, p3)]; // Kanten p1-p2 und p2-p3
-                   edgePoints = edgePoints.filter(p => p !== null); // Filter nulls
-                   edgePoints.sort((a,b) => a.x - b.x); // Sortiere nach X
-                   if(edgePoints.length >= 2){
-                       fillScanline(y, edgePoints[0], edgePoints[1], triangle.color, triangle.texture, triangle.materialAlpha);
-                   }
-              }
-         }
-    } else {
-        // Das Dreieck hat eine horizontale Kante oben oder unten (p1.y == p2.y oder p2.y == p3.y)
-        // Oder p2 ist sehr nah an p1.y
-        // Behandle als ein einzelnes Dreieck von p1.y bis p3.y
-        for (let y = Math.ceil(p1.y); y <= Math.floor(p3.y); y++) {
-            if (y < 0 || y >= canvas.height) continue;
-            const p_left = interpolate(y, p1, p3); // Kante p1-p3
-            let edgePoints = [interpolate(y, p1, p2), interpolate(y, p2, p3)]; // Kanten p1-p2 und p2-p3
-             edgePoints = edgePoints.filter(p => p !== null); // Filter nulls
-             edgePoints.sort((a,b) => a.x - b.x); // Sortiere nach X
-             if(edgePoints.length >= 2){
-                 fillScanline(y, edgePoints[0], edgePoints[1], triangle.color, triangle.texture, triangle.materialAlpha);
-             }
-        }
-    }
+    if (p4) {
+      // Obere Hälfte des Dreiecks (von p1 zu p2 und p4)
+      // Iteriere y von p1.y (aufgerundet) bis p2.y (abgerundet)
+      for (let y = Math.ceil(p1.y); y < Math.floor(p2.y); y++) {
+        if (y < 0 || y >= canvas.height) continue // Clipping Y
+
+        // Interpoliere Punkte auf den beiden Kanten bei der aktuellen Y-Koordinate
+        const p_left = interpolate(y, p1, p2) // Kante p1-p2
+        const p_right = interpolate(y, p1, p4) // Kante p1-p4 (auf der anderen Seite)
+
+        if (p_left && p_right) {
+          // Rufe fillScanline auf, um die horizontale Linie zu füllen
+          fillScanline(
+            y,
+            p_left, // Startpunkt der Scanline (links)
+            p_right, // Endpunkt der Scanline (rechts)
+            triangle.color, // Fallback Farbe
+            triangle.texture, // Texturdaten
+            triangle.materialAlpha, // Material Alpha
+          )
+        }
+      }
+      // Untere Hälfte des Dreiecks (von p2 und p4 zu p3)
+      // Iteriere y von p2.y (aufgerundet) bis p3.y (abgerundet)
+      for (let y = Math.ceil(p2.y); y <= Math.floor(p3.y); y++) {
+        if (y < 0 || y >= canvas.height) continue // Clipping Y
+
+        // Interpoliere Punkte auf den beiden Kanten bei der aktuellen Y-Koordinate
+        const p_left = interpolate(y, p2, p3) // Kante p2-p3
+        const p_right = interpolate(y, p4, p3) // Kante p4-p3 (andere Seite)
+
+        if (p_left && p_right) {
+          // Rufe fillScanline auf, um die horizontale Linie zu füllen
+          fillScanline(
+            y,
+            p_left,
+            p_right,
+            triangle.color,
+            triangle.texture,
+            triangle.materialAlpha,
+          )
+        }
+      }
+    } else {
+      // Das Dreieck ist ein einfaches Dreieck (kein Splitting nötig)
+      // Dies passiert, wenn p2.y sehr nah an p1.y oder p3.y ist
+      // oder wenn die Kante p1-p3 vertikal ist.
+      // Iteriere y von p1.y (aufgerundet) bis p3.y (abgerundet)
+      for (let y = Math.ceil(p1.y); y <= Math.floor(p3.y); y++) {
+        if (y < 0 || y >= canvas.height) continue // Clipping Y
+
+        // Interpoliere Punkte auf den beiden äußeren Kanten
+        // Bestimme, welche Seite die Kante p1-p3 ist und welche die anderen beiden Kanten kombiniert sind
+        // Dies erfordert etwas Logik, um die "linke" und "rechte" Kante bei der aktuellen Y zu finden.
+        // Eine vereinfachte Annahme könnte sein, dass p1-p3 immer eine Kante ist,
+        // und die andere Kante ist entweder p1-p2 oder p2-p3, je nach Y.
+        // Alternativ kann man alle Kantenpunkte bei Y berechnen und die zwei äußersten nehmen.
+
+        const edgePoint13 = interpolate(y, p1, p3);
+        const edgePoint12 = interpolate(y, p1, p2);
+        const edgePoint23 = interpolate(y, p2, p3);
+
+        let scanlinePoints = [edgePoint13, edgePoint12, edgePoint23].filter(p => p !== null);
+
+        // Sortiere die gefundenen Punkte nach X, um die linke und rechte Kante zu finden
+        scanlinePoints.sort((a, b) => a.x - b.x);
+
+        // Wir brauchen genau 2 Punkte für eine Scanline
+        if (scanlinePoints.length >= 2) {
+          fillScanline(
+            y,
+            scanlinePoints[0], // Linker Punkt der Scanline
+            scanlinePoints[scanlinePoints.length - 1], // Rechter Punkt der Scanline
+            triangle.color,
+            triangle.texture,
+            triangle.materialAlpha,
+          )
+        }
+         // Füge hier ggf. eine Warnung ein, wenn scanlinePoints.length < 2 ist
+      }
+  }
 }
 console.log("565")
-      
+
 function getRandomColor() {
   const letters = "0123456789ABCDEF"
   let color = "#"
@@ -575,75 +642,52 @@ function getRandomColor() {
 }
 
 console.log("576")
-      
-const TEXTURE_URL = "https://i.postimg.cc/xCPN8FCj/texture01.png";
-
-// Erstelle ein neues Image Objekt
-const textureImage = new Image();
-
-// Setze die crossOrigin Eigenschaft für CORS, falls das Bild von einer anderen Domain kommt
-// (oft nötig, wenn du Pixeldaten lesen willst, wie wir es für das Sampling tun)
-textureImage.crossOrigin = '';
-
-// Definiere eine Funktion, die aufgerufen wird, wenn das Bild vollständig geladen ist
-textureImage.onload = () => {
-  // HIER ist das Texturbild vollständig geladen und bereit zur Verwendung
-  console.log("Textur erfolgreich geladen:", textureImage.src, textureImage.width, textureImage.height);
-
-  // Ab hier kannst du das 'textureImage' Objekt nutzen,
-  // z.B. es in ein Canvas zeichnen, Pixeldaten extrahieren, etc.
-};
-
-// Definiere eine Funktion, die aufgerufen wird, wenn ein Fehler beim Laden auftritt
-textureImage.onerror = (err) => {
-  console.error("Fehler beim Laden der Textur:", TEXTURE_URL, err);
-};
-
-// Setze die Quelle des Bildes, was den Ladevorgang startet
-textureImage.src = TEXTURE_URL;
-
-console.log("Image-Ladevorgang gestartet... Code läuft hier sofort weiter!");
 
 //__ Fetch Model Data __
-let model1 = "https://api.jsonsilo.com/public/7cd9822c-f656-466c-aab5-dfc9e4cfb5eb"
-let model2 = "https://github.com/3ngelch3n/code_wisp/blob/main/cube_with_texture.json"
-const scene: Triangle[] = [];
-const JSON_URL = "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/cube_with_texture.json"; // Deine URL!
+let model1 =
+  "https://api.jsonsilo.com/public/7cd9822c-f656-466c-aab5-dfc9e4cfb5eb"
+let model2 =
+  "https://github.com/3ngelch3n/code_wisp/blob/main/cube_with_texture.json"
+const scene: Triangle[] = []
+const JSON_URL = "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/cube_with_texture.json";
 
 fetch(JSON_URL)
-  .then((response) => {
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  })
+  .then((response) => { /* ... Fehlerbehandlung ... */ return response.json(); })
   .then(async (data) => {
+    // *** Definiere defaultColor HIER ***
+    const defaultColor = "#111111"; // Oder eine andere Standardfarbe
+
     const vertices_data = data.vertices;
+    // ... (normals_data, texcoords_data, faces_data, materials_data) ...
     const normals_data = data.normals;
     const texcoords_data = data.texcoords;
     const faces_data = data.faces;
     const materials_data = data.materials;
 
+
     const textureUrlsToLoad: string[] = [];
     const materialsInfo: { [materialName: string]: { textureUrl?: string; alpha: number; kdColor?: string } } = {};
 
+    const TEXTURE_BASE_URL = ""; // Basispfad ist leer, da die URL in der JSON komplett ist
+
     for (const matName in materials_data) {
         const material = materials_data[matName];
-        const matInfo: { textureUrl?: string; alpha: number; kdColor?: string } = { alpha: 1.0 }; // Standard: opak
+        const matInfo: { textureUrl?: string; alpha: number; kdColor?: string } = { alpha: 1.0 };
         if (material) {
              if (material.map_Kd && typeof material.map_Kd === 'string') {
-                 matInfo.textureUrl = material.map_Kd;
-                if (!textureUrlsToLoad.includes(matInfo.textureUrl)) {
-                    textureUrlsToLoad.push(matInfo.textureUrl);
+                const textureRelativePath = material.map_Kd;
+                const textureFullUrl = textureRelativePath; // Annahme: URL in JSON ist komplett
+
+                matInfo.textureUrl = textureFullUrl;
+                if (!textureUrlsToLoad.includes(textureFullUrl)) {
+                    textureUrlsToLoad.push(textureFullUrl);
                 }
              }
-             // Hole Dissolve/Alpha Wert (d)
              if (material.d !== undefined && typeof material.d === 'number') {
                  matInfo.alpha = material.d;
-             } else if (material.Tr !== undefined && typeof material.Tr === 'number') { // Manchmal wird Tr statt d benutzt
+             } else if (material.Tr !== undefined && typeof material.Tr === 'number') {
                  matInfo.alpha = 1.0 - material.Tr;
              }
-             // Hole Kd Farbe als Fallback
              if(material.Kd && material.Kd.length === 3) {
                  matInfo.kdColor = rgbToHex(material.Kd[0], material.Kd[1], material.Kd[2]);
              }
@@ -658,24 +702,15 @@ fetch(JSON_URL)
          console.log(`Alle ${textureUrlsToLoad.length} Texturen geladen.`);
     } catch (error) {
          console.error("Fehler beim Laden einer oder mehrerer Texturen:", error);
-         // Fahre fort, auch wenn Texturen fehlen (sie werden dann nicht gerendert)
+         // Hier könntest du entscheiden, ob du abbricht oder ohne Texturen zeichnest
     }
 
     for (const faceData of faces_data) {
           if (faceData.indices.length === 3) {
-
-              const v_idx1 = faceData.indices[0].v;
-              const v_idx2 = faceData.indices[1].v;
-              const v_idx3 = faceData.indices[2].v;
-
-              const vt_idx1 = faceData.indices[0].vt;
-              const vt_idx2 = faceData.indices[1].vt;
-              const vt_idx3 = faceData.indices[2].vt;
-
-              const v1_3D = new Vector3(...vertices_data[v_idx1]);
-              const v2_3D = new Vector3(...vertices_data[v_idx2]);
-              const v3_3D = new Vector3(...vertices_data[v_idx3]);
-
+              // ... (Code zum Holen von v_idx, vt_idx, v1_3D, uv1 etc.) ...
+              const v_idx1 = faceData.indices[0].v; const v_idx2 = faceData.indices[1].v; const v_idx3 = faceData.indices[2].v;
+              const vt_idx1 = faceData.indices[0].vt; const vt_idx2 = faceData.indices[1].vt; const vt_idx3 = faceData.indices[2].vt;
+              const v1_3D = new Vector3(...vertices_data[v_idx1]); const v2_3D = new Vector3(...vertices_data[v_idx2]); const v3_3D = new Vector3(...vertices_data[v_idx3]);
               const uv1 = (vt_idx1 !== null && texcoords_data[vt_idx1] !== undefined) ? { u: texcoords_data[vt_idx1][0], v: 1.0 - texcoords_data[vt_idx1][1] } : null;
               const uv2 = (vt_idx2 !== null && texcoords_data[vt_idx2] !== undefined) ? { u: texcoords_data[vt_idx2][0], v: 1.0 - texcoords_data[vt_idx2][1] } : null;
               const uv3 = (vt_idx3 !== null && texcoords_data[vt_idx3] !== undefined) ? { u: texcoords_data[vt_idx3][0], v: 1.0 - texcoords_data[vt_idx3][1] } : null;
@@ -687,11 +722,11 @@ fetch(JSON_URL)
               const textureDataForFace = textureUrlForFace ? loadedTextures[textureUrlForFace] : undefined;
 
               const materialAlpha = materialInfo ? materialInfo.alpha : 1.0;
+              // *** defaultColor wird hier richtig referenziert ***
               const faceColor = (materialInfo && materialInfo.kdColor) ? materialInfo.kdColor : defaultColor;
 
 
               const triangle = new Triangle(v1_3D, v2_3D, v3_3D, uv1, uv2, uv3, faceColor, textureDataForFace, materialAlpha);
-
               scene.push(triangle);
             } else {
                  console.warn("Skipping non-triangle face or face without 3 vertex indices:", faceData);
@@ -699,17 +734,20 @@ fetch(JSON_URL)
         }
 
     console.log(`Szene mit ${scene.length} Dreiecken erstellt.`);
-    // Starte die Game Loop erst, nachdem Szene geladen ist
+    // *** Rufe gameLoop() HIER auf, nachdem alles geladen und erstellt ist ***
+    //gameLoop();
+    shouldStart = true
+    console.log("Starting The Gameloop now!")
 
   })
   .catch((error) => {
     console.error("fehler beim laden der modelldata oder Texturen:", error);
   });
 
-
-
 forever(function () {
+  if (shouldStart) {
   gameLoop()
+  }
 })
 
 function drawFrame() {
@@ -726,7 +764,7 @@ function drawFrame() {
   })
 }
 
-console.log("looping now!: 728")
+
 function gameLoop() {
   updateCamera()
   drawFrame()
@@ -744,8 +782,6 @@ function drawSkyBox() {
   )
 }
 
-
-
 function drawFPS() {
   const now = performance.now()
   const delta = now - lastFrameTime
@@ -761,8 +797,6 @@ function drawFPS() {
   ctx.fillText(`Y: ${camera.y.toFixed(2)}`, 70, 30)
   ctx.fillText(`Z: ${camera.z.toFixed(2)}`, 135, 30)
 }
-
-
 
 function updateCamera() {
   horizontalSpeed = 0
@@ -827,4 +861,4 @@ function updateCamera() {
 
   camera.pitch = Math.max(-89, Math.min(89, camera.pitch))
 }
-/(/texture borkem
+//textur brfokenm again
