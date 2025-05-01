@@ -21,6 +21,8 @@ let playerRotation = 0
 
 const moveSpeed = 0.1
 
+const enable_outlines = false
+
 const rotationSpeed = -2
 
 const projectionDistance = 1
@@ -197,6 +199,10 @@ class Vector3 {
     this.z = z
   }
 
+  add(other: Vector3): Vector3 {
+      return new Vector3(this.x + other.x, this.y + other.y, this.z + other.z);
+  }
+  
   subtract(other: Vector3): Vector3 {
     return new Vector3(this.x - other.x, this.y - other.y, this.z - other.z)
   }
@@ -233,6 +239,20 @@ function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
   return normal.normalize()
 }
 
+function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
+    // Vektor vom Mittelpunkt zum Vertex
+    const diff = vec.subtract(center);
+    // Skalierten Vektor berechnen
+    const scaledDiff = new Vector3(
+        diff.x * factor,
+        diff.y * factor,
+        diff.z * factor
+    );
+    // Neue Position = Mittelpunkt + skalierter Vektor
+    return center.add(scaledDiff); // <-- Füge eine Add-Methode zur Vector3-Klasse hinzu, falls noch nicht vorhanden
+}
+
+
 function fillTriangleProjected(triangle: Triangle) {
   const projectedVertices = triangle.vertices.map(project)
   projectedVertices.sort((a, b) => a.y - b.y)
@@ -246,12 +266,13 @@ function fillTriangleProjected(triangle: Triangle) {
     z1: number,
     z2: number,
     color: string,
+    applyZBias: boolean,
   ) {
     const steps = x2 - x1
     for (let x = x1; x <= x2; x++) {
       const t = (x - x1) / steps
       const z = z1 * (1 - t) + z2 * t
-      setPixel(Math.round(x), Math.round(y), z, color)
+      setPixel(Math.round(x), Math.round(y), z, color, applyZBias)
     }
   }
   function interpolate(
@@ -297,32 +318,39 @@ function fillTriangleProjected(triangle: Triangle) {
         }
       }
       if (p1.x < p2.x) {
-        fillScanline(y, p1.x, p2.x, p1.z, p2.z, fillColor)
+        fillScanline(y, p1.x, p2.x, p1.z, p2.z, fillColor, triangle.applyZBias)
       } else {
-        fillScanline(y, p2.x, p1.x, p2.z, p1.z, fillColor)
+        fillScanline(y, p2.x, p1.x, p2.z, p1.z, fillColor, triangle.applyZBias)
       }
     }
   }
 }
 
 class Triangle {
-  vertices: [Vector3, Vector3, Vector3]
-  color: string
-  normal: Vector3
-  bakedLight: boolean
-  constructor(
-    v1: Vector3,
-    v2: Vector3,
-    v3: Vector3,
-    color: string = "white",
-    normal: Vector3,
-    bakedLight: boolean,
-  ) {
-    this.vertices = [v1, v2, v3]
-    this.color = color
-    this.normal = normal
-    this.bakedLight = bakedLight
-  }
+    vertices: [Vector3, Vector3, Vector3];
+    color: string;
+    normal: Vector3;
+    bakedLight: boolean;
+    isPlayer: boolean;
+    applyZBias: boolean; // <-- Neu hinzugefügt
+
+    constructor(
+        v1: Vector3,
+        v2: Vector3,
+        v3: Vector3,
+        color: string = "white",
+        normal: Vector3,
+        bakedLight: boolean,
+        isPlayer: boolean = false,
+        applyZBias: boolean = false // <-- Standardwert ist false
+    ) {
+        this.vertices = [v1, v2, v3];
+        this.color = color;
+        this.normal = normal;
+        this.bakedLight = bakedLight;
+        this.isPlayer = isPlayer;
+        this.applyZBias = applyZBias; // <-- Weisen den Wert zu
+    }
 }
 
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
@@ -375,6 +403,10 @@ let textured =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/cube_textured"
 let mario_test =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/mario_wisp_test"
+
+let playerCenter = new Vector3(0, 0, 0);
+let playerCount = 0;
+
 fetch(mario_test)
   .then((response) => {
     if (!response.ok) {
@@ -385,6 +417,17 @@ fetch(mario_test)
   .then((data) => {
     const vertices = data.vertices
     const faces = data.faces
+
+    let sumX = 0, sumY = 0, sumZ = 0;
+    playerCount = vertices.length;
+    for (const vert of vertices) {
+      sumX += vert[0];
+      sumY += vert[1];
+      sumZ += vert[2];
+    }
+    if (playerCount > 0) {
+      playerCenter = new Vector3(sumX / playerCount, sumY / playerCount, sumZ / playerCount);
+    }
     for (const face of faces) {
       const faceIndic = face[0]
       const faceColor = face[1]
@@ -399,7 +442,7 @@ fetch(mario_test)
         const g = (normal.y + 1) / 2
         const b = (normal.z + 1) / 2
         const faceColor = rgbToHex(r, g, b)*/
-
+        if (enable_outlines) {
         const triangle = new Triangle(
           v1_3D,
           v2_3D,
@@ -407,8 +450,22 @@ fetch(mario_test)
           faceColor,
           normal,
           false,
+          true
         )
         scene.push(triangle)
+        }
+        else {
+          const triangle = new Triangle(
+          v1_3D,
+          v2_3D,
+          v3_3D,
+          faceColor,
+          normal,
+          false,
+          false
+        )
+        scene.push(triangle)
+        }
       }
     }
   })
@@ -478,12 +535,37 @@ function drawFrame() {
     zBuffer[i] = Infinity
   }
 
-  //drawSkyBox();
-  drawFPS()
-
-  scene.forEach((triangle) => {
+  scene.filter(triangle => !triangle.isPlayer).forEach((triangle) => {
     fillTriangleProjected(triangle)
   })
+  
+  const outlineScaleFactor = 1.1
+  const outlineColor = "#333333"
+  scene.filter(triangle => triangle.isPlayer).forEach((triangle) => {
+    const scaledV1 = scaleVector3(triangle.vertices[0], playerCenter, outlineScaleFactor);
+    const scaledV2 = scaleVector3(triangle.vertices[1], playerCenter, outlineScaleFactor);
+    const scaledV3 = scaleVector3(triangle.vertices[2], playerCenter, outlineScaleFactor);
+
+      const outlineTriangle = new Triangle(
+          scaledV1,
+          scaledV2,
+          scaledV3,
+          outlineColor,
+          new Vector3(0,0,0),
+          true,
+          true,
+          true
+      );
+
+      
+    fillTriangleProjected(outlineTriangle);
+  })
+  scene.filter(triangle => triangle.isPlayer).forEach((triangle) => {
+      // Beleuchtung wird in fillTriangleProjected angewendet, da bakedLight false ist
+      fillTriangleProjected(triangle);
+  });
+
+  drawFPS()
 }
 
 function gameLoop() {
@@ -508,20 +590,27 @@ function drawSkyBox() {
   )
 }
 
-function setPixel(x: any, y: any, z: any, color: any) {
-  if (
-    x < 0 ||
-    y < 0 ||
-    x >= screenDimensions.width ||
-    y >= screenDimensions.height
-  )
-    return
-  const index = y * screenDimensions.width + x
-  if (z < zBuffer[index]) {
-    zBuffer[index] = z
-    ctx.fillStyle = color
-    ctx.fillRect(x, y, 1, 1)
-  }
+function setPixel(x: number, y: number, z: number, color: string, applyZBias: boolean) {
+    // Runde Koordinaten, um sicherzustellen, dass sie Ganzzahlen sind
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+
+    if (
+        ix < 0 ||
+        iy < 0 ||
+        ix >= screenDimensions.width ||
+        iy >= screenDimensions.height
+    )
+        return;
+
+    const index = iy * screenDimensions.width + ix;
+    const bias = applyZBias ? 100 : 0; 
+    const biasedZ = z + bias;
+    if (biasedZ < zBuffer[index]) {
+        zBuffer[index] = biasedZ;
+        ctx.fillStyle = color;
+        ctx.fillRect(ix, iy, 1, 1);
+    }
 }
 
 function drawFPS() {
@@ -612,4 +701,3 @@ function updateCamera() {
 
   camera.pitch = Math.max(-89, Math.min(89, camera.pitch))
 }
-//backup 11:18
