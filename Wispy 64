@@ -37,8 +37,9 @@ let lightDir: Vector3
 let playerIsAnimRunning: boolean = false
 enum animations {
   start_jumping,
-  jumping_fall,
+  single_jumping_fall,
   running,
+  fall,
   idle,
 }
 enum state {
@@ -46,7 +47,6 @@ enum state {
   air,
   water,
 }
-let currentAnimation = animations.idle
 const epsilon = 1e-6
 resolutionScale = Math.max(resolutionScale, 1)
 if (document.querySelectorAll("canvas").length > 1) {
@@ -397,6 +397,7 @@ let player = {
   intendedYaw: 0,
   animWannaState: 0,
   state: state.ground,
+  currentAnimation = animations.idle,
 }
 
 class AnimatableObject {
@@ -1370,7 +1371,7 @@ function drawFPS() {
   ctx.fillText(`FV: ${player.forwardVel.toFixed(2)}`, 5, 45)
   ctx.fillText(`PY: ${player.yaw.toFixed(2)}`, 80, 45)
   ctx.fillText(`M: ${intendedMag.toFixed(2)}`, 145, 45)
-  ctx.fillText(`IY: ${player.intendedYaw.toFixed(2)}`, 5, 60)
+  ctx.fillText(`GR: ${player.verticalVel.toFixed(2)}`, 5, 60)
 }
 
 function updateSkyBox() {
@@ -1581,22 +1582,26 @@ function updatePlayer() {
   player_actions_moving(isIdle)
   if (player.state == state.ground) {
     if (player.forwardVel == 0) {
-      if (!isIdle) {
-        player.animWannaState = 0
-        animTime = 0
-        animTime2 = 0
-      }
-      playerFreeFall()
+      setPlayerAnimation(animations.idle)
     } else {
-      if (isIdle) {
-        animTime = 0
-        animTime2 = 0
-      }
-      //playerAnimRunning(player.forwardVel / 3, 0)
+      setPlayerAnimation(animations.running)
     }
+  }else if (player.state == state.air) {
+    if (player.currentAnimation == animations.fall || player.currentAnimation == animations.jumping_fall)
+    {} else {setPlayerAnimation(animations.fall)}
   }
+  updatePlayerAnimations()
   //highlightPlayerGridCell()
   setPlayerFloor()
+}
+
+function setPlayerAnimation(animationSet: animations) {
+  if (player.currentAnimation != animationSet) {
+  player.currentAnimation = animationSet
+  player.animWannaState = 0
+  animTime = 0
+  animTime2 = 0
+  }
 }
 
 function setPlayerFloor() {
@@ -1683,11 +1688,19 @@ function setPlayerFloor() {
     })
 
   if (heightList.length == 0) {
-    player.state = state.air
+    playerSetAir()
   } else {
     player.state = state.ground
     player.position.y = Math.max(...heightList)
   }
+}
+
+function playerSetAir() {
+  if (player.state != state.air) {
+    player.verticalVel = 0
+    if (//!!)
+  }
+  player.state = state.air
 }
 
 function highlightPlayerGridCell() {
@@ -1734,7 +1747,7 @@ function highlightPlayerGridCell() {
     }
   } else {
   }
-} //!!
+}
 
 function player_actions_moving(was_standing_still: boolean) {
   if (player.state == state.ground) {
@@ -1744,7 +1757,8 @@ function player_actions_moving(was_standing_still: boolean) {
     updateAirMovement()
   }
   function updateAirMovement() {
-    if (player.verticalVel > -1.875) player.verticalVel += gravity
+    const gravityMult = 2
+    if (player.verticalVel > -1.875/gravityMult) player.verticalVel += gravity/gravityMult
     player.position.y += player.verticalVel
     const speed = player.forwardVel
     const yawDegrees = player.yaw
@@ -1903,15 +1917,24 @@ function importPlayer() {
     })
 }
 
-function playerAnimStart() {
-  animationTimer = 0
-  switch (currentAnimation) {
+function updatePlayerAnimations() {
+  switch (player.currentAnimation) {
     case animations.idle:
+      playerAnimIdle()
+      break
+    case animations.fall:
+      playerAnimFreeFall()
+      break
+    case animations.single_jumping_fall:
+      playerAnimSingleJump()
+      break
+    case animations.running:
+      playerAnimRunning(player.forwardVel / 3)
       break
   }
 }
 
-function playerAnimRunning(runSpeed: number, off: number) {
+function playerAnimRunning(runSpeed: number) {
   const timeSin = Math.sin(animTime)
   const timeSin2 = Math.sin(animTime2)
   playerObj.rightArm.rotation = new rotation(
@@ -1921,28 +1944,28 @@ function playerAnimRunning(runSpeed: number, off: number) {
   )
   playerObj.rightArm.position = new Vector3(-timeSin2 * 1.3, -0.5, -3)
   playerObj.leftArm.rotation = new rotation(
-    off + timeSin * 32 + 10,
+    timeSin * 32 + 10,
     -40 - timeSin,
     0,
   )
   playerObj.leftArm.position = new Vector3(timeSin * 1.3, -0.5, 3)
 
-  playerObj.leftLeg.rotation = new rotation(off, 0, timeSin2 * 60)
+  playerObj.leftLeg.rotation = new rotation(0, 0, timeSin2 * 60)
   playerObj.leftLeg.position = new Vector3(
     timeSin2 * 1.4,
     Math.abs(timeSin2),
     0,
   )
-  playerObj.rightLeg.rotation = new rotation(off, 0, -timeSin * 60)
+  playerObj.rightLeg.rotation = new rotation(0, 0, -timeSin * 60)
   playerObj.rightLeg.position = new Vector3(
     -timeSin * 1.4,
     Math.abs(timeSin),
     0,
   )
 
-  playerObj.Body.rotation = new rotation(off + timeSin * 3, 0, 0)
+  playerObj.Body.rotation = new rotation(timeSin * 3, 0, 0)
   playerObj.Body.position = new Vector3(-0.2, timeSin2 / 8, 0)
-  playerObj.Head.rotation = new rotation(off - timeSin2 * 7, 0, 7 - timeSin)
+  playerObj.Head.rotation = new rotation(-timeSin2 * 7, 0, 7 - timeSin)
   playerObj.Head.position = new Vector3(0.2, timeSin2 / 7 - 0.1, 0)
   const diff = Math.random(-0.3, 0.3)
   animTime = (animTime + runSpeed + diff) % 360
@@ -1978,31 +2001,48 @@ function playerAnimIdle() {
   animTime2 = (animTime2 + 2 - diff) % 360
 }
 
-function playerFreeFall() {
-  const timeSin = Math.sin(animTime)
-  const timeSinAbs = Math.abs(timeSin)
-  const timeSinAbs4 = Math.abs(timeSin) / 4
-  const timeSin2 = Math.sin(animTime2)
-  
-  playerObj.rightArm.rotation = new rotation(10, 5, 200)
+function playerAnimFreeFall() {
+  playerObj.rightArm.rotation = new rotation(10, 0, 200)
   playerObj.rightArm.position = new Vector3(-1.5, 8.5, -0.5)
-  playerObj.leftArm.rotation = new rotation(10, 5, 200)
+  playerObj.leftArm.rotation = new rotation(-10, 0, 200)
   playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
 
-  playerObj.leftLeg.rotation = new rotation(0, 0, 0)
-  playerObj.leftLeg.position = new Vector3(0, 0, 0)
-  playerObj.rightLeg.rotation = new rotation(0, 0, 0)
-  playerObj.rightLeg.position = new Vector3(0, 0, 0)
+  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
+  playerObj.leftLeg.position = new Vector3(0, .2, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
+  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
 
   playerObj.Body.rotation = new rotation(0, 0, 8)
   playerObj.Body.position = new Vector3(0.8, 0, 0)
 
-  playerObj.Head.rotation = new rotation(0, 0, 13)
-  playerObj.Head.position = new Vector3(1.2, 0, 0)
+  playerObj.Head.rotation = new rotation(0, 0, 16)
+  playerObj.Head.position = new Vector3(1.6, 0, 0)
 
-  const diff = Math.random(-0.3, 0.3)
-  animTime = (animTime + 3 + diff) % 360
-  animTime2 = (animTime2 + 2 - diff) % 360
+  animTime = 0
+  animTime2 = 0
+  player.animWannaState = 0
+}
+
+function playerAnimSingleJump() {
+  playerObj.rightArm.rotation = new rotation(-30, 0, -10)
+  playerObj.rightArm.position = new Vector3(-1,-.3,-.6)
+  playerObj.leftArm.rotation = new rotation(-10, 0, 200)
+  playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
+
+  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
+  playerObj.leftLeg.position = new Vector3(0, .2, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
+  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 0)
+  playerObj.Body.position = new Vector3(0, 0, 0)
+
+  playerObj.Head.rotation = new rotation(-5, 0, 3)
+  playerObj.Head.position = new Vector3(0.3, .1, 0)
+
+  animTime = 0
+  animTime2 = 0
+  player.animWannaState = 0
 }
 
 function playerAnimJumpStart() {
@@ -2026,6 +2066,6 @@ function playerAnimJumpStart() {
   playerObj.Head.position = new Vector3(0, 0 + animationTimer, 0)
 
   if (animationTimer < animationTime) animationTimer++
-  if (animationTimer == animationTime) currentAnimation = animations.idle
+  if (animationTimer == animationTime) player.currentAnimation = animations.jumping_fall
 }
 //LATESTBACKUO FUNCTIONING 14:09 01.05
