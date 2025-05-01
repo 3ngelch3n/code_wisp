@@ -1,27 +1,16 @@
 let resolutionScale = 1
-//This can be any number bigger than 1 - 1 is the highest resolution
 
 let camera = {
   x: 0,
-
   y: 7,
-
   z: -12,
-
   yaw: 0,
-
   pitch: 0,
-
   yawVel: 0,
-
   pitchVel: 0,
-
   turningYaw: false,
-
   targetYaw: 0,
-
   stepAngle: 33.333,
-
   turningSpeedYaw: 200,
 }
 
@@ -37,107 +26,68 @@ const light = {
 }
 
 let horizontalSpeed = 0
-
 let playerRotation = 0
-
 let intendedY = 0
 let intendedX = 0
 let intendedMag = 0
-
 const moveSpeed = 0.1
-
 const enable_outlines = true
-
 const rotationSpeed = -2
-
 const projectionDistance = 1
-
 let lightDir: Vector3
-
 let playerIsAnimRunning: boolean = false
-
 enum animations {
   start_jumping,
   jumping_fall,
   running,
   idle,
 }
-
 enum state {
   ground,
   air,
   water,
 }
-
 let currentAnimation = animations.idle
-
-const epsilon = 1e-6 
-
+const epsilon = 1e-6
 resolutionScale = Math.max(resolutionScale, 1)
-
 if (document.querySelectorAll("canvas").length > 1) {
   document.querySelectorAll("canvas")[0].parentElement.children[1].remove()
 }
-
 let gamecan = document.querySelector("canvas")
-
 let canvas = document.createElement("canvas")
-
 canvas.height = gamecan.height
-
 canvas.width = gamecan.width
-
 canvas.style.height = gamecan.style.height
-
 canvas.style.width = gamecan.style.width
-
 canvas.style.position = "relative"
-
 canvas.style.top = `${0 - Number(gamecan.style.height.match(/\d*/))}px`
-
 canvas.style.left = `0px`
-
 gamecan.parentElement.append(canvas)
-
 let ctx = canvas.getContext("2d")
-
 sprite.visible = false
-
 let lastFrameTime = performance.now()
-
 let fps = 0
-
 let smoothFPS = 0
-
 const screenDimensions = {
   width: 480 / resolutionScale,
-
   height: 360 / resolutionScale,
-
   halfwidth: 240 / resolutionScale,
-
   halfheight: 180 / resolutionScale,
 }
-
 let zBuffer = new Float32Array(screenDimensions.width * screenDimensions.height)
 let imageData = ctx.createImageData(
   screenDimensions.width,
   screenDimensions.height,
 )
 let pixelBuffer = imageData.data
-
 enum levels {
   castle_grounds,
 
   inside_castle,
 }
-
 let level = levels.castle_grounds
-
 let skybox = new Image()
-
 updateSkyBox()
-
 function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   let worldX = vertex.x - camera.x
   let worldY = vertex.y - camera.y
@@ -149,7 +99,7 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   const rotatedX = cosYaw * worldX + sinYaw * worldZ
   const rotatedZ = -sinYaw * worldX + cosYaw * worldZ
   worldX = rotatedX
-  worldZ = rotatedZ // Rotation um die X-Achse (Pitch)
+  worldZ = rotatedZ
 
   const pitchInRadians = camera.pitch
   const cosPitch = Math.cos(pitchInRadians)
@@ -157,7 +107,7 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   const rotatedY = cosPitch * worldY - sinPitch * worldZ
   const rotatedZ2 = sinPitch * worldY + cosPitch * worldZ
   worldY = rotatedY
-  worldZ = rotatedZ2 // Vermeide Division durch Null und Clipping von Punkten sehr nah an der Kamera
+  worldZ = rotatedZ2
 
   if (worldZ <= 0.1) {
     return null
@@ -166,19 +116,18 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   const screenX = (projectionDistance * worldX) / worldZ
   const screenY = (projectionDistance * worldY) / worldZ
 
-  // Berechne das Seitenverhältnis
-  const aspectRatio = screenDimensions.width / screenDimensions.height // Abbildung auf Canvas-Koordinaten - Berücksichtige das Seitenverhältnis bei screenY
+  const aspectRatio = screenDimensions.width / screenDimensions.height
 
   const canvasX =
     screenDimensions.halfwidth + screenX * screenDimensions.halfwidth
   const canvasY =
     screenDimensions.halfheight -
-    screenY * screenDimensions.halfheight * aspectRatio // Skaliere screenY zusätzlich mit dem Seitenverhältnis
+    screenY * screenDimensions.halfheight * aspectRatio
 
   return {
     x: canvasX,
     y: canvasY,
-    z: worldZ, // Behalte die transformierte Z-Koordinate für den Z-Buffer
+    z: worldZ,
   }
 }
 
@@ -267,137 +216,99 @@ function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
 }
 
 function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
-  // Vektor vom Mittelpunkt zum Vertex
   const diff = vec.subtract(center)
-  // Skalierten Vektor berechnen
   const scaledDiff = new Vector3(
     diff.x * factor,
     diff.y * factor,
     diff.z * factor,
   )
-  // Neue Position = Mittelpunkt + skalierter Vektor
-  return center.add(scaledDiff) // <-- Füge eine Add-Methode zur Vector3-Klasse hinzu, falls noch nicht vorhanden
+  return center.add(scaledDiff)
 }
 
 function fillScanline(
-  y: number, // Dies sollte bereits ein Integer sein (gerundet von aussen)
-  x1: number, // Dies sind Gleitkommazahlen aus interpolate
-  x2: number, // Dies sind Gleitkommazahlen aus interpolate
+  y: number,
+  x1: number,
+  x2: number,
   z1: number,
   z2: number,
-  // Akzeptiere RGB-Byte-Werte (0-255) direkt
   rByte: number,
   gByte: number,
   bByte: number,
-  applyZBias: boolean, // Wird weiterhin benötigt, um Z1/Z2 mit Bias zu berechnen
+  applyZBias: boolean,
 ) {
-  // Runde x1 und x2 einmal, bevor die Schleife beginnt
   const ix1 = Math.round(x1)
   const ix2 = Math.round(x2)
-  // y sollte bereits von aussen gerundet sein, sicherheitshalber
   const iy = Math.round(y)
 
-  let steps = ix2 - ix1 // Anzahl der Schritte (Pixel) auf dieser Scanline
+  let steps = ix2 - ix1
 
-  // Füge applyZBias zum Z-Wert hinzu, bevor du ihn interpolierst/nutzt
   const biasedZ1 = z1 + (applyZBias ? 3 : 0)
   const biasedZ2 = z2 + (applyZBias ? 3 : 0)
 
   if (steps === 0) {
-    // Handle vertikale Linien (einzelner Pixel)
-    // setPixel(ix1, iy, biasedZ1, rByte, gByte, bByte, 255); // y ist jetzt iy
-    setPixel(ix1, iy, biasedZ1, rByte, gByte, bByte, 255) // Aufruf des globalen setPixel
+    setPixel(ix1, iy, biasedZ1, rByte, gByte, bByte, 255)
     return
   }
 
-  // Inkrementelle Z-Interpolation für die biased Z-Werte
   let currentZ = biasedZ1
   const zStep = (biasedZ2 - biasedZ1) / steps
 
-  // Iteriere mit gerundeten Integer-Koordinaten (ix)
   for (let ix = ix1; ix <= ix2; ix++) {
-    // Loop von gerundetem x1 bis gerundetem x2
     if (ix > screenDimensions.width || ix < -screenDimensions.width) return
-    // Call the global setPixel with integer coordinates, biased Z, and byte colors
-    setPixel(ix, iy, currentZ, rByte, gByte, bByte, 255) // Aufruf des globalen setPixel
-    currentZ += zStep // Inkrementiere den Z-Wert für den nächsten Pixel
+    setPixel(ix, iy, currentZ, rByte, gByte, bByte, 255)
+    currentZ += zStep
   }
 }
 
-// PASSE interpolate AN (falls nötig) und ziehe sie heraus
 function interpolate(
   y: number,
   vA: { x: number; y: number; z: number },
   vB: { x: number; y: number; z: number },
 ): { x: number; z: number } | null {
-  // Kleiner Wert für Toleranzvergleiche
   const yDiff = vB.y - vA.y
 
   if (Math.abs(yDiff) < epsilon) {
     if (Math.abs(y - vA.y) < epsilon) {
-      return { x: vA.x, z: vA.z } // y ist auf gleicher Höhe, gib Punkt A zurück
+      return { x: vA.x, z: vA.z }
     }
-    return null // Horizontale Kante, aber y liegt nicht auf dieser Höhe
+    return null
   }
 
-  // Berechne den Interpolationsparameter t
   const t = (y - vA.y) / yDiff
 
-  // Prüfe, ob t innerhalb des Segments liegt [0, 1] mit Toleranz
   if (t < -epsilon || t > 1 + epsilon) return null
 
-  // Interpoliere X und Z linear basierend auf t
   const x = vA.x + t * (vB.x - vA.x)
-  const z = vA.z + t * (vB.z - vA.z) // Linear interpolation of Z in screen space
-
-  return { x, z } // Gib ein Objektliteral zurück
+  const z = vA.z + t * (vB.z - vA.z)
+  return { x, z }
 }
 
-// --- ENDE HERAUSGELÖSTE HILFSFUNKTIONEN ---
-
-// --- OPTIMIERTE fillTriangleProjected FUNKTION ---
 function fillTriangleProjected(triangle: Triangle) {
-  // Projiziere Eckpunkte ins 2D Bildschirm-System + behalte Z (Kameraraum)
-  const projectedVertices = triangle.vertices.map(project) // 'project' erstellt Vektoren
+  const projectedVertices = triangle.vertices.map(project)
 
-  // Wenn irgendein Eckpunkt geclipped wurde (hinter Near Plane oder hinter Far Plane in 'project'), überspringe das Dreieck komplett
   if (projectedVertices.some((v) => v === null)) {
     return
   }
 
-  // --- KORRIGIERTES BACKFACE CULLING mit Vektor vom Kamera zum Vertex ---
-  // Nutze die Normale im Weltraum (triangle.normal) und den Vektor von der Kamera zu einem Vertex
-  // Hier wird angenommen, dass triangle.normal die transformierte Normale für animierte Objekte ist
-
-  const cameraPos = new Vector3(camera.x, camera.y, camera.z) // Erstellt einen neuen Vektor
-  const vertexPos = triangle.vertices[0] // Nutze den ersten Vertex im Weltraum
-  const camToVertex = vertexPos.subtract(cameraPos) // Erstellt einen neuen Vektor in subtract
-
-  // Berechne das Punktprodukt der Dreiecksnormale (zeigt von Vorderseite weg) und des Vektors Kamera->Vertex
-  // Wenn das Punktprodukt >= 0 ist, zeigt die Normale zur Kamera->Vertex-Richtung oder senkrecht dazu.
-  // Das bedeutet, die Vorderseite des Dreiecks schaut WEG von der Kamera (oder ist kantenweise). Cull.
-  // Wenn das Punktprodukt < 0 ist, zeigt die Normale entgegengesetzt zu Kamera->Vertex. Vorderseite schaut ZUR Kamera. Rendern.
-  const dotCulling = triangle.normal.dot(camToVertex) // Benutzt die dot-Methode
-
-  // Cull das Dreieck, wenn die Vorderseite von der Kamera weg zeigt UND es sich nicht um ein Player-Dreieck handelt
+  /*
+  const cameraPos = new Vector3(camera.x, camera.y, camera.z) 
+  const vertexPos = triangle.vertices[0] 
+  const camToVertex = vertexPos.subtract(cameraPos) 
+  const dotCulling = triangle.normal.dot(camToVertex) 
   if (dotCulling >= 0 && !triangle.isPlayer) {
-    return // Dreieck verwerfen
+    return
   }
-  // --- ENDE BACKFACE CULLING ---
+  */
 
-  // Sortiere die projizierten Eckpunkte nach ihrer Y-Koordinate (aufsteigend) für die Scanline-Füllung
-  // v1 ist oben, v3 ist unten
   projectedVertices.sort((a, b) => a.y - b.y)
-  const v1 = projectedVertices[0]! // Nutze Non-null assertion, da wir oben auf null geprüft haben
+  const v1 = projectedVertices[0]!
   const v2 = projectedVertices[1]!
   const v3 = projectedVertices[2]!
 
-  // --- FARBBERECHNUNG UND KONVERTIERUNG (Optimiert) ---
-  // Berechne die finale Farbe (mit Beleuchtung) als RGB-Floats (0-1) EINMAL vor den Scanline-Schleifen
   let rFloat = 1.0,
     gFloat = 1.0,
-    bFloat = 1.0 // Standard: Weiß
-  const initialColor = hexToRgb(triangle.color) // Erstellt ein Objekt {r, g, b} (0-1)
+    bFloat = 1.0
+  const initialColor = hexToRgb(triangle.color)
 
   if (initialColor !== null) {
     rFloat = initialColor.r
@@ -405,46 +316,28 @@ function fillTriangleProjected(triangle: Triangle) {
     bFloat = initialColor.b
 
     if (!triangle.bakedLight) {
-      // Nutze die transformierte Normale, die in triangle.normal gespeichert sein sollte
-      const lightLevels = calculateLightLevel(triangle.normal) // Gibt einen Float zurück
+      const lightLevels = calculateLightLevel(triangle.normal)
       rFloat = Math.max(0, Math.min(1, rFloat + lightLevels))
       gFloat = Math.max(0, Math.min(1, gFloat + lightLevels))
       bFloat = Math.max(0, Math.min(1, bFloat + lightLevels))
     }
   }
 
-  // Konvertiere die finale Farbe zu RGB-Bytes (0-255) EINMAL für die Scanline-Funktion
-  // Math.floor ist notwendig, um Integer-Werte zu erhalten, die in den Uint8ClampedArray passen
-  const rByte = Math.floor(rFloat * 255) // Math.round geht auch, floor ist oft minimal schneller
+  const rByte = Math.floor(rFloat * 255)
   const gByte = Math.floor(gFloat * 255)
   const bByte = Math.floor(bFloat * 255)
-  // --- ENDE FARBBERECHNUNG ---
 
-  // --- HAUPT SCANLINE SCHLEIFE ---
-  // Iteriere über jede horizontale Scanline von der Oberkante des Dreiecks (gerundet von v1.y)
-  // bis zur Unterkante (gerundet von v3.y)
   for (let y = Math.round(v1.y); y <= Math.round(v3.y); y++) {
-    // Äussere Schleife liefert gerundetes y
-
-    // Interpoliere den Schnittpunkt der Scanline (y) mit der linken Kante des Dreiecks (v1-v3)
-    const p1 = interpolate(y, v1, v3) // Ruft die herausgelöste interpolate Funktion auf
-
-    // Interpoliere den Schnittpunkt der Scanline (y) mit der rechten Kante des Dreiecks
-    // Die rechte Kante ist entweder v1-v2 (oberer Teil des Dreiecks) oder v2-v3 (unterer Teil)
+    const p1 = interpolate(y, v1, v3)
     let p2: { x: number; z: number } | null = null
     if (y < v2.y) {
-      p2 = interpolate(y, v1, v2) // Ruft die herausgelöste interpolate Funktion auf
+      p2 = interpolate(y, v1, v2)
     } else {
-      p2 = interpolate(y, v2, v3) // Ruft die herausgelöste interpolate Funktion auf
+      p2 = interpolate(y, v2, v3)
     }
 
-    // Wenn beide Schnittpunkte (p1 und p2) für diese Scanline gültig sind (y schneidet beide Kanten)
     if (p1 !== null && p2 !== null) {
-      // Stelle sicher, dass der erste X-Wert (x1) kleiner oder gleich dem zweiten (x2) ist
-      // Dies stellt sicher, dass die fillScanline Schleife korrekt läuft (von links nach rechts)
       if (p1.x < p2.x) {
-        // Ruf die herausgelöste fillScanline Funktion auf
-        // Übergib y, die X-Koordinaten, die Z-Werte und die vorberechneten Byte-Farben sowie applyZBias
         fillScanline(
           y,
           p1.x,
@@ -457,7 +350,6 @@ function fillTriangleProjected(triangle: Triangle) {
           triangle.applyZBias,
         )
       } else {
-        // Tausche p1 und p2, falls p2 weiter links liegt als p1
         fillScanline(
           y,
           p2.x,
@@ -472,7 +364,6 @@ function fillTriangleProjected(triangle: Triangle) {
       }
     }
   }
-  // --- ENDE HAUPT SCANLINE SCHLEIFE ---
 }
 
 class Triangle {
@@ -525,8 +416,8 @@ class collisionTriangle {
     worldVertices: [Vector3, Vector3, Vector3],
     worldNormal: Vector3,
   ): void {
-    this.vertices = worldVertices // Aktualisiere die Eckpunkte auf Weltraum-Koordinaten
-    this.normal = worldNormal.normalize() // Aktualisiere und normalisiere die Normale im Weltraum
+    this.vertices = worldVertices
+    this.normal = worldNormal.normalize()
 
     if (this.normal.y > 0.01) {
       this.collisionType = collisionTypes.floor
@@ -551,155 +442,132 @@ const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION
 
 const staticSurfacePartition: collisionTriangle[][][] = []
 
-const tv1 = new Vector3(30, 0, 20)
+const tv1 = new Vector3(30, 10, 20)
 const tv2 = new Vector3(10, 0, 10)
 const tv3 = new Vector3(10, 0, 30)
 
-let scene: Triangle[] = [new Triangle(
-  tv1,
-  tv2,
-  tv3,
-  "#AAFFFF",
-  calculateNormal(
-    tv1,
-    tv2,
-    tv3,
-  ),
-  false
-)]
+let scene: Triangle[] = [
+  new Triangle(tv1, tv2, tv3, "#AAFFFF", calculateNormal(tv1, tv2, tv3), false),
+]
 
-const allStaticCollisionTriangles: collisionTriangle[] = [];
+const allStaticCollisionTriangles: collisionTriangle[] = []
 
 setupStaticCollisionGeometry()
 console.log(staticSurfacePartition)
-/*const collisionTriangles: collisionTriangle[] = [
-  new collisionTriangle(
-    new Vector3(10, 0, 0),
-    new Vector3(-10, 0, -10),
-    new Vector3(-10, 0, 10),
-    calculateNormal(
-      new Vector3(10, 0, 0),
-      new Vector3(-10, 0, -10),
-      new Vector3(-10, 0, 10),
-    ),
-  ),
-]*/
-
 
 function initializeSpatialPartition() {
-    for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
-        staticSurfacePartition[z] = new Array<collisionTriangle[]>(NUM_CELLS_PER_DIMENSION);
+  for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
+    staticSurfacePartition[z] = new Array<collisionTriangle[]>(
+      NUM_CELLS_PER_DIMENSION,
+    )
 
-        for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
-
-            staticSurfacePartition[z][x] = [] as collisionTriangle[];
-        }
+    for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
+      staticSurfacePartition[z][x] = [] as collisionTriangle[]
     }
-    console.log(`Räumliche Partition initialisiert: ${NUM_CELLS_PER_DIMENSION}x${NUM_CELLS_PER_DIMENSION} Zellen.`);
+  }
+  console.log(
+    `Räumliche Partition initialisiert: ${NUM_CELLS_PER_DIMENSION}x${NUM_CELLS_PER_DIMENSION} Zellen.`,
+  )
 }
 
 function setupStaticCollisionGeometry() {
-    // 1. Initialisiere das Grid (Muss VOR dem Hinzufügen von Dreiecken passieren!)
-    initializeSpatialPartition();
+  initializeSpatialPartition()
 
-    // 2. Lade oder erstelle deine statischen Kollisionsdreiecke
-    // In deinem Beispiel hattest du ein Array collisionTriangles deklariert.
-    // Hier würden die Dreiecke normalerweise aus einer Modelldatei geladen und erstellt werden.
+  const rawCollisionTrianglesData = [
+    {
+      vertices: [tv1, tv2, tv3],
+      normal: calculateNormal(tv1, tv2, tv3),
+    },
+  ]
 
-    const rawCollisionTrianglesData = [
-        // Beispiel: Ein Dreieck im Modellraum (oder direkt im Weltraum, je nach deiner Datenquelle)
-        {
-            vertices: [tv1, tv2, tv3],
-            // Normale berechnen, sollte auch im richtigen Raum sein (Modell oder Weltraum)
-            normal: calculateNormal(tv1, tv2, tv3)
-        },
-        // Füge hier weitere Dreiecke hinzu
-    ];
+  rawCollisionTrianglesData.forEach((data) => {
+    const colTriangle = new collisionTriangle(
+      data.vertices[0],
+      data.vertices[1],
+      data.vertices[2],
+      data.normal,
+    )
 
-    rawCollisionTrianglesData.forEach(data => {
-        // Erstelle ein collisionTriangle Objekt
-        const colTriangle = new collisionTriangle(data.vertices[0], data.vertices[1], data.vertices[2], data.normal);
+    const worldVertices = data.vertices
+    const worldNormal = data.normal
 
-        // Wenn deine Daten bereits im Weltraum sind (wie in deinem Snippet):
-        const worldVertices = data.vertices; // Nutze die vorhandenen
-        const worldNormal = data.normal; // Nutze die vorhandenen
+    colTriangle.updateCollisionData(
+      worldVertices as [Vector3, Vector3, Vector3],
+      worldNormal,
+    )
 
-        // Aktualisiere die Kollisionsdaten mit den Weltraum-Daten
-        // Dies setzt auch originOffset und collisionType korrekt
-        colTriangle.updateCollisionData(worldVertices as [Vector3, Vector3, Vector3], worldNormal);
+    addTriangleToPartition_BoundingBox(colTriangle)
+  })
 
-
-        // 4. Füge das korrekt aktualisierte Dreieck zum Grid hinzu
-        addTriangleToPartition_BoundingBox(colTriangle);
-    });
-
-    console.log("Statische Kollisionsgeometrie im Grid eingerichtet.");
-
+  console.log("Statische Kollisionsgeometrie im Grid eingerichtet.")
 }
 
-function getWorldCoordsCellIndices(worldX: number, worldZ: number): { cellX: number, cellZ: number } {
-    const cellX = Math.floor((worldX + LEVEL_BOUNDARY_MAX) / CELL_SIZE);
-    const cellZ = Math.floor((worldZ + LEVEL_BOUNDARY_MAX) / CELL_SIZE);
+function getWorldCoordsCellIndices(
+  worldX: number,
+  worldZ: number,
+): { cellX: number; cellZ: number } {
+  const cellX = Math.floor((worldX + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
+  const cellZ = Math.floor((worldZ + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
 
-    return { cellX: cellX, cellZ: cellZ };
+  return { cellX: cellX, cellZ: cellZ }
 }
 
 function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
-    // === Berechne die 2D-Bounding Box des Dreiecks (auf der XZ-Ebene) ===
-    // Finde die min/max X und Z Koordinaten der 3 Vertices im Weltraum
-    const minX = Math.min(triangle.vertices[0].x, triangle.vertices[1].x, triangle.vertices[2].x);
-    const maxX = Math.max(triangle.vertices[0].x, triangle.vertices[1].x, triangle.vertices[2].x);
-    const minZ = Math.min(triangle.vertices[0].z, triangle.vertices[1].z, triangle.vertices[2].z);
-    const maxZ = Math.max(triangle.vertices[0].z, triangle.vertices[1].z, triangle.vertices[2].z);
-    // === Ende Bounding Box ===
+  const minX = Math.min(
+    triangle.vertices[0].x,
+    triangle.vertices[1].x,
+    triangle.vertices[2].x,
+  )
+  const maxX = Math.max(
+    triangle.vertices[0].x,
+    triangle.vertices[1].x,
+    triangle.vertices[2].x,
+  )
+  const minZ = Math.min(
+    triangle.vertices[0].z,
+    triangle.vertices[1].z,
+    triangle.vertices[2].z,
+  )
+  const maxZ = Math.max(
+    triangle.vertices[0].z,
+    triangle.vertices[1].z,
+    triangle.vertices[2].z,
+  )
 
+  const startCellIndices = getWorldCoordsCellIndices(minX, minZ)
+  const startCellX = startCellIndices.cellX
+  const startCellZ = startCellIndices.cellZ
 
-    // === Bestimme den Bereich der Zellen, die die Bounding Box überlappt ===
-    // Finde den Index der Start-Zelle (unten links auf der XZ-Ebene)
-    const startCellIndices = getWorldCoordsCellIndices(minX, minZ);
-    const startCellX = startCellIndices.cellX;
-    const startCellZ = startCellIndices.cellZ;
+  const endCellIndices = getWorldCoordsCellIndices(maxX, maxZ)
+  const endCellX = endCellIndices.cellX
+  const endCellZ = endCellIndices.cellZ
 
-    // Finde den Index der End-Zelle (oben rechts auf der XZ-Ebene)
-    const endCellIndices = getWorldCoordsCellIndices(maxX, maxZ);
-    const endCellX = endCellIndices.cellX;
-    const endCellZ = endCellIndices.cellZ;
-    // === Ende Zellbereich ===
+  const clampedStartCellX = Math.max(0, startCellX)
+  const clampedEndCellX = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellX)
+  const clampedStartCellZ = Math.max(0, startCellZ)
+  const clampedEndCellZ = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellZ)
 
+  for (let z = clampedStartCellZ; z <= clampedEndCellZ; z++) {
+    for (let x = clampedStartCellX; x <= clampedEndCellX; x++) {
+      if (Array.isArray(staticSurfacePartition[z][x])) {
+        console.log(
+          `DEBUG: Vor push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
+        )
+        console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle) // Zeige das Objekt, das du hinzufügen willst
 
-    // === Iteriere über alle Zellen in diesem Bereich und füge das Dreieck hinzu ===
-    // Stelle sicher, dass die Zell-Indizes innerhalb der Grid-Grenzen liegen!
-    const clampedStartCellX = Math.max(0, startCellX);
-    const clampedEndCellX = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellX);
-    const clampedStartCellZ = Math.max(0, startCellZ);
-    const clampedEndCellZ = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellZ);
+        staticSurfacePartition[z][x].push(triangle)
 
-
-    for (let z = clampedStartCellZ; z <= clampedEndCellZ; z++) {
-        for (let x = clampedStartCellX; x <= clampedEndCellX; x++) {
-             // Füge einen Verweis auf das Dreieck zu jeder dieser Zellen hinzu
-
-             // === ZUSÄTZLICHE LOG-AUSGABEN ZUR FEHLERSUCHE ===
-             // Prüfe, ob es wirklich ein Array ist (sollte es nach initializeSpatialPartition sein)
-             if (Array.isArray(staticSurfacePartition[z][x])) {
-                 console.log(`DEBUG: Vor push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`);
-                 console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle); // Zeige das Objekt, das du hinzufügen willst
-
-                 // Führe den push aus
-                 staticSurfacePartition[z][x].push(triangle);
-
-                 console.log(`DEBUG: Nach push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`);
-                 // console.log(`DEBUG: Inhalt der Zelle [${z}][${x}] nach push: `, staticSurfacePartition[z][x]); // Kann viel Output geben!
-
-             } else {
-                 console.error(`FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z][x]}`, staticSurfacePartition[z][x]);
-             }
-             // === ENDE ZUSÄTZLICHE LOG-AUSGABEN ===
-
-             // Deine ursprüngliche Log-Zeile (jetzt im DEBUG-Block oben)
-             // console.log(`Dreieck zu Zelle [${z}][${x}] hinzugefügt. Anzahl Dreiecke in Zelle: ${staticSurfacePartition[z][x].length}`);
-        }
+        console.log(
+          `DEBUG: Nach push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
+        )
+      } else {
+        console.error(
+          `FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z][x]}`,
+          staticSurfacePartition[z][x],
+        )
+      }
     }
+  }
 }
 
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
@@ -747,15 +615,13 @@ let playerObj: {
   leftLeg: AnimatableObject
   rightLeg: AnimatableObject
 } = {
-  leftArm: resetAnimatableObject(), // Initialisiere direkt
-  rightArm: resetAnimatableObject(), // Initialisiere direkt
-  Head: resetAnimatableObject(), // Initialisiere direkt
-  Body: resetAnimatableObject(), // Initialisiere direkt
-  leftLeg: resetAnimatableObject(), // Initialisiere direkt
-  rightLeg: resetAnimatableObject(), // Initialisiere direkt
+  leftArm: resetAnimatableObject(),
+  rightArm: resetAnimatableObject(),
+  Head: resetAnimatableObject(),
+  Body: resetAnimatableObject(),
+  leftLeg: resetAnimatableObject(),
+  rightLeg: resetAnimatableObject(),
 }
-
-
 
 //__ Fetch Model Data __
 const mario_model =
@@ -777,18 +643,7 @@ let playerCount = 0
 
 importPlayer()
 //loadModel(scene, test_map)
-/*let scale = 3
-const v1 = new Vector3(10*scale,0,10*scale)
-const v2 = new Vector3(-10*scale,0,10*scale)
-const v3 = new Vector3(10*scale,0,-10*scale)
-scene.push(new Triangle(v1, v2, v3, "#00A0FF", calculateNormal(
-                         v1, v2, v3), true, false))
-const v11 = new Vector3(-10*scale,0,-10*scale)
-const v12 = new Vector3(-10*scale,0,10*scale)
-const v13 = new Vector3(10*scale,0,-10*scale)
-scene.push(new Triangle(v11, v12, v13, "#001AFF", calculateNormal(
-                         v11, v12, v13), true, false))
-*/
+
 function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
   const ir = Math.floor(Math.max(0.0, Math.min(1.0, r)) * 255 + 0.5)
   const ig = Math.floor(Math.max(0.0, Math.min(1.0, g)) * 255 + 0.5)
@@ -1340,84 +1195,106 @@ function updatePlayer() {
     playerAnimRunning(player.forwardVel / 3, 0)
   }
   highlightPlayerGridCell()
-  checkForFloor()
+  player.position.y = checkForFloor()
 }
 
-function checkForFloor() {
-  const playerX = player.position.x;
-  const playerZ = player.position.z;
+function checkForFloor(): number {
+  const playerX = player.position.x
+  const playerZ = player.position.z
 
-  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ);
-  const playerCellX = cellIndices.cellX;
-  const playerCellZ = cellIndices.cellZ;
+  const FLOOR_LOWER_LIMIT = -1
+  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
+  const playerCellX = cellIndices.cellX
+  const playerCellZ = cellIndices.cellZ
   let trianglesInPlayerCell: collisionTriangle[] = []
-  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX];
-  let inTriangle: collisionTriangle[] = []
-  trianglesInPlayerCell.filter((triangle) => triangle.collisionType === collisionTypes.floor).forEach((triangle) => {
-    const v1 = triangle.vertices[0];
-    const v2 = triangle.vertices[1];
-    const v3 = triangle.vertices[2];
+  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
+  let heightList: number[] = []
+  trianglesInPlayerCell
+    .filter((triangle) => triangle.collisionType === collisionTypes.floor)
+    .forEach((triangle) => {
+      const v1 = triangle.vertices[0]
+      const v2 = triangle.vertices[1]
+      const v3 = triangle.vertices[2]
 
-    const cross_v1_v2 = (v2.z - v1.z) * (playerX - v1.x) - (v2.x - v1.x) * (playerZ - v1.z);
-    const cross_v2_v3 = (v3.z - v2.z) * (playerX - v2.x) - (v3.x - v2.x) * (playerZ - v2.z);
-    const cross_v3_v1 = (v1.z - v3.z) * (playerX - v3.x) - (v1.x - v3.x) * (playerZ - v3.z);
+      const cross_v1_v2 =
+        (v2.z - v1.z) * (playerX - v1.x) - (v2.x - v1.x) * (playerZ - v1.z)
+      const cross_v2_v3 =
+        (v3.z - v2.z) * (playerX - v2.x) - (v3.x - v2.x) * (playerZ - v2.z)
+      const cross_v3_v1 =
+        (v1.z - v3.z) * (playerX - v3.x) - (v1.x - v3.x) * (playerZ - v3.z)
 
-    const isInside2D = (cross_v1_v2 >= -epsilon && cross_v2_v3 >= -epsilon && cross_v3_v1 >= -epsilon) ||
-                   (cross_v1_v2 <= epsilon && cross_v2_v3 <= epsilon && cross_v3_v1 <= epsilon);
-    
-    if (!isInside2D)
-      return -1000
+      const isInside2D =
+        (cross_v1_v2 >= -epsilon &&
+          cross_v2_v3 >= -epsilon &&
+          cross_v3_v1 >= -epsilon) ||
+        (cross_v1_v2 <= epsilon &&
+          cross_v2_v3 <= epsilon &&
+          cross_v3_v1 <= epsilon)
 
-    const nx = triangle.normal.x;
-    const ny = triangle.normal.y; 
-    const nz = triangle.normal.z;
-    const oo = triangle.originOffset; 
+      if (!isInside2D) return
 
-    if (Math.abs(ny) < epsilon) {
-      return -1000
-    }
+      const nx = triangle.normal.x
+      const ny = triangle.normal.y
+      const nz = triangle.normal.z
+      const oo = triangle.originOffset
 
-    const heightAtPoint = -(playerX * nx + nz * playerZ + oo) / ny;
-    return heightAtPoint
-    
-  })
+      if (Math.abs(ny) < epsilon) {
+        return
+      }
 
+      const heightAtPoint = -(playerX * nx + nz * playerZ + oo) / ny
+      heightList.push(heightAtPoint)
+    })
+
+  //!!
+  return heightList.length > 0 ? Math.max(...heightList) : FLOOR_LOWER_LIMIT
 }
 
 function highlightPlayerGridCell() {
-  const playerX = player.position.x;
-  const playerZ = player.position.z;
-  const gridY = 0.2;
+  const playerX = player.position.x
+  const playerZ = player.position.z
+  const gridY = 0.2
 
-  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ);
-  const playerCellX = cellIndices.cellX;
-  const playerCellZ = cellIndices.cellZ;
+  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
+  const playerCellX = cellIndices.cellX
+  const playerCellZ = cellIndices.cellZ
   let trianglesInPlayerCell: collisionTriangle[] = []
-  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX];
-  
-  if (playerCellX >= 0 && playerCellX < NUM_CELLS_PER_DIMENSION && playerCellZ >= 0 && playerCellZ < NUM_CELLS_PER_DIMENSION) {
-  const worldX_min = playerCellX * CELL_SIZE - LEVEL_BOUNDARY_MAX;
-  const worldX_max = (playerCellX + 1) * CELL_SIZE - LEVEL_BOUNDARY_MAX;
-  const worldZ_min = playerCellZ * CELL_SIZE - LEVEL_BOUNDARY_MAX;
-  const worldZ_max = (playerCellZ + 1) * CELL_SIZE - LEVEL_BOUNDARY_MAX;
+  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
 
-  const v1 = new Vector3(worldX_min, gridY, worldZ_min);
-  const v2 = new Vector3(worldX_max, gridY, worldZ_min);
-  const v3 = new Vector3(worldX_max, gridY, worldZ_max);
-  const v4 = new Vector3(worldX_min, gridY, worldZ_max);
+  if (
+    playerCellX >= 0 &&
+    playerCellX < NUM_CELLS_PER_DIMENSION &&
+    playerCellZ >= 0 &&
+    playerCellZ < NUM_CELLS_PER_DIMENSION
+  ) {
+    const worldX_min = playerCellX * CELL_SIZE - LEVEL_BOUNDARY_MAX
+    const worldX_max = (playerCellX + 1) * CELL_SIZE - LEVEL_BOUNDARY_MAX
+    const worldZ_min = playerCellZ * CELL_SIZE - LEVEL_BOUNDARY_MAX
+    const worldZ_max = (playerCellZ + 1) * CELL_SIZE - LEVEL_BOUNDARY_MAX
 
-  if (trianglesInPlayerCell.length > 0) {
-    scene.push(new Triangle(v1, v2, v3, "#00FF00", new Vector3(0,1,0), false, true))
-    scene.push(new Triangle(v1, v4, v3, "#009900", new Vector3(0,1,0), false, true))
-  }else {
-    scene.push(new Triangle(v1, v2, v3, "#000088", new Vector3(0,1,0), false, true))
-    scene.push(new Triangle(v1, v4, v3, "#000066", new Vector3(0,1,0), false, true))
-  }
-  }else {
-        
+    const v1 = new Vector3(worldX_min, gridY, worldZ_min)
+    const v2 = new Vector3(worldX_max, gridY, worldZ_min)
+    const v3 = new Vector3(worldX_max, gridY, worldZ_max)
+    const v4 = new Vector3(worldX_min, gridY, worldZ_max)
+
+    if (trianglesInPlayerCell.length > 0) {
+      scene.push(
+        new Triangle(v1, v2, v3, "#00FF00", new Vector3(0, 1, 0), false, true),
+      )
+      scene.push(
+        new Triangle(v1, v4, v3, "#009900", new Vector3(0, 1, 0), false, true),
+      )
+    } else {
+      scene.push(
+        new Triangle(v1, v2, v3, "#000088", new Vector3(0, 1, 0), false, true),
+      )
+      scene.push(
+        new Triangle(v1, v4, v3, "#000066", new Vector3(0, 1, 0), false, true),
+      )
     }
+  } else {
+  }
 }
-
 
 function player_actions_moving(was_standing_still: boolean) {
   updateGroundMovement()
@@ -1666,4 +1543,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO 22:21 29.04
+//LATESTBACKUO
