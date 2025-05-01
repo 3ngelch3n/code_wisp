@@ -342,17 +342,15 @@ function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   dir.x = yawedX
   dir.z = yawedZ
 
-  return dir.normalize() // Stelle sicher, dass der Vektor normalisiert ist
+  return dir.normalize()
 }
 
 function calculateLightLevel(normal: Vector3): number {
-  const lightDirection = calculateLightDirection(light.yaw, light.pitch)
+  const dot = normal.dot(lightDir)
 
-  const dot = normal.dot(lightDirection)
+  const levelFloat = dot + 0.5
 
-  const levelFloat = dot + 1.0
-
-  return levelFloat
+  return levelFloat/8
 }
 
 function getRandomColor() {
@@ -429,7 +427,8 @@ function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
 //__ RGB zu Hex Konverter __
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (c: number): string => {
-    const hex = Math.floor(c * 255).toString(16)
+    const clampedC = Math.max(0, Math.min(1, c));
+    const hex = Math.floor(clampedC * 255).toString(16)
     return hex.length === 1 ? "0" + hex : hex
   }
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
@@ -495,7 +494,7 @@ function gameLoop() {
 }
 
 function updateLight() {
-  lightDir = 
+  lightDir = calculateLightDirection(light.yaw, light.pitch)
 }
 
 function drawSkyBox() {
