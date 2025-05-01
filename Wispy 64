@@ -91,170 +91,197 @@ updateSkyBox()
 const nearZ = 0.1
 
 function worldToView(vertex: Vector3): Vector3 {
-    // Translation: Verschiebe den Punkt relativ zur Kamera
-    let viewX = vertex.x - camera.x;
-    let viewY = vertex.y - camera.y;
-    let viewZ = vertex.z - camera.z;
+  // Translation: Verschiebe den Punkt relativ zur Kamera
+  let viewX = vertex.x - camera.x
+  let viewY = vertex.y - camera.y
+  let viewZ = vertex.z - camera.z
 
-    // Rotation: Drehe den Punkt entgegengesetzt zur Kamera-Rotation
-    // Reihenfolge: Yaw (um Y), dann Pitch (um X) wie in deiner ursprünglichen project Funktion
-    const yawInRadians = camera.yaw;
-    const cosYaw = Math.cos(yawInRadians);
-    const sinYaw = Math.sin(yawInRadians);
-    const rotatedX = cosYaw * viewX + sinYaw * viewZ;
-    const rotatedZ = -sinYaw * viewX + cosYaw * viewZ; // Drehung um Y
-    viewX = rotatedX;
-    viewZ = rotatedZ; // viewZ ist jetzt rotiert
+  // Rotation: Drehe den Punkt entgegengesetzt zur Kamera-Rotation
+  // Reihenfolge: Yaw (um Y), dann Pitch (um X) wie in deiner ursprünglichen project Funktion
+  const yawInRadians = camera.yaw
+  const cosYaw = Math.cos(yawInRadians)
+  const sinYaw = Math.sin(yawInRadians)
+  const rotatedX = cosYaw * viewX + sinYaw * viewZ
+  const rotatedZ = -sinYaw * viewX + cosYaw * viewZ // Drehung um Y
+  viewX = rotatedX
+  viewZ = rotatedZ // viewZ ist jetzt rotiert
 
-    const pitchInRadians = camera.pitch;
-    const cosPitch = Math.cos(pitchInRadians);
-    const sinPitch = Math.sin(pitchInRadians);
-    const rotatedY = cosPitch * viewY - sinPitch * viewZ; // Nutzt den rotierten viewZ
-    const rotatedZ2 = sinPitch * viewY + cosPitch * viewZ; // Nutzt den rotierten viewZ, dies ist die finale Tiefe
-    viewY = rotatedY;
-    viewZ = rotatedZ2; // Der finale Z-Wert in Kamera-Koordinaten (Tiefe)
+  const pitchInRadians = camera.pitch
+  const cosPitch = Math.cos(pitchInRadians)
+  const sinPitch = Math.sin(pitchInRadians)
+  const rotatedY = cosPitch * viewY - sinPitch * viewZ // Nutzt den rotierten viewZ
+  const rotatedZ2 = sinPitch * viewY + cosPitch * viewZ // Nutzt den rotierten viewZ, dies ist die finale Tiefe
+  viewY = rotatedY
+  viewZ = rotatedZ2 // Der finale Z-Wert in Kamera-Koordinaten (Tiefe)
 
-    return new Vector3(viewX, viewY, viewZ); // Gibt den Eckpunkt in Kamera-Koordinaten zurück
+  return new Vector3(viewX, viewY, viewZ) // Gibt den Eckpunkt in Kamera-Koordinaten zurück
 }
 
 // NEU: Transformiert einen 3D Punkt von Kamera-Koordinaten (View Space) in 2D Bildschirm-Koordinaten (Screen Space).
 // Führt die Perspektiv-Division und Skalierung/Verschiebung auf Canvas-Pixel durch.
 // WICHTIG: Geht davon aus, dass der Punkt bereits GEKLIPPT ist (vertex.z > 0.1). Führt KEINEN Z-Check durch.
 function viewToScreen(vertex: Vector3): { x: number; y: number; z: number } {
-    // Überprüfe, ob der Z-Wert immer noch gültig ist (sollte nach Clipping der Fall sein)
-    // Eine Division durch Null oder negatives Z würde hier Fehler verursachen.
-    if (vertex.z <= epsilon) { // Nutze epsilon anstelle von 0.1 für Robustheit
-         // Dieser Pfad sollte nach korrektem Clipping nicht erreicht werden,
-         // aber es ist eine Sicherheitsmaßnahme.
-         console.warn("viewToScreen: Punkt hinter/auf Projektionsebene!");
-         // Gebe einen Punkt zurück, der außerhalb des Bildschirms liegt
-         return { x: -1, y: -1, z: vertex.z };
-    }
+  // Überprüfe, ob der Z-Wert immer noch gültig ist (sollte nach Clipping der Fall sein)
+  // Eine Division durch Null oder negatives Z würde hier Fehler verursachen.
+  if (vertex.z <= epsilon) {
+    // Nutze epsilon anstelle von 0.1 für Robustheit
+    // Dieser Pfad sollte nach korrektem Clipping nicht erreicht werden,
+    // aber es ist eine Sicherheitsmaßnahme.
+    console.warn("viewToScreen: Punkt hinter/auf Projektionsebene!")
+    // Gebe einen Punkt zurück, der außerhalb des Bildschirms liegt
+    return { x: -1, y: -1, z: vertex.z }
+  }
 
-    // Perspektivische Division
-    const screenX = (projectionDistance * vertex.x) / vertex.z;
-    const screenY = (projectionDistance * vertex.y) / vertex.z; // Korrigiert: War / vertex.y im Original
+  // Perspektivische Division
+  const screenX = (projectionDistance * vertex.x) / vertex.z
+  const screenY = (projectionDistance * vertex.y) / vertex.z // Korrigiert: War / vertex.y im Original
 
-    // Skalierung und Verschiebung auf Canvas-Pixel
-    const aspectRatio = screenDimensions.width / screenDimensions.height;
-    // Deine ursprüngliche project Funktion skalierte screenY zusätzlich mit aspectRatio.
-    const canvasX = screenDimensions.halfwidth + screenX * screenDimensions.halfwidth;
-    const canvasY = screenDimensions.halfheight - screenY * screenDimensions.halfheight * aspectRatio; // Aspect ratio hier
+  // Skalierung und Verschiebung auf Canvas-Pixel
+  const aspectRatio = screenDimensions.width / screenDimensions.height
+  // Deine ursprüngliche project Funktion skalierte screenY zusätzlich mit aspectRatio.
+  const canvasX =
+    screenDimensions.halfwidth + screenX * screenDimensions.halfwidth
+  const canvasY =
+    screenDimensions.halfheight -
+    screenY * screenDimensions.halfheight * aspectRatio // Aspect ratio hier
 
-    return {
-        x: canvasX,
-        y: canvasY,
-        z: vertex.z, // Gibt den Z-Wert in Kamera-Koordinaten als Tiefe für Z-Buffering zurück
-    };
+  return {
+    x: canvasX,
+    y: canvasY,
+    z: vertex.z, // Gibt den Z-Wert in Kamera-Koordinaten als Tiefe für Z-Buffering zurück
+  }
 }
 
-type ViewSpaceTriangle = [Vector3, Vector3, Vector3];
+type ViewSpaceTriangle = [Vector3, Vector3, Vector3]
 
 // NEU: Helper function to interpolate a point along an edge
 // based on parameter t. Used in clipping to find intersection points.
 function interpolateVertices(vA: Vector3, vB: Vector3, t: number): Vector3 {
-    return new Vector3(
-        vA.x + t * (vB.x - vA.x),
-        vA.y + t * (vB.y - vA.y),
-        vA.z + t * (vB.z - vA.z)
-    );
+  return new Vector3(
+    vA.x + t * (vB.x - vA.x),
+    vA.y + t * (vB.y - vA.y),
+    vA.z + t * (vB.z - vA.z),
+  )
 }
 
-function clipTriangleAgainstNearPlane(triangle: ViewSpaceTriangle): ViewSpaceTriangle[] {
-    const v1 = triangle[0];
-    const v2 = triangle[1];
-    const v3 = triangle[2];
-    const nearZ = 0.1; // Die Z-Koordinate der Nah-Ebene in View Space
-    // Dein epsilon ist bereits global definiert
+function clipTriangleAgainstNearPlane(
+  triangle: ViewSpaceTriangle,
+): ViewSpaceTriangle[] {
+  const v1 = triangle[0]
+  const v2 = triangle[1]
+  const v3 = triangle[2]
+  const nearZ = 0.1 // Die Z-Koordinate der Nah-Ebene in View Space
+  // Dein epsilon ist bereits global definiert
 
-    // 1. Überprüfe, welche Eckpunkte deutlich vor der Nah-Ebene liegen
-    // Verwende v.z > nearZ + epsilon, um Punkte genau auf der Ebene als "außen" zu behandeln.
-    const v1_inside = v1.z > nearZ + epsilon;
-    const v2_inside = v2.z > nearZ + epsilon;
-    const v3_inside = v3.z > nearZ + epsilon;
+  // 1. Überprüfe, welche Eckpunkte deutlich vor der Nah-Ebene liegen
+  // Verwende v.z > nearZ + epsilon, um Punkte genau auf der Ebene als "außen" zu behandeln.
+  const v1_inside = v1.z > nearZ + epsilon
+  const v2_inside = v2.z > nearZ + epsilon
+  const v3_inside = v3.z > nearZ + epsilon
 
-    // Zähle, wie viele Eckpunkte deutlich vor der Ebene liegen
-    const numInside = (v1_inside ? 1 : 0) + (v2_inside ? 1 : 0) + (v3_inside ? 1 : 0);
+  // Zähle, wie viele Eckpunkte deutlich vor der Ebene liegen
+  const numInside =
+    (v1_inside ? 1 : 0) + (v2_inside ? 1 : 0) + (v3_inside ? 1 : 0)
 
-    // --- 2. Bearbeite die Fälle basierend auf der Anzahl der Eckpunkte innen ---
+  // --- 2. Bearbeite die Fälle basierend auf der Anzahl der Eckpunkte innen ---
 
-    if (numInside === 0) {
-        // Case 0: Alle Eckpunkte sind hinter oder sehr nahe an der Ebene.
-        return []; // Verwirf das Dreieck.
+  if (numInside === 0) {
+    // Case 0: Alle Eckpunkte sind hinter oder sehr nahe an der Ebene.
+    return [] // Verwirf das Dreieck.
+  }
+
+  if (numInside === 3) {
+    // Case 3: Alle Eckpunkte sind deutlich vor der Ebene.
+    return [triangle] // Behalte das ursprüngliche Dreieck.
+  }
+
+  // Case 1 oder 2 innen: Das Dreieck schneidet die Nah-Ebene.
+  // Wir müssen Schnittpunkte finden und neue Dreiecke bilden.
+
+  // Helper, um den Schnittpunkt einer Kante (vA zu vB) mit der Ebene Z = planeZ zu berechnen.
+  // Nimmt an, dass vA und vB auf unterschiedlichen Seiten der Ebene liegen.
+  // Formel für t: vA.z + t * (vB.z - vA.z) = planeZ  -> t = (planeZ - vA.z) / (vB.z - vA.z)
+  function getIntersection(vA: Vector3, vB: Vector3, planeZ: number): Vector3 {
+    // Vermeide Division durch Null, falls Kante parallel zur Ebene
+    if (Math.abs(vB.z - vA.z) < epsilon) {
+      console.warn("Clipping Kante parallel zur Ebene!")
+      return vA // Notfall-Rückgabe
+    }
+    const t = (planeZ - vA.z) / (vB.z - vA.z)
+    // Klemme t auf [0, 1], um sicherzustellen, dass der Schnittpunkt auf dem KANTENsegment liegt.
+    const clampedT = Math.max(0, Math.min(1, t))
+    return interpolateVertices(vA, vB, clampedT) // Verwende den geklemmten t-Wert
+  }
+
+  // Liste, um die Eckpunkte des resultierenden Polygons zu sammeln (in Reihenfolge entlang der Kanten)
+  const clippedPolygonsVertices: Vector3[] = []
+  const originalVertices = [v1, v2, v3]
+  const insideFlags = [v1_inside, v2_inside, v3_inside]
+
+  // Gehe entlang der Kanten des Originaldreiecks (V1->V2, V2->V3, V3->V1)
+  for (let i = 0; i < 3; i++) {
+    const currentVertex = originalVertices[i]
+    const nextVertex = originalVertices[(i + 1) % 3] // %3 sorgt für V3 -> V1
+    const currentInside = insideFlags[i]
+    const nextInside = insideFlags[(i + 1) % 3]
+
+    if (currentInside) {
+      // Wenn der aktuelle Punkt innen ist, behalte ihn für das resultierende Polygon.
+      clippedPolygonsVertices.push(currentVertex)
     }
 
-    if (numInside === 3) {
-        // Case 3: Alle Eckpunkte sind deutlich vor der Ebene.
-        return [triangle]; // Behalte das ursprüngliche Dreieck.
+    if (currentInside !== nextInside) {
+      // Wenn die Kante die Ebene kreuzt (ein Endpunkt innen, einer außen)
+      // Berechne den Schnittpunkt und füge ihn zum resultierenden Polygon hinzu.
+      const intersectionPoint = getIntersection(
+        currentVertex,
+        nextVertex,
+        nearZ,
+      )
+      clippedPolygonsVertices.push(intersectionPoint)
     }
+  }
 
-    // Case 1 oder 2 innen: Das Dreieck schneidet die Nah-Ebene.
-    // Wir müssen Schnittpunkte finden und neue Dreiecke bilden.
+  // clippedPolygonsVertices enthält jetzt die Eckpunkte des resultierenden Polygons
+  // in Reihenfolge (3 Eckpunkte für Case 1 innen, 4 für Case 2 innen).
 
-    // Helper, um den Schnittpunkt einer Kante (vA zu vB) mit der Ebene Z = planeZ zu berechnen.
-    // Nimmt an, dass vA und vB auf unterschiedlichen Seiten der Ebene liegen.
-    // Formel für t: vA.z + t * (vB.z - vA.z) = planeZ  -> t = (planeZ - vA.z) / (vB.z - vA.z)
-    function getIntersection(vA: Vector3, vB: Vector3, planeZ: number): Vector3 {
-        // Vermeide Division durch Null, falls Kante parallel zur Ebene
-        if (Math.abs(vB.z - vA.z) < epsilon) {
-             console.warn("Clipping Kante parallel zur Ebene!");
-             return vA; // Notfall-Rückgabe
-        }
-        const t = (planeZ - vA.z) / (vB.z - vA.z);
-        // Klemme t auf [0, 1], um sicherzustellen, dass der Schnittpunkt auf dem KANTENsegment liegt.
-        const clampedT = Math.max(0, Math.min(1, t));
-        return interpolateVertices(vA, vB, clampedT); // Verwende den geklemmten t-Wert
-    }
+  // Nun trianguliere das Ergebnis (es ist ein konvexes Polygon).
+  if (clippedPolygonsVertices.length < 3) {
+    // Sollte nicht passieren, wenn Clipping korrekt, aber zur Sicherheit.
+    return [] // Kein gültiges Polygon
+  }
+  if (clippedPolygonsVertices.length === 3) {
+    // Das Ergebnis ist ein Dreieck (Passiert bei Case 1 innen).
+    return [
+      [
+        clippedPolygonsVertices[0],
+        clippedPolygonsVertices[1],
+        clippedPolygonsVertices[2],
+      ],
+    ]
+  }
+  if (clippedPolygonsVertices.length === 4) {
+    // Das Ergebnis ist ein Viereck (Passiert bei Case 2 innen). Trianguliere in 2 Dreiecke.
+    // Nimm den ersten Punkt als Anker und bilde Dreiecke mit ihm und den anderen Punktpaaren.
+    return [
+      [
+        clippedPolygonsVertices[0],
+        clippedPolygonsVertices[1],
+        clippedPolygonsVertices[2],
+      ], // Dreieck 1 (0, 1, 2)
+      [
+        clippedPolygonsVertices[0],
+        clippedPolygonsVertices[2],
+        clippedPolygonsVertices[3],
+      ], // Dreieck 2 (0, 2, 3)
+    ]
+  }
 
-    // Liste, um die Eckpunkte des resultierenden Polygons zu sammeln (in Reihenfolge entlang der Kanten)
-    const clippedPolygonsVertices: Vector3[] = [];
-    const originalVertices = [v1, v2, v3];
-    const insideFlags = [v1_inside, v2_inside, v3_inside];
-
-    // Gehe entlang der Kanten des Originaldreiecks (V1->V2, V2->V3, V3->V1)
-    for (let i = 0; i < 3; i++) {
-        const currentVertex = originalVertices[i];
-        const nextVertex = originalVertices[(i + 1) % 3]; // %3 sorgt für V3 -> V1
-        const currentInside = insideFlags[i];
-        const nextInside = insideFlags[(i + 1) % 3];
-
-        if (currentInside) {
-            // Wenn der aktuelle Punkt innen ist, behalte ihn für das resultierende Polygon.
-            clippedPolygonsVertices.push(currentVertex);
-        }
-
-        if (currentInside !== nextInside) {
-            // Wenn die Kante die Ebene kreuzt (ein Endpunkt innen, einer außen)
-            // Berechne den Schnittpunkt und füge ihn zum resultierenden Polygon hinzu.
-            const intersectionPoint = getIntersection(currentVertex, nextVertex, nearZ);
-            clippedPolygonsVertices.push(intersectionPoint);
-        }
-    }
-
-    // clippedPolygonsVertices enthält jetzt die Eckpunkte des resultierenden Polygons
-    // in Reihenfolge (3 Eckpunkte für Case 1 innen, 4 für Case 2 innen).
-
-    // Nun trianguliere das Ergebnis (es ist ein konvexes Polygon).
-    if (clippedPolygonsVertices.length < 3) {
-        // Sollte nicht passieren, wenn Clipping korrekt, aber zur Sicherheit.
-        return []; // Kein gültiges Polygon
-    }
-    if (clippedPolygonsVertices.length === 3) {
-        // Das Ergebnis ist ein Dreieck (Passiert bei Case 1 innen).
-        return [[clippedPolygonsVertices[0], clippedPolygonsVertices[1], clippedPolygonsVertices[2]]];
-    }
-    if (clippedPolygonsVertices.length === 4) {
-        // Das Ergebnis ist ein Viereck (Passiert bei Case 2 innen). Trianguliere in 2 Dreiecke.
-        // Nimm den ersten Punkt als Anker und bilde Dreiecke mit ihm und den anderen Punktpaaren.
-        return [
-            [clippedPolygonsVertices[0], clippedPolygonsVertices[1], clippedPolygonsVertices[2]], // Dreieck 1 (0, 1, 2)
-            [clippedPolygonsVertices[0], clippedPolygonsVertices[2], clippedPolygonsVertices[3]]  // Dreieck 2 (0, 2, 3)
-        ];
-    }
-
-    // Falls etwas schief ging und mehr als 4 Punkte rauskommen (sollte nicht passieren bei Dreieck Input)
-    console.error("clipTriangleAgainstNearPlane: Clipping erzeugte Polygon mit mehr als 4 Eckpunkten!");
-    return [];
+  // Falls etwas schief ging und mehr als 4 Punkte rauskommen (sollte nicht passieren bei Dreieck Input)
+  console.error(
+    "clipTriangleAgainstNearPlane: Clipping erzeugte Polygon mit mehr als 4 Eckpunkten!",
+  )
+  return []
 }
 
 function project(vertex: Vector3): { x: number; y: number; z: number } | null {
@@ -278,7 +305,6 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   worldY = rotatedY
   worldZ = rotatedZ2
 
-  
   if (worldZ <= 0.1) {
     return null // Vertex is behind the camera
   }
@@ -417,72 +443,73 @@ function fillScanline(
   bByte: number,
   applyZBias: boolean,
 ) {
-  const iy = Math.round(y);
+  const iy = Math.round(y)
 
   // Sicherstellen, dass die Scanline-Y-Koordinate im gültigen Bereich liegt.
-   // Dies sollte zwar schon durch den Y-Loop in fillTriangleProjected geklemmt sein,
-   // aber eine zusätzliche Prüfung schadet nicht.
-   if (iy < 0 || iy >= screenDimensions.height) {
-       return;
-   }
+  // Dies sollte zwar schon durch den Y-Loop in fillTriangleProjected geklemmt sein,
+  // aber eine zusätzliche Prüfung schadet nicht.
+  if (iy < 0 || iy >= screenDimensions.height) {
+    return
+  }
 
   // Runde die X-Koordinaten für die Pixel-Indizierung.
-   // Diese können immer noch außerhalb des Bildschirms liegen.
-  let ix1 = Math.round(x1);
-  let ix2 = Math.round(x2);
+  // Diese können immer noch außerhalb des Bildschirms liegen.
+  let ix1 = Math.round(x1)
+  let ix2 = Math.round(x2)
 
   // Berechne die ursprüngliche Breite der Scanline für die Z-Interpolation.
-   // Dies ist der Abstand in Pixeln zwischen ix1 und ix2 VOR dem Clipping.
-   const originalWidth = ix2 - ix1;
+  // Dies ist der Abstand in Pixeln zwischen ix1 und ix2 VOR dem Clipping.
+  const originalWidth = ix2 - ix1
 
   // Klemme die X-Koordinaten auf die Bildschirmgrenzen [0, screenDimensions.width - 1].
-   const screenWidth = screenDimensions.width;
-   const clippedIx1 = Math.max(0, Math.min(screenWidth - 1, ix1));
-   const clippedIx2 = Math.max(0, Math.min(screenWidth - 1, ix2));
+  const screenWidth = screenDimensions.width
+  const clippedIx1 = Math.max(0, Math.min(screenWidth - 1, ix1))
+  const clippedIx2 = Math.max(0, Math.min(screenWidth - 1, ix2))
 
   // Wenn nach dem Klemmmen der Start-X-Wert größer ist als der End-X-Wert,
-   // liegt die gesamte Scanline außerhalb des Bildschirms (horizontal).
-   if (clippedIx1 > clippedIx2) {
-       return;
-   }
+  // liegt die gesamte Scanline außerhalb des Bildschirms (horizontal).
+  if (clippedIx1 > clippedIx2) {
+    return
+  }
 
   // Berechne die Z-Werte (Tiefen) an den Start- und Endpunkten der *geklippten* Scanline.
-   // Wir müssen basierend auf dem Abstand entlang der *ursprünglichen* Scanline interpolieren.
-   let clippedZ1 = z1;
-   let clippedZ2 = z2;
+  // Wir müssen basierend auf dem Abstand entlang der *ursprünglichen* Scanline interpolieren.
+  let clippedZ1 = z1
+  let clippedZ2 = z2
 
-   // Vermeide Division durch Null bei vertikalen Linien oder Punkten
-   if (originalWidth !== 0) {
-       // Anteil der ursprünglichen Breite bis zum Start des geklippten Segments.
-       const t1 = (clippedIx1 - ix1) / originalWidth;
-       clippedZ1 = z1 + t1 * (z2 - z1); // Interpoliere Z
+  // Vermeide Division durch Null bei vertikalen Linien oder Punkten
+  if (originalWidth !== 0) {
+    // Anteil der ursprünglichen Breite bis zum Start des geklippten Segments.
+    const t1 = (clippedIx1 - ix1) / originalWidth
+    clippedZ1 = z1 + t1 * (z2 - z1) // Interpoliere Z
 
-       // Anteil der ursprünglichen Breite bis zum Ende des geklippten Segments.
-       const t2 = (clippedIx2 - ix1) / originalWidth;
-       clippedZ2 = z1 + t2 * (z2 - z1); // Interpoliere Z
-   }
+    // Anteil der ursprünglichen Breite bis zum Ende des geklippten Segments.
+    const t2 = (clippedIx2 - ix1) / originalWidth
+    clippedZ2 = z1 + t2 * (z2 - z1) // Interpoliere Z
+  }
 
   // Wende einen kleinen Z-Bias an, um die Zeichenreihenfolge zu beeinflussen (z.B. für Outlines).
-   // Der Bias wird auf die Z-Werte der geklippten Endpunkte angewendet.
-  const biasedZ1 = clippedZ1 + (applyZBias ? 3 : 0);
-  const biasedZ2 = clippedZ2 + (applyZBias ? 3 : 0);
+  // Der Bias wird auf die Z-Werte der geklippten Endpunkte angewendet.
+  const biasedZ1 = clippedZ1 + (applyZBias ? 3 : 0)
+  const biasedZ2 = clippedZ2 + (applyZBias ? 3 : 0)
 
   // Berechne den Z-Schritt (Delta Z pro Pixel) entlang der *geklippten* Scanline.
-   const clippedWidth = clippedIx2 - clippedIx1;
-   let zStep = 0;
+  const clippedWidth = clippedIx2 - clippedIx1
+  let zStep = 0
 
-   if (clippedWidth > 0) { // Vermeide Division durch Null für einzelne Pixel
-       zStep = (biasedZ2 - biasedZ1) / clippedWidth;
-   }
+  if (clippedWidth > 0) {
+    // Vermeide Division durch Null für einzelne Pixel
+    zStep = (biasedZ2 - biasedZ1) / clippedWidth
+  }
 
   // Starte die Z-Interpolation am Z-Wert des geklippten Startpunkts.
-   let currentZ = biasedZ1;
+  let currentZ = biasedZ1
 
   // Schleife über die Pixel des *geklippten* horizontalen Bereichs [clippedIx1, clippedIx2].
   for (let ix = clippedIx1; ix <= clippedIx2; ix++) {
     // setPixel führt die Bounds-Checks erneut durch (sicher ist sicher) und macht das Z-Buffering.
-    setPixel(ix, iy, currentZ, rByte, gByte, bByte, 255);
-    currentZ += zStep; // Inkrementiere Z für das nächste Pixel auf der Scanline
+    setPixel(ix, iy, currentZ, rByte, gByte, bByte, 255)
+    currentZ += zStep // Inkrementiere Z für das nächste Pixel auf der Scanline
   }
 }
 
@@ -494,7 +521,7 @@ function interpolate(
   vB: { x: number; y: number; z: number },
 ): { x: number; z: number } | null {
   const yDiff = vB.y - vA.y
-  
+
   if (Math.abs(yDiff) < epsilon) {
     if (Math.abs(y - vA.y) < epsilon) {
       return { x: vA.x, z: vA.z }
@@ -506,157 +533,181 @@ function interpolate(
   if (t < -epsilon || t > 1 + epsilon) return null
 
   // MODIFIED: Diese Überprüfung wurde entfernt. Sie verhinderte, dass
-   // Punkte außerhalb des Segments korrekt berechnet werden, was für Dreiecke
-   // am Bildschirmrand notwendig ist. Das Clipping wird in fillScanline gehandhabt.
-   // if (t < -epsilon || t > 1 + epsilon) return null
+  // Punkte außerhalb des Segments korrekt berechnet werden, was für Dreiecke
+  // am Bildschirmrand notwendig ist. Das Clipping wird in fillScanline gehandhabt.
+  // if (t < -epsilon || t > 1 + epsilon) return null
 
-  const x = vA.x + t * (vB.x - vA.x);
-  const z = vA.z + t * (vB.z - vA.z); // Interpoliere Z (Tiefe) genauso
-  return { x, z }; // Gibt den 2D Punkt mit Z zurück
+  const x = vA.x + t * (vB.x - vA.x)
+  const z = vA.z + t * (vB.z - vA.z) // Interpoliere Z (Tiefe) genauso
+  return { x, z } // Gibt den 2D Punkt mit Z zurück
 }
 
 // Renders a projected triangle to the screen using scanline filling and Z-buffering.
 // Handles sorting vertices by Y and splitting complex triangles.
-function fillTriangleProjected(triangle: Triangle) { // Input triangle ist in World Space
+function fillTriangleProjected(triangle: Triangle) {
+  // Input triangle ist in World Space
 
-    // 1. Transformiere das Dreieck von Welt-Koordinaten in Kamera-Koordinaten (View Space)
-    // Rufe die neue worldToView Funktion für jeden Eckpunkt auf.
-    const v1View = worldToView(triangle.vertices[0]);
-    const v2View = worldToView(triangle.vertices[1]);
-    const v3View = worldToView(triangle.vertices[2]);
-    // Erstelle ein Dreieck-Array für die Clipping-Funktionen.
-    const viewTriangle: ViewSpaceTriangle = [v1View, v2View, v3View];
+  // 1. Transformiere das Dreieck von Welt-Koordinaten in Kamera-Koordinaten (View Space)
+  // Rufe die neue worldToView Funktion für jeden Eckpunkt auf.
+  const v1View = worldToView(triangle.vertices[0])
+  const v2View = worldToView(triangle.vertices[1])
+  const v3View = worldToView(triangle.vertices[2])
+  // Erstelle ein Dreieck-Array für die Clipping-Funktionen.
+  const viewTriangle: ViewSpaceTriangle = [v1View, v2View, v3View]
 
-    // 2. Back-face Culling (oft in View Space nach Transformation)
-    // Berechne die Normale in View Space aus den View Space Eckpunkten.
-    const v1v2View = v2View.subtract(v1View);
-    const v1v3View = v3View.subtract(v1View);
-    const normalView = v1v2View.cross(v1v3View).normalize();
+  // 2. Back-face Culling (oft in View Space nach Transformation)
+  // Berechne die Normale in View Space aus den View Space Eckpunkten.
+  const v1v2View = v2View.subtract(v1View)
+  const v1v3View = v3View.subtract(v1View)
+  const normalView = v1v2View.cross(v1v3View).normalize()
 
-    // Annahme: Kamera blickt in +Z Richtung in View Space.
-    const cameraForwardViewActual = new Vector3(0, 0, 1);
+  // Annahme: Kamera blickt in +Z Richtung in View Space.
+  const cameraForwardViewActual = new Vector3(0, 0, 1)
 
-    // Berechne das Skalarprodukt zwischen der Normalen im View Space und der Blickrichtung.
-    const dotCullingCorrectedView = normalView.dot(cameraForwardViewActual);
+  // Berechne das Skalarprodukt zwischen der Normalen im View Space und der Blickrichtung.
+  const dotCullingCorrectedView = normalView.dot(cameraForwardViewActual)
 
-    // Korrigiertes Back-face Culling: Blende aus, wenn die Normale vom Blickvektor weg zeigt.
-    // Wenn die Normale von der Vorderseite des Dreiecks weg zeigt und normalView.dot(cameraForwardViewActual) > epsilon ist,
-    // dann zeigt die VORDERSEITE vom Betrachter weg. Verwende epsilon für einen robusten Float-Vergleich.
-    // Blende aus, wenn dotProduct > epsilon und es KEIN Spieler-Dreieck ist.
-    if (dotCullingCorrectedView > epsilon && !triangle.isPlayer) {
-         // console.log("Culling backface (korrigiert)"); // Debugging
-         return; // Blende diese Rückseite aus
+  // Korrigiertes Back-face Culling: Blende aus, wenn die Normale vom Blickvektor weg zeigt.
+  // Wenn die Normale von der Vorderseite des Dreiecks weg zeigt und normalView.dot(cameraForwardViewActual) > epsilon ist,
+  // dann zeigt die VORDERSEITE vom Betrachter weg. Verwende epsilon für einen robusten Float-Vergleich.
+  // Blende aus, wenn dotProduct > epsilon und es KEIN Spieler-Dreieck ist.
+  if (dotCullingCorrectedView > epsilon && !triangle.isPlayer) {
+    // console.log("Culling backface (korrigiert)"); // Debugging
+    return // Blende diese Rückseite aus
+  }
+
+  // 3. Clipping gegen Nah-Ebene (und dann ggf. weitere Ebenen)
+  // DIESER SCHRITT ERSETZT den alten Check 'if (projectedVertices.some((v) => v === null))'.
+  // Rufe die Clipping-Funktion für die Nah-Ebene mit dem View Space Dreieck auf.
+  // Die Funktion gibt eine Liste von 0, 1 oder 2 Dreiecken in View Space zurück.
+  let clippedTrianglesView = clipTriangleAgainstNearPlane(viewTriangle)
+
+  // TODO: Wenn du Clipping gegen weitere Ebenen (Fern, Links, Rechts, Oben, Unten) implementierst,
+  // würde hier eine Kaskade von Clipping-Aufrufen folgen. Jede Stufe nimmt die Dreiecke der vorherigen.
+  // Z.B.:
+  // let finalClippedTriangles: ViewSpaceTriangle[] = [];
+  // clippedTrianglesView.forEach(tri => {
+  //    const clippedAgainstFar = clipTriangleAgainstFar(tri); // clipTriangleAgainstFar muss implementiert werden
+  //    clippedAgainstFar.forEach(farTri => {
+  //        const clippedAgainstLeft = clipTriangleAgainstLeft(farTri); // clipTriangleAgainstLeft muss implementiert werden
+  //        clippedAgainstLeft.forEach(leftTri => {
+  //            // ... usw. bis alle 6 Ebenen durch sind ...
+  //            finalClippedTriangles.push(...ergebnis);
+  //        });
+  //    });
+  // });
+
+  // Für diese Implementierung (nur Near-Clipping) sind die Ergebnisse von clipTriangleAgainstNearPlane
+  // die finalen geklippten Dreiecke, die weiterverarbeitet werden.
+  let finalClippedTriangles = clippedTrianglesView // Die Liste der Dreiecke nach Near-Clipping
+
+  // 4. Projektion auf 2D Bildschirm-Koordinaten und Rasterisierung
+  // Gehe durch JEDES der resultierenden geklippten Dreiecke (0, 1 oder 2 Stück).
+  finalClippedTriangles.forEach((clippedTriView) => {
+    // Iteriere über die geklippten Dreiecke (in View Space)
+
+    // Für jedes geklippte Dreieck: Projiziere seine 3 Eckpunkte von View Space nach Screen Space
+    // Verwende die viewToScreen Funktion, die KEINEN Z<=0.1 Check macht, da Punkte geklippt sind.
+    const p1 = viewToScreen(clippedTriView[0]) // Aufruf der viewToScreen Funktion
+    const p2 = viewToScreen(clippedTriView[1])
+    const p3 = viewToScreen(clippedTriView[2])
+
+    // Nun folgt deine bisherige Rasterisierungslogik, die mit diesen 2D-projizierten Punkten arbeitet.
+    // Diese Punkte p1, p2, p3 sind die {x, y, z} Objekte, die du bisher von project bekommen hast.
+
+    // Sortiere die 3 projizierten Eckpunkte nach ihrer 2D y-Koordinate für die Scanline-Füllung
+    const projectedPoints2D = [p1, p2, p3] // Dies sind {x, y, z} Objekte nach Projektion
+    projectedPoints2D.sort((a, b) => a.y - b.y) // Sortiere nach der 2D y-Koordinate
+
+    const pp1 = projectedPoints2D[0] // Der oberste Punkt
+    const pp2 = projectedPoints2D[1] // Der mittlere Punkt
+    const pp3 = projectedPoints2D[2] // Der unterste Punkt
+
+    // Bestimme die Farbe und Beleuchtung für dieses Dreieck
+    let rFloat = 1.0,
+      gFloat = 1.0,
+      bFloat = 1.0
+    const initialColor = hexToRgb(triangle.color) // Nutze die Farbe des Originaldreiecks
+
+    if (initialColor !== null) {
+      rFloat = initialColor.r
+      gFloat = initialColor.g
+      bFloat = initialColor.b
+
+      if (!triangle.bakedLight) {
+        // Beleuchtung: Nutze die Normale des Originaldreiecks für diffuse Beleuchtung.
+        // Eine präzisere Implementierung würde die Normale des geklippten Dreiecks verwenden,
+        // falls sich die Orientierung signifikant ändert. Hier verwenden wir die Originalnormale.
+        const lightLevels = calculateLightLevel(triangle.normal)
+        rFloat = Math.max(0, Math.min(1, rFloat + lightLevels))
+        gFloat = Math.max(0, Math.min(1, gFloat + lightLevels))
+        bFloat = Math.max(0, Math.min(1, bFloat + lightLevels))
+      }
     }
 
-    // 3. Clipping gegen Nah-Ebene (und dann ggf. weitere Ebenen)
-    // DIESER SCHRITT ERSETZT den alten Check 'if (projectedVertices.some((v) => v === null))'.
-    // Rufe die Clipping-Funktion für die Nah-Ebene mit dem View Space Dreieck auf.
-    // Die Funktion gibt eine Liste von 0, 1 oder 2 Dreiecken in View Space zurück.
-    let clippedTrianglesView = clipTriangleAgainstNearPlane(viewTriangle);
+    const rByte = Math.floor(rFloat * 255)
+    const gByte = Math.floor(gFloat * 255)
+    const bByte = Math.floor(bFloat * 255)
 
-    // TODO: Wenn du Clipping gegen weitere Ebenen (Fern, Links, Rechts, Oben, Unten) implementierst,
-    // würde hier eine Kaskade von Clipping-Aufrufen folgen. Jede Stufe nimmt die Dreiecke der vorherigen.
-    // Z.B.:
-    // let finalClippedTriangles: ViewSpaceTriangle[] = [];
-    // clippedTrianglesView.forEach(tri => {
-    //    const clippedAgainstFar = clipTriangleAgainstFar(tri); // clipTriangleAgainstFar muss implementiert werden
-    //    clippedAgainstFar.forEach(farTri => {
-    //        const clippedAgainstLeft = clipTriangleAgainstLeft(farTri); // clipTriangleAgainstLeft muss implementiert werden
-    //        clippedAgainstLeft.forEach(leftTri => {
-    //            // ... usw. bis alle 6 Ebenen durch sind ...
-    //            finalClippedTriangles.push(...ergebnis);
-    //        });
-    //    });
-    // });
+    // Rasterisiere das Dreieck, indem horizontale Scanlines gefüllt werden.
+    // Gehe durch die Y-Koordinaten (Pixelreihen) von der oberen Spitze zur unteren Spitze.
+    const startY = Math.round(pp1.y)
+    const endY = Math.round(pp3.y)
 
-    // Für diese Implementierung (nur Near-Clipping) sind die Ergebnisse von clipTriangleAgainstNearPlane
-    // die finalen geklippten Dreiecke, die weiterverarbeitet werden.
-    let finalClippedTriangles = clippedTrianglesView; // Die Liste der Dreiecke nach Near-Clipping
+    // Klemme den Y-Loop-Bereich an die Bildschirmhöhe, um Robustheit zu gewährleisten.
+    const clampedStartY = Math.max(
+      0,
+      Math.min(screenDimensions.height - 1, startY),
+    )
+    const clampedEndY = Math.max(0, Math.min(screenDimensions.height - 1, endY))
 
-    // 4. Projektion auf 2D Bildschirm-Koordinaten und Rasterisierung
-    // Gehe durch JEDES der resultierenden geklippten Dreiecke (0, 1 oder 2 Stück).
-    finalClippedTriangles.forEach(clippedTriView => { // Iteriere über die geklippten Dreiecke (in View Space)
+    for (let y = clampedStartY; y <= clampedEndY; y++) {
+      // Finde die Schnittpunkte dieser horizontalen Scanline (bei Y) mit den Kanten des geklippten, projizierten Dreiecks.
+      // Nutze die interpolate Funktion (die für Scanlines), die x und z interpoliert.
+      // Die Kanten sind V1-V3 (immer) und entweder V1-V2 (obere Hälfte) oder V2-V3 (untere Hälfte).
+      const scanlineP1 = interpolate(y, pp1, pp3) // Schnittpunkt mit der Kante von oberster zu unterster Spitze
 
-        // Für jedes geklippte Dreieck: Projiziere seine 3 Eckpunkte von View Space nach Screen Space
-        // Verwende die viewToScreen Funktion, die KEINEN Z<=0.1 Check macht, da Punkte geklippt sind.
-        const p1 = viewToScreen(clippedTriView[0]); // Aufruf der viewToScreen Funktion
-        const p2 = viewToScreen(clippedTriView[1]);
-        const p3 = viewToScreen(clippedTriView[2]);
+      let scanlineP2 = null
+      if (y < pp2.y) {
+        // Wenn die Scanline in der oberen Hälfte des Dreiecks ist, schneidet sie die Kante V1-V2.
+        scanlineP2 = interpolate(y, pp1, pp2)
+      } else {
+        // Wenn die Scanline in der unteren Hälfte ist (oder genau auf pp2.y), schneidet sie die Kante V2-V3.
+        scanlineP2 = interpolate(y, pp2, pp3)
+      }
 
-        // Nun folgt deine bisherige Rasterisierungslogik, die mit diesen 2D-projizierten Punkten arbeitet.
-        // Diese Punkte p1, p2, p3 sind die {x, y, z} Objekte, die du bisher von project bekommen hast.
-
-        // Sortiere die 3 projizierten Eckpunkte nach ihrer 2D y-Koordinate für die Scanline-Füllung
-        const projectedPoints2D = [p1, p2, p3]; // Dies sind {x, y, z} Objekte nach Projektion
-        projectedPoints2D.sort((a, b) => a.y - b.y); // Sortiere nach der 2D y-Koordinate
-
-        const pp1 = projectedPoints2D[0]; // Der oberste Punkt
-        const pp2 = projectedPoints2D[1]; // Der mittlere Punkt
-        const pp3 = projectedPoints2D[2]; // Der unterste Punkt
-
-        // Bestimme die Farbe und Beleuchtung für dieses Dreieck
-        let rFloat = 1.0, gFloat = 1.0, bFloat = 1.0;
-        const initialColor = hexToRgb(triangle.color); // Nutze die Farbe des Originaldreiecks
-
-        if (initialColor !== null) {
-             rFloat = initialColor.r;
-             gFloat = initialColor.g;
-             bFloat = initialColor.b;
-
-             if (!triangle.bakedLight) {
-                 // Beleuchtung: Nutze die Normale des Originaldreiecks für diffuse Beleuchtung.
-                 // Eine präzisere Implementierung würde die Normale des geklippten Dreiecks verwenden,
-                 // falls sich die Orientierung signifikant ändert. Hier verwenden wir die Originalnormale.
-                 const lightLevels = calculateLightLevel(triangle.normal);
-                 rFloat = Math.max(0, Math.min(1, rFloat + lightLevels));
-                 gFloat = Math.max(0, Math.min(1, gFloat + lightLevels));
-                 bFloat = Math.max(0, Math.min(1, bFloat + lightLevels));
-             }
+      // Wenn gültige Schnittpunkte für diese Scanline gefunden wurden (sollte meist der Fall sein im geklemmten Bereich):
+      if (scanlineP1 !== null && scanlineP2 !== null) {
+        // Sicherstellen, dass scanlineP1 der linkere und scanlineP2 der rechtere Punkt ist.
+        // fillScanline erwartet dies.
+        if (scanlineP1.x < scanlineP2.x) {
+          fillScanline(
+            y,
+            scanlineP1.x,
+            scanlineP2.x,
+            scanlineP1.z,
+            scanlineP2.z,
+            rByte,
+            gByte,
+            bByte,
+            triangle.applyZBias,
+          )
+        } else {
+          fillScanline(
+            y,
+            scanlineP2.x,
+            scanlineP1.x,
+            scanlineP2.z,
+            scanlineP1.z,
+            rByte,
+            gByte,
+            bByte,
+            triangle.applyZBias,
+          )
         }
-
-        const rByte = Math.floor(rFloat * 255);
-        const gByte = Math.floor(gFloat * 255);
-        const bByte = Math.floor(bFloat * 255);
-
-
-        // Rasterisiere das Dreieck, indem horizontale Scanlines gefüllt werden.
-        // Gehe durch die Y-Koordinaten (Pixelreihen) von der oberen Spitze zur unteren Spitze.
-        const startY = Math.round(pp1.y);
-        const endY = Math.round(pp3.y);
-
-        // Klemme den Y-Loop-Bereich an die Bildschirmhöhe, um Robustheit zu gewährleisten.
-        const clampedStartY = Math.max(0, Math.min(screenDimensions.height - 1, startY));
-        const clampedEndY = Math.max(0, Math.min(screenDimensions.height - 1, endY));
-
-
-        for (let y = clampedStartY; y <= clampedEndY; y++) {
-            // Finde die Schnittpunkte dieser horizontalen Scanline (bei Y) mit den Kanten des geklippten, projizierten Dreiecks.
-            // Nutze die interpolate Funktion (die für Scanlines), die x und z interpoliert.
-            // Die Kanten sind V1-V3 (immer) und entweder V1-V2 (obere Hälfte) oder V2-V3 (untere Hälfte).
-            const scanlineP1 = interpolate(y, pp1, pp3); // Schnittpunkt mit der Kante von oberster zu unterster Spitze
-
-            let scanlineP2 = null;
-            if (y < pp2.y) {
-                // Wenn die Scanline in der oberen Hälfte des Dreiecks ist, schneidet sie die Kante V1-V2.
-                scanlineP2 = interpolate(y, pp1, pp2);
-            } else {
-                // Wenn die Scanline in der unteren Hälfte ist (oder genau auf pp2.y), schneidet sie die Kante V2-V3.
-                scanlineP2 = interpolate(y, pp2, pp3);
-            }
-
-            // Wenn gültige Schnittpunkte für diese Scanline gefunden wurden (sollte meist der Fall sein im geklemmten Bereich):
-            if (scanlineP1 !== null && scanlineP2 !== null) {
-                // Sicherstellen, dass scanlineP1 der linkere und scanlineP2 der rechtere Punkt ist.
-                // fillScanline erwartet dies.
-                if (scanlineP1.x < scanlineP2.x) {
-                    fillScanline(y, scanlineP1.x, scanlineP2.x, scanlineP1.z, scanlineP2.z, rByte, gByte, bByte, triangle.applyZBias);
-                } else {
-                    fillScanline(y, scanlineP2.x, scanlineP1.x, scanlineP2.z, scanlineP1.z, rByte, gByte, bByte, triangle.applyZBias);
-                }
-            }
-        }
-    }); // Ende der Schleife über die resultierenden geklippten Dreiecke
-
+      }
+    }
+  }) // Ende der Schleife über die resultierenden geklippten Dreiecke
 }
 
 // Represents a renderable triangle with color, normal, and lighting properties.
@@ -734,42 +785,51 @@ const LEVEL_DIMENSION = LEVEL_BOUNDARY_MAX * 2 // Total dimension of the level (
 const NUM_CELLS_PER_DIMENSION = Math.ceil(LEVEL_DIMENSION / CELL_SIZE) // Number of grid cells along one dimension
 const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION // Alias for clarity
 
-// 3D array representing the spatial partition grid.
-// Each cell can store a list of collision triangles that intersect it.
-const staticSurfacePartition: collisionTriangle[][][] = []
+let staticSurfacePartitionTriangles: collisionTriangle[] = []
+const staticSurfacePartition: number[][][] = []
 
-const tv1 = new Vector3(10, 7, 10);
-const tv2 = new Vector3(-10, 0, -20); // Der Wert, der vorher tv3 zugewiesen war
+const tv1 = new Vector3(10, 7, 10)
+const tv2 = new Vector3(-10, 0, -20) // Der Wert, der vorher tv3 zugewiesen war
 const tv3 = new Vector3(-10, 0, 10)
 
-const tv11 = new Vector3(30, 0, 30);
-const tv21 = new Vector3(-30, 0, -30); // Der Wert, der vorher tv3 zugewiesen war
+const tv11 = new Vector3(30, 0, 30)
+const tv21 = new Vector3(-30, 0, -30) // Der Wert, der vorher tv3 zugewiesen war
 const tv31 = new Vector3(-30, 0, 30)
 
-const tv12 = new Vector3(-30, 0, -30);
-const tv22 = new Vector3(30, 0, 30); // Der Wert, der vorher tv3 zugewiesen war
+const tv12 = new Vector3(-30, 0, -30)
+const tv22 = new Vector3(30, 0, 30) // Der Wert, der vorher tv3 zugewiesen war
 const tv32 = new Vector3(30, 0, -30)
 
 let scene: Triangle[] = [
   new Triangle(tv1, tv2, tv3, "#00FFFF", calculateNormal(tv1, tv2, tv3), false),
-  new Triangle(tv11, tv21, tv31, "#00FFFF", calculateNormal(tv11, tv21, tv31), false),
-  new Triangle(tv12, tv22, tv32, "#00FFFF", calculateNormal(tv12, tv22, tv32), false),
+  new Triangle(
+    tv11,
+    tv21,
+    tv31,
+    "#009999",
+    calculateNormal(tv11, tv21, tv31),
+    false,
+  ),
+  new Triangle(
+    tv12,
+    tv22,
+    tv32,
+    "#006666",
+    calculateNormal(tv12, tv22, tv32),
+    false,
+  ),
 ]
-
-const allStaticCollisionTriangles: collisionTriangle[] = []
 
 setupStaticCollisionGeometry()
 console.log(staticSurfacePartition)
+console.log(staticSurfacePartitionTriangles)
 
-// Initializes the spatial partition grid with empty arrays for each cell.
 function initializeSpatialPartition() {
   for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
-    staticSurfacePartition[z] = new Array<collisionTriangle[]>(
-      NUM_CELLS_PER_DIMENSION,
-    )
+    staticSurfacePartition[z] = new Array<number[]>(NUM_CELLS_PER_DIMENSION)
 
     for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
-      staticSurfacePartition[z][x] = [] as collisionTriangle[] // Ensure each cell is an array
+      staticSurfacePartition[z][x] = [] as number[] // Ensure each cell is an array
     }
   }
   console.log(
@@ -792,8 +852,8 @@ function setupStaticCollisionGeometry() {
       normal: calculateNormal(tv11, tv21, tv31),
     },
     {
-      vertices: [tv11, tv21, tv31],
-      normal: calculateNormal(tv11, tv21, tv31),
+      vertices: [tv12, tv22, tv32],
+      normal: calculateNormal(tv12, tv22, tv32),
     },
     // Add more raw collision data here as needed
   ]
@@ -814,8 +874,7 @@ function setupStaticCollisionGeometry() {
       worldVertices as [Vector3, Vector3, Vector3],
       worldNormal,
     )
-
-    // Add the triangle to the spatial partition grid based on its bounding box
+    staticSurfacePartitionTriangles.push(colTriangle)
     addTriangleToPartition_BoundingBox(colTriangle)
   })
 
@@ -884,7 +943,9 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
         )
         console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle)
 
-        staticSurfacePartition[z][x].push(triangle)
+        staticSurfacePartition[z][x].push(
+          staticSurfacePartitionTriangles.length - 1,
+        )
 
         console.log(
           `DEBUG: Nach push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
@@ -1047,69 +1108,86 @@ forever(function () {
 })
 
 function drawFrame() {
-    ctx.clearRect(0, 0, gamecan.width, gamecan.height);
-    zBuffer.fill(Infinity);
-    pixelBuffer.fill(0);
+  ctx.clearRect(0, 0, gamecan.width, gamecan.height)
+  zBuffer.fill(Infinity)
+  pixelBuffer.fill(0)
 
-    scene
-        .filter((triangle) => !triangle.isPlayer)
-        .forEach((triangle) => {
-            fillTriangleProjected(triangle);
-        });
+  scene
+    .filter((triangle) => !triangle.isPlayer)
+    .forEach((triangle) => {
+      fillTriangleProjected(triangle)
+    })
 
-    const outlineScaleFactor = 1.1;
-    const outlineColor = "#333333";
-    const off = 4;
+  const outlineScaleFactor = 1.1
+  const outlineColor = "#333333"
+  const off = 4
 
-    scene
-        .filter((triangle) => triangle.isPlayer)
-        .forEach((originalPlayerTriangle) => {
-            const center = playerCenter.add(new Vector3(player.position.x, player.position.y + off, player.position.z));
-            const scaledV1 = scaleVector3(originalPlayerTriangle.vertices[0], center, outlineScaleFactor);
-            const scaledV2 = scaleVector3(originalPlayerTriangle.vertices[1], center, outlineScaleFactor);
-            const scaledV3 = scaleVector3(originalPlayerTriangle.vertices[2], center, outlineScaleFactor);
+  scene
+    .filter((triangle) => triangle.isPlayer)
+    .forEach((originalPlayerTriangle) => {
+      const center = playerCenter.add(
+        new Vector3(
+          player.position.x,
+          player.position.y + off,
+          player.position.z,
+        ),
+      )
+      const scaledV1 = scaleVector3(
+        originalPlayerTriangle.vertices[0],
+        center,
+        outlineScaleFactor,
+      )
+      const scaledV2 = scaleVector3(
+        originalPlayerTriangle.vertices[1],
+        center,
+        outlineScaleFactor,
+      )
+      const scaledV3 = scaleVector3(
+        originalPlayerTriangle.vertices[2],
+        center,
+        outlineScaleFactor,
+      )
 
-            const outlineTriangle = new Triangle(
-                scaledV1,
-                scaledV2,
-                scaledV3,
-                outlineColor,
-                calculateNormal(scaledV1, scaledV2, scaledV3),
-                true,
-                true,
-                true
-            );
+      const outlineTriangle = new Triangle(
+        scaledV1,
+        scaledV2,
+        scaledV3,
+        outlineColor,
+        calculateNormal(scaledV1, scaledV2, scaledV3),
+        true,
+        true,
+        true,
+      )
 
-            fillTriangleProjected(outlineTriangle);
-        });
+      fillTriangleProjected(outlineTriangle)
+    })
 
-    scene
-        .filter((triangle) => triangle.isPlayer)
-        .forEach((triangle) => {
-            fillTriangleProjected(triangle);
-        });
+  scene
+    .filter((triangle) => triangle.isPlayer)
+    .forEach((triangle) => {
+      fillTriangleProjected(triangle)
+    })
 
-    ctx.putImageData(imageData, 0, 0);
+  ctx.putImageData(imageData, 0, 0)
 
-    drawFPS();
+  drawFPS()
 
-    scene
-        .filter((triangle) => triangle.isPlayer)
-        .forEach((triangle) => {
-            scene.pop();
-        });
+  scene
+    .filter((triangle) => triangle.isPlayer)
+    .forEach((triangle) => {
+      scene.pop()
+    })
 }
 
 function gameLoop() {
-    inputs();
-    updatePlayer();
-    updateCamera();
-    updateLight();
-    updateAnimations();
-    drawFrame();
-    //requestAnimationFrame(gameLoop);
+  inputs()
+  updatePlayer()
+  updateCamera()
+  updateLight()
+  updateAnimations()
+  drawFrame()
+  //requestAnimationFrame(gameLoop);
 }
-
 
 function updateLight() {
   lightDir = calculateLightDirection(light.yaw, light.pitch)
@@ -1247,8 +1325,8 @@ function setPixel(
   aByte: number = 255,
 ) {
   // Sicherstellen, dass die Pixel-Koordinaten im gültigen Bereich liegen, bevor auf Arrays zugegriffen wird.
-   const ix = Math.floor(x); // Boden für Array-Indizes verwenden
-   const iy = Math.floor(y); // Boden für Array-Indizes verwenden
+  const ix = Math.floor(x) // Boden für Array-Indizes verwenden
+  const iy = Math.floor(y) // Boden für Array-Indizes verwenden
 
   if (
     ix < 0 ||
@@ -1256,22 +1334,22 @@ function setPixel(
     ix >= screenDimensions.width ||
     iy >= screenDimensions.height
   ) {
-    return; // Pixel außerhalb der Bildschirmgrenzen ignorieren
-   }
+    return // Pixel außerhalb der Bildschirmgrenzen ignorieren
+  }
 
-  const index = iy * screenDimensions.width + ix; // Berechne den Index im 1D-Array
+  const index = iy * screenDimensions.width + ix // Berechne den Index im 1D-Array
 
   // Z-Buffering Check: Nur zeichnen, wenn dieser Pixel näher liegt als das, was aktuell im Z-Buffer ist.
-   // 'z' ist der Tiefenwert des aktuellen Pixels, der ggf. schon den Z-Bias enthält.
+  // 'z' ist der Tiefenwert des aktuellen Pixels, der ggf. schon den Z-Bias enthält.
   if (z < zBuffer[index]) {
-    zBuffer[index] = z; // Aktualisiere den Z-Buffer mit dem neuen, näheren Z-Wert
+    zBuffer[index] = z // Aktualisiere den Z-Buffer mit dem neuen, näheren Z-Wert
 
     // Aktualisiere die Pixeldaten im Pixel-Buffer.
-    const pixelIndex = index * 4; // Jeder Pixel benötigt 4 Bytes (R, G, B, A)
-    pixelBuffer[pixelIndex] = rByte;     // Rot-Kanal
-    pixelBuffer[pixelIndex + 1] = gByte; // Grün-Kanal
-    pixelBuffer[pixelIndex + 2] = bByte; // Blau-Kanal
-    pixelBuffer[pixelIndex + 3] = aByte; // Alpha-Kanal (Transparenz)
+    const pixelIndex = index * 4 // Jeder Pixel benötigt 4 Bytes (R, G, B, A)
+    pixelBuffer[pixelIndex] = rByte // Rot-Kanal
+    pixelBuffer[pixelIndex + 1] = gByte // Grün-Kanal
+    pixelBuffer[pixelIndex + 2] = bByte // Blau-Kanal
+    pixelBuffer[pixelIndex + 3] = aByte // Alpha-Kanal (Transparenz)
   }
 }
 
@@ -1502,22 +1580,22 @@ function updatePlayer() {
   const isIdle = player.forwardVel == 0
   player_actions_moving(isIdle)
   if (player.state == state.ground) {
-  if (player.forwardVel == 0) {
-    if (!isIdle) {
-      player.animWannaState = 0
-      animTime = 0
-      animTime2 = 0
+    if (player.forwardVel == 0) {
+      if (!isIdle) {
+        player.animWannaState = 0
+        animTime = 0
+        animTime2 = 0
+      }
+      playerAnimIdle()
+    } else {
+      if (isIdle) {
+        animTime = 0
+        animTime2 = 0
+      }
+      playerAnimRunning(player.forwardVel / 3, 0)
     }
-    playerAnimIdle()
-  } else {
-    if (isIdle) {
-      animTime = 0
-      animTime2 = 0
-    }
-    playerAnimRunning(player.forwardVel / 3, 0)
   }
-  }
-  highlightPlayerGridCell()
+  //highlightPlayerGridCell()
   setPlayerFloor()
 }
 
@@ -1530,7 +1608,32 @@ function setPlayerFloor() {
   const playerCellX = cellIndices.cellX
   const playerCellZ = cellIndices.cellZ
   let trianglesInPlayerCell: collisionTriangle[] = []
-  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
+  let processedTriangleIndices: number[] = []
+  const checkCellX = playerCellX
+  const checkCellZ = playerCellZ
+  if (
+    checkCellX >= 0 &&
+    checkCellX < NUM_CELLS_PER_DIMENSION &&
+    checkCellZ >= 0 &&
+    checkCellZ < NUM_CELLS_PER_DIMENSION
+  ) {
+    const cellTriangleIndices = staticSurfacePartition[checkCellZ]?.[checkCellX]
+    if (cellTriangleIndices && Array.isArray(cellTriangleIndices)) {
+      cellTriangleIndices.forEach((index) => {
+        if (index >= 0 && index < staticSurfacePartitionTriangles.length) {
+          if (!processedTriangleIndices.find((element) => element == index)) {
+            trianglesInPlayerCell.push(staticSurfacePartitionTriangles[index])
+            processedTriangleIndices.push(index) // Füge das Objekt zum Set hinzu
+          }
+        } else {
+          console.warn(
+            `setPlayerFloor: Ungültiger Dreiecksindex im Spatial Partition: ${index}`,
+          )
+        }
+      })
+    }
+  }
+  //trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
   let heightList: number[] = []
   //console.log(trianglesInPlayerCell)
   trianglesInPlayerCell
@@ -1567,18 +1670,22 @@ function setPlayerFloor() {
 
       const heightAtPoint = -(playerX * nx + nz * playerZ + oo) / ny
       if (player.state == state.ground) {
-        if (player.position.y <= heightAtPoint+10 && player.position.y >= heightAtPoint)
+        if (
+          player.position.y <= heightAtPoint + 5 &&
+          player.position.y >= heightAtPoint
+        )
           heightList.push(heightAtPoint)
       }
-      if (player.position.y + 3 >= heightAtPoint 
-          && player.position.y <= heightAtPoint)
+      if (
+        player.position.y >= heightAtPoint - 1.5 &&
+        player.position.y <= heightAtPoint
+      )
         heightList.push(heightAtPoint)
     })
 
-  console.log(heightList)
   if (heightList.length == 0) {
     player.state = state.air
-  }else {
+  } else {
     player.state = state.ground
     player.position.y = Math.max(...heightList)
   }
@@ -1587,12 +1694,12 @@ function setPlayerFloor() {
 function highlightPlayerGridCell() {
   const playerX = player.position.x
   const playerZ = player.position.z
-  const gridY = 0.2
+  const gridY = 4
 
   const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
   const playerCellX = cellIndices.cellX
   const playerCellZ = cellIndices.cellZ
-  let trianglesInPlayerCell: collisionTriangle[] = []
+  let trianglesInPlayerCell: number[] = []
   trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
 
   if (
@@ -1628,26 +1735,28 @@ function highlightPlayerGridCell() {
     }
   } else {
   }
-}//!!
+} //!!
 
 function player_actions_moving(was_standing_still: boolean) {
   if (player.state == state.ground) {
-  updateGroundMovement()
-  }else if (player.state == state.air) {
+    updateGroundMovement()
+  } else if (player.state == state.air) {
     //updateGroundMovement()
-    if (Keyboard.keyDown(Key.T))
-      player.position.y -= 0.1
-    if (Keyboard.keyDown(Key.Z))
-      player.position.y += 0.1
     updateAirMovement()
   }
   function updateAirMovement() {
-    if (player.verticalVel > -1.875)
-      player.verticalVel += gravity
+    if (player.verticalVel > -1.875) player.verticalVel += gravity
     player.position.y += player.verticalVel
-    
+    const speed = player.forwardVel
+    const yawDegrees = player.yaw
+
+    const deltaX = speed * Math.sin(yawDegrees)
+    const deltaZ = speed * Math.cos(yawDegrees)
+
+    player.position.x += deltaX / 32
+    player.position.z += deltaZ / 32
   }
-  
+
   function updateGroundMovement() {
     const currentYaw = player.yaw
     const intendedYaw = player.intendedYaw
@@ -1656,7 +1765,7 @@ function player_actions_moving(was_standing_still: boolean) {
 
     // Aktualisiere den Gierwinkel (Yaw) des Spielers sanft in Richtung intendedYaw
     // Nutzt deine existierende rotateTowardsAngleDegrees Funktion
-    const rotationSpeed = 8 // Übernommen aus deiner alten update_walking_speed Logik
+    const rotationSpeed = 9 // Übernommen aus deiner alten update_walking_speed Logik
     if (inputMagnitude != 0) {
       if (was_standing_still) {
         player.yaw = intendedYaw
@@ -1860,6 +1969,35 @@ function playerAnimIdle() {
   playerObj.Body.rotation = new rotation(0, 0, 0)
   playerObj.Body.position = new Vector3(0, -timeSinAbs4, 0)
   if (player.animWannaState > 90) {
+    playerObj.Head.rotation = new rotation(timeSin2 * 36, 0, timeSinAbs)
+  } else {
+    playerObj.Head.rotation = new rotation(timeSin2 / 2, 0, timeSinAbs)
+  }
+  playerObj.Head.position = new Vector3(0, -timeSinAbs4, 0)
+  const diff = Math.random(-0.3, 0.3)
+  animTime = (animTime + 3 + diff) % 360
+  animTime2 = (animTime2 + 2 - diff) % 360
+}
+
+function playerFreeFall() {
+  const timeSin = Math.sin(animTime)
+  const timeSinAbs = Math.abs(timeSin)
+  const timeSinAbs4 = Math.abs(timeSin) / 4
+  const timeSin2 = Math.sin(animTime2)
+  player.animWannaState = (player.animWannaState + 1) % 270
+  playerObj.rightArm.rotation = new rotation(0, timeSin, -timeSinAbs)
+  playerObj.rightArm.position = new Vector3(0, -timeSinAbs4, 0)
+  playerObj.leftArm.rotation = new rotation(0, timeSin, -timeSinAbs)
+  playerObj.leftArm.position = new Vector3(0, -timeSinAbs4, 0)
+
+  playerObj.leftLeg.rotation = new rotation(0, 0, -timeSin * 3)
+  playerObj.leftLeg.position = new Vector3(0, 0, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, timeSin * 3)
+  playerObj.rightLeg.position = new Vector3(0, 0, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 0)
+  playerObj.Body.position = new Vector3(0, -timeSinAbs4, 0)
+  if (player.animWannaState > 90) {
     playerObj.Head.rotation = new rotation(timeSin2 * 28, 0, timeSinAbs)
   } else {
     playerObj.Head.rotation = new rotation(timeSin2 / 2, 0, timeSinAbs)
@@ -1893,4 +2031,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO MAYBE FUNCTIONING 22:04 30.04
+//LATESTBACKUO FUNCTIONING 14:09 01.05
