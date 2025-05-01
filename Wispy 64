@@ -79,51 +79,47 @@ const rotationSpeed = -2
 const projectionDistance = 1
 
 function project(vertex: Vector3): { x: number; y: number; z: number } | null {
-  let worldX = vertex.x - camera.x
-  let worldY = vertex.y - camera.y
-  let worldZ = vertex.z - camera.z
+  let worldX = vertex.x - camera.x
+  let worldY = vertex.y - camera.y
+  let worldZ = vertex.z - camera.z
 
-  const yawInRadians = camera.yaw
-  const cosYaw = Math.cos(yawInRadians)
-  const sinYaw = Math.sin(yawInRadians)
-  const rotatedX = cosYaw * worldX + sinYaw * worldZ
-  const rotatedZ = -sinYaw * worldX + cosYaw * worldZ
-  worldX = rotatedX
-  worldZ = rotatedZ
+  const yawInRadians = camera.yaw
+  const cosYaw = Math.cos(yawInRadians)
+  const sinYaw = Math.sin(yawInRadians)
+  const rotatedX = cosYaw * worldX + sinYaw * worldZ
+  const rotatedZ = -sinYaw * worldX + cosYaw * worldZ
+  worldX = rotatedX
+  worldZ = rotatedZ // Rotation um die X-Achse (Pitch)
 
-  // Rotation um die X-Achse (Pitch)
-  const pitchInRadians = camera.pitch
-  const cosPitch = Math.cos(pitchInRadians)
-  const sinPitch = Math.sin(pitchInRadians)
-  const rotatedY = cosPitch * worldY - sinPitch * worldZ
-  const rotatedZ2 = sinPitch * worldY + cosPitch * worldZ
-  worldY = rotatedY
-  worldZ = rotatedZ2
+  const pitchInRadians = camera.pitch
+  const cosPitch = Math.cos(pitchInRadians)
+  const sinPitch = Math.sin(pitchInRadians)
+  const rotatedY = cosPitch * worldY - sinPitch * worldZ
+  const rotatedZ2 = sinPitch * worldY + cosPitch * worldZ
+  worldY = rotatedY
+  worldZ = rotatedZ2 // Vermeide Division durch Null und Clipping von Punkten sehr nah an der Kamera
 
+  if (worldZ <= 0.95) {
+    return null
+  } // Perspektivische Division
 
-  // Vermeide Division durch Null und Clipping von Punkten sehr nah an der Kamera
-  if (worldZ <= 0.95) {
-    return null
-  }
-
-  // Perspektivische Division
-  const screenX = (projectionDistance * worldX) / worldZ
-  const screenY = (projectionDistance * worldY) / worldZ
+  const screenX = (projectionDistance * worldX) / worldZ
+  const screenY = (projectionDistance * worldY) / worldZ
 
   // Berechne das Seitenverhältnis
-  const aspectRatio = screenDimensions.width / screenDimensions.height;
+  const aspectRatio = screenDimensions.width / screenDimensions.height // Abbildung auf Canvas-Koordinaten - Berücksichtige das Seitenverhältnis bei screenY
 
-   // Abbildung auf Canvas-Koordinaten - Berücksichtige das Seitenverhältnis bei screenY
-  const canvasX =
-    screenDimensions.halfwidth + screenX * screenDimensions.halfwidth
-  const canvasY =
-    screenDimensions.halfheight - screenY * screenDimensions.halfheight * aspectRatio; // Skaliere screenY zusätzlich mit dem Seitenverhältnis
+  const canvasX =
+    screenDimensions.halfwidth + screenX * screenDimensions.halfwidth
+  const canvasY =
+    screenDimensions.halfheight -
+    screenY * screenDimensions.halfheight * aspectRatio // Skaliere screenY zusätzlich mit dem Seitenverhältnis
 
-  return {
-    x: canvasX,
-    y: canvasY,
-    z: worldZ, // Behalte die transformierte Z-Koordinate für den Z-Buffer
-  }
+  return {
+    x: canvasX,
+    y: canvasY,
+    z: worldZ, // Behalte die transformierte Z-Koordinate für den Z-Buffer
+  }
 }
 
 function drawTriangleProjected(triangle: Triangle) {
@@ -195,36 +191,36 @@ class Vector3 {
   }
 
   subtract(other: Vector3): Vector3 {
-    return new Vector3(this.x - other.x, this.y - other.y, this.z - other.z);
+    return new Vector3(this.x - other.x, this.y - other.y, this.z - other.z)
   }
 
   cross(other: Vector3): Vector3 {
     return new Vector3(
       this.y * other.z - this.z * other.y,
       this.z * other.x - this.x * other.z,
-      this.x * other.y - this.y * other.x
-    );
+      this.x * other.y - this.y * other.x,
+    )
   }
 
   magnitude(): number {
-    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z)
   }
 
   normalize(): Vector3 {
-    const mag = this.magnitude();
+    const mag = this.magnitude()
     if (mag > 1e-6) {
-      return new Vector3(this.x / mag, this.y / mag, this.z / mag);
+      return new Vector3(this.x / mag, this.y / mag, this.z / mag)
     } else {
-      return new Vector3(0, 0, 0);
+      return new Vector3(0, 0, 0)
     }
   }
 }
 
 function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
-  const edge1 = v2.subtract(v1);
-  const edge2 = v3.subtract(v1);
-  const normal = edge1.cross(edge2);
-  return normal.normalize();
+  const edge1 = v2.subtract(v1)
+  const edge2 = v3.subtract(v1)
+  const normal = edge1.cross(edge2)
+  return normal.normalize()
 }
 
 function fillTriangleProjected(triangle: Triangle) {
@@ -306,52 +302,51 @@ function getRandomColor() {
   return color
 }
 
-const scene: Triangle[] = [];
+const scene: Triangle[] = []
 
 //__ Fetch Model Data __
 fetch("https://api.jsonsilo.com/public/7cd9822c-f656-466c-aab5-dfc9e4cfb5eb")
   .then((response) => {
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
-    return response.json();
+    return response.json()
   })
   .then((data) => {
-    const vertices = data.vertices;
-    const faces = data.faces;
+    const vertices = data.vertices
+    const faces = data.faces
     for (const face of faces) {
       if (face.length === 3) {
-          const v1_3D = new Vector3(...vertices[face[0]]);
-          const v2_3D = new Vector3(...vertices[face[1]]);
-          const v3_3D = new Vector3(...vertices[face[2]]);
+        const v1_3D = new Vector3(...vertices[face[0]])
+        const v2_3D = new Vector3(...vertices[face[1]])
+        const v3_3D = new Vector3(...vertices[face[2]])
 
-          const normal = calculateNormal(v1_3D, v2_3D, v3_3D);
+        const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
 
-          // Bilde Normalenkomponenten [-1, 1] auf Farbkomponenten [0, 1] ab
-          const r = (normal.x + 1) / 2;
-          const g = (normal.y + 1) / 2;
-          const b = (normal.z + 1) / 2;
+        // Bilde Normalenkomponenten [-1, 1] auf Farbkomponenten [0, 1] ab
+        const r = (normal.x + 1) / 2
+        const g = (normal.y + 1) / 2
+        const b = (normal.z + 1) / 2
 
-          // Konvertiere RGB [0, 1] in einen Hex-Farbstring
-          const faceColor = rgbToHex(r, g, b);
+        // Konvertiere RGB [0, 1] in einen Hex-Farbstring
+        const faceColor = rgbToHex(r, g, b)
 
-          const triangle = new Triangle(v1_3D, v2_3D, v3_3D, faceColor);
-          scene.push(triangle);
-        }
+        const triangle = new Triangle(v1_3D, v2_3D, v3_3D, faceColor)
+        scene.push(triangle)
+      }
     }
-    })
+  })
   .catch((error) => {
-    console.error("fehler beim laden der modeldata:", error);
-  });
-
+    console.error("fehler beim laden der modeldata:", error)
+  })
 
 //__ RGB zu Hex Konverter __
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (c: number): string => {
-    const hex = Math.floor(c * 255).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
-  };
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    const hex = Math.floor(c * 255).toString(16)
+    return hex.length === 1 ? "0" + hex : hex
+  }
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
 forever(function () {
