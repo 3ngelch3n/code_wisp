@@ -88,6 +88,9 @@ enum levels {
 let level = levels.castle_grounds
 let skybox = new Image()
 updateSkyBox()
+
+// Projects a 3D vertex from world space to 2D screen space,
+// accounting for camera position, rotation, and perspective.
 function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   let worldX = vertex.x - camera.x
   let worldY = vertex.y - camera.y
@@ -110,7 +113,7 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   worldZ = rotatedZ2
 
   if (worldZ <= 0.1) {
-    return null
+    return null // Vertex is behind the camera
   }
 
   const screenX = (projectionDistance * worldX) / worldZ
@@ -127,10 +130,11 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   return {
     x: canvasX,
     y: canvasY,
-    z: worldZ,
+    z: worldZ, // Return depth for Z-buffering
   }
 }
 
+// Represents rotation around pitch, yaw, and roll axes.
 class rotation {
   pitch: number
   yaw: number
@@ -142,6 +146,7 @@ class rotation {
   }
 }
 
+// Represents a 3D vector with common vector operations.
 class Vector3 {
   x: number
   y: number
@@ -161,6 +166,7 @@ class Vector3 {
     return new Vector3(this.x - other.x, this.y - other.y, this.z - other.z)
   }
 
+  // Calculates the cross product of this vector and another.
   cross(other: Vector3): Vector3 {
     return new Vector3(
       this.y * other.z - this.z * other.y,
@@ -173,6 +179,7 @@ class Vector3 {
     return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z)
   }
 
+  // Returns a new vector with the same direction but unit length.
   normalize(): Vector3 {
     const mag = this.magnitude()
     if (mag > 1e-6) {
@@ -181,6 +188,8 @@ class Vector3 {
       return new Vector3(0, 0, 0)
     }
   }
+
+  // Calculates the dot product of this vector and another.
   dot(other: Vector3): number {
     return this.x * other.x + this.y * other.y + this.z * other.z
   }
@@ -208,6 +217,7 @@ class AnimatableObject {
   }
 }
 
+// Calculates the normal vector for a triangle defined by three vertices.
 function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
   const edge1 = v2.subtract(v1)
   const edge2 = v3.subtract(v1)
@@ -215,6 +225,7 @@ function calculateNormal(v1: Vector3, v2: Vector3, v3: Vector3): Vector3 {
   return normal.normalize()
 }
 
+// Scales a vector relative to a given center point.
 function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
   const diff = vec.subtract(center)
   const scaledDiff = new Vector3(
@@ -225,6 +236,8 @@ function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
   return center.add(scaledDiff)
 }
 
+// Fills a horizontal line of pixels (scanline) between two x-coordinates
+// at a given y-coordinate, performing Z-buffering and linear Z interpolation.
 function fillScanline(
   y: number,
   x1: number,
@@ -242,6 +255,7 @@ function fillScanline(
 
   let steps = ix2 - ix1
 
+  // Apply a small Z bias to prioritize drawing certain polygons (e.g., UI or player).
   const biasedZ1 = z1 + (applyZBias ? 3 : 0)
   const biasedZ2 = z2 + (applyZBias ? 3 : 0)
 
@@ -260,6 +274,8 @@ function fillScanline(
   }
 }
 
+// Linearly interpolates between two 2D points based on a target y-coordinate,
+// also interpolating the associated Z value. Used for finding points on triangle edges.
 function interpolate(
   y: number,
   vA: { x: number; y: number; z: number },
@@ -276,35 +292,42 @@ function interpolate(
 
   const t = (y - vA.y) / yDiff
 
-  if (t < -epsilon || t > 1 + epsilon) return null
+  if (t < -epsilon || t > 1 + epsilon) return null // Point is outside the segment
 
   const x = vA.x + t * (vB.x - vA.x)
-  const z = vA.z + t * (vB.z - vA.z)
+  const z = vA.z + t * (vB.z - vA.z) // Interpolate Z as well
   return { x, z }
 }
 
+// Renders a projected triangle to the screen using scanline filling and Z-buffering.
+// Handles sorting vertices by Y and splitting complex triangles.
 function fillTriangleProjected(triangle: Triangle) {
+  // Project the triangle's vertices to screen space
   const projectedVertices = triangle.vertices.map(project)
 
+  // If any vertex is behind the camera, the triangle is culled
   if (projectedVertices.some((v) => v === null)) {
     return
   }
 
   /*
-  const cameraPos = new Vector3(camera.x, camera.y, camera.z) 
-  const vertexPos = triangle.vertices[0] 
-  const camToVertex = vertexPos.subtract(cameraPos) 
-  const dotCulling = triangle.normal.dot(camToVertex) 
+  const cameraPos = new Vector3(camera.x, camera.y, camera.z)
+  const vertexPos = triangle.vertices[0]
+  const camToVertex = vertexPos.subtract(cameraPos)
+  // Back-face culling: check if the triangle normal faces away from the camera
+  const dotCulling = triangle.normal.dot(camToVertex)
   if (dotCulling >= 0 && !triangle.isPlayer) {
     return
   }
   */
 
+  // Sort vertices by Y-coordinate for scanline rasterization
   projectedVertices.sort((a, b) => a.y - b.y)
   const v1 = projectedVertices[0]!
   const v2 = projectedVertices[1]!
   const v3 = projectedVertices[2]!
 
+  // Determine the triangle's color, applying lighting if not baked
   let rFloat = 1.0,
     gFloat = 1.0,
     bFloat = 1.0
@@ -327,16 +350,21 @@ function fillTriangleProjected(triangle: Triangle) {
   const gByte = Math.floor(gFloat * 255)
   const bByte = Math.floor(bFloat * 255)
 
+  // Rasterize the triangle by filling horizontal scanlines
   for (let y = Math.round(v1.y); y <= Math.round(v3.y); y++) {
+    // Find the intersection points on the left and right edges of the triangle
     const p1 = interpolate(y, v1, v3)
     let p2: { x: number; z: number } | null = null
     if (y < v2.y) {
+      // Top part of the triangle: edge V1-V2
       p2 = interpolate(y, v1, v2)
     } else {
+      // Bottom part of the triangle: edge V2-V3
       p2 = interpolate(y, v2, v3)
     }
 
     if (p1 !== null && p2 !== null) {
+      // Ensure p1.x is the left point and p2.x is the right point
       if (p1.x < p2.x) {
         fillScanline(
           y,
@@ -366,13 +394,14 @@ function fillTriangleProjected(triangle: Triangle) {
   }
 }
 
+// Represents a renderable triangle with color, normal, and lighting properties.
 class Triangle {
   vertices: [Vector3, Vector3, Vector3]
   color: string
   normal: Vector3
   bakedLight: boolean
   isPlayer: boolean
-  applyZBias: boolean
+  applyZBias: boolean // For Z-buffering order control
 
   constructor(
     v1: Vector3,
@@ -393,11 +422,12 @@ class Triangle {
   }
 }
 
+// Represents a triangle used for collision detection.
 class collisionTriangle {
   vertices: [Vector3, Vector3, Vector3]
   normal: Vector3
   collisionType: collisionTypes
-  originOffset: number
+  originOffset: number // Distance from origin to the plane along the normal
 
   constructor(
     v1: Vector3,
@@ -412,6 +442,7 @@ class collisionTriangle {
     this.normal = normal
   }
 
+  // Updates collision data based on potentially transformed world vertices and normal.
   updateCollisionData(
     worldVertices: [Vector3, Vector3, Vector3],
     worldNormal: Vector3,
@@ -419,6 +450,7 @@ class collisionTriangle {
     this.vertices = worldVertices
     this.normal = worldNormal.normalize()
 
+    // Determine collision type based on the up component of the normal
     if (this.normal.y > 0.01) {
       this.collisionType = collisionTypes.floor
     } else if (this.normal.y < -0.01) {
@@ -426,20 +458,19 @@ class collisionTriangle {
     } else {
       this.collisionType = collisionTypes.wall
     }
+    // Calculate the plane equation constant (Ax + By + Cz + D = 0, where D = -normal.dot(vertex))
     this.originOffset = -this.normal.dot(this.vertices[0])
   }
 }
 
-const LEVEL_BOUNDARY_MAX = 200
+const LEVEL_BOUNDARY_MAX = 200 // Max extent of the level in world units
+const CELL_SIZE = 40 // Size of a grid cell in world units
+const LEVEL_DIMENSION = LEVEL_BOUNDARY_MAX * 2 // Total dimension of the level (e.g., 400)
+const NUM_CELLS_PER_DIMENSION = Math.ceil(LEVEL_DIMENSION / CELL_SIZE) // Number of grid cells along one dimension
+const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION // Alias for clarity
 
-const CELL_SIZE = 40
-
-const LEVEL_DIMENSION = LEVEL_BOUNDARY_MAX * 2
-
-const NUM_CELLS_PER_DIMENSION = Math.ceil(LEVEL_DIMENSION / CELL_SIZE)
-
-const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION
-
+// 3D array representing the spatial partition grid.
+// Each cell can store a list of collision triangles that intersect it.
 const staticSurfacePartition: collisionTriangle[][][] = []
 
 const tv1 = new Vector3(30, 10, 20)
@@ -455,6 +486,7 @@ const allStaticCollisionTriangles: collisionTriangle[] = []
 setupStaticCollisionGeometry()
 console.log(staticSurfacePartition)
 
+// Initializes the spatial partition grid with empty arrays for each cell.
 function initializeSpatialPartition() {
   for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
     staticSurfacePartition[z] = new Array<collisionTriangle[]>(
@@ -462,7 +494,7 @@ function initializeSpatialPartition() {
     )
 
     for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
-      staticSurfacePartition[z][x] = [] as collisionTriangle[]
+      staticSurfacePartition[z][x] = [] as collisionTriangle[] // Ensure each cell is an array
     }
   }
   console.log(
@@ -470,14 +502,17 @@ function initializeSpatialPartition() {
   )
 }
 
+// Sets up the static collision geometry by creating collisionTriangle objects
+// and distributing them into the spatial partition grid.
 function setupStaticCollisionGeometry() {
-  initializeSpatialPartition()
+  initializeSpatialPartition() // Make sure the grid is initialized
 
   const rawCollisionTrianglesData = [
     {
       vertices: [tv1, tv2, tv3],
       normal: calculateNormal(tv1, tv2, tv3),
     },
+    // Add more raw collision data here as needed
   ]
 
   rawCollisionTrianglesData.forEach((data) => {
@@ -491,28 +526,35 @@ function setupStaticCollisionGeometry() {
     const worldVertices = data.vertices
     const worldNormal = data.normal
 
+    // Update collision data with world coordinates (important if geometry is transformed later)
     colTriangle.updateCollisionData(
       worldVertices as [Vector3, Vector3, Vector3],
       worldNormal,
     )
 
+    // Add the triangle to the spatial partition grid based on its bounding box
     addTriangleToPartition_BoundingBox(colTriangle)
   })
 
   console.log("Statische Kollisionsgeometrie im Grid eingerichtet.")
 }
 
+// Converts world coordinates (x, z) into corresponding cell indices in the spatial partition grid.
 function getWorldCoordsCellIndices(
   worldX: number,
   worldZ: number,
 ): { cellX: number; cellZ: number } {
+  // Shift world coordinates so that (-LEVEL_BOUNDARY_MAX, -LEVEL_BOUNDARY_MAX) maps to (0, 0) in the grid
   const cellX = Math.floor((worldX + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
   const cellZ = Math.floor((worldZ + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
 
   return { cellX: cellX, cellZ: cellZ }
 }
 
+// Adds a collision triangle to all grid cells that its bounding box intersects.
+// This allows for efficient querying of nearby collision triangles.
 function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
+  // Calculate the bounding box of the triangle in world space
   const minX = Math.min(
     triangle.vertices[0].x,
     triangle.vertices[1].x,
@@ -534,6 +576,7 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
     triangle.vertices[2].z,
   )
 
+  // Get the grid cell indices for the corners of the bounding box
   const startCellIndices = getWorldCoordsCellIndices(minX, minZ)
   const startCellX = startCellIndices.cellX
   const startCellZ = startCellIndices.cellZ
@@ -542,18 +585,21 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
   const endCellX = endCellIndices.cellX
   const endCellZ = endCellIndices.cellZ
 
+  // Clamp indices to be within the grid boundaries
   const clampedStartCellX = Math.max(0, startCellX)
   const clampedEndCellX = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellX)
   const clampedStartCellZ = Math.max(0, startCellZ)
   const clampedEndCellZ = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellZ)
 
+  // Iterate over all cells intersected by the bounding box and add the triangle to their list
   for (let z = clampedStartCellZ; z <= clampedEndCellZ; z++) {
     for (let x = clampedStartCellX; x <= clampedEndCellX; x++) {
-      if (Array.isArray(staticSurfacePartition[z][x])) {
+      // Basic check to ensure the cell is an array before pushing
+      if (Array.isArray(staticSurfacePartition[z]?.[x])) {
         console.log(
           `DEBUG: Vor push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
         )
-        console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle) // Zeige das Objekt, das du hinzufügen willst
+        console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle)
 
         staticSurfacePartition[z][x].push(triangle)
 
@@ -561,18 +607,23 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
           `DEBUG: Nach push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
         )
       } else {
+        // Error handling if a cell is not initialized correctly
         console.error(
-          `FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z][x]}`,
-          staticSurfacePartition[z][x],
+          `FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z]?.[x]}`,
+          staticSurfacePartition[z]?.[x],
         )
       }
     }
   }
 }
 
+// Calculates a 3D vector representing the direction of light
+// based on its yaw and pitch angles.
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
+  // Start with a vector pointing along the positive Z axis (or chosen forward direction)
   let dir = new Vector3(0, 0, 1)
 
+  // Apply pitch rotation around the X axis
   const cosPitch = Math.cos(pitch)
   const sinPitch = Math.sin(pitch)
   const pitchedY = dir.y * cosPitch - dir.z * sinPitch
@@ -580,6 +631,7 @@ function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   dir.y = pitchedY
   dir.z = pitchedZ
 
+  // Apply yaw rotation around the Y axis
   const cosYaw = Math.cos(yaw)
   const sinYaw = Math.sin(yaw)
   const yawedX = dir.x * cosYaw + dir.z * sinYaw
@@ -587,14 +639,21 @@ function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   dir.x = yawedX
   dir.z = yawedZ
 
-  return dir.normalize()
+  return dir.normalize() // Return a unit vector
 }
 
+// Calculates a light intensity factor for a surface based on its normal
+// and the global light direction using the dot product.
 function calculateLightLevel(normal: Vector3): number {
+  // Dot product gives a value between -1 (surface facing away from light)
+  // and 1 (surface facing directly at light).
   const dot = normal.dot(lightDir)
 
+  // Shift and scale the dot product to get a light level (e.g., 0 to 1 or adjusted range).
+  // Adding 0.5 shifts the range from [-1, 1] to [-0.5, 1.5].
   const levelFloat = dot + 0.5
 
+  // Dividing by 8 further scales the light level (adjust as needed for desired brightness).
   return levelFloat / 8
 }
 
@@ -1543,4 +1602,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO 23:09 29.04
+//LATESTBACKUO 23:10 29.04 (Commented)
