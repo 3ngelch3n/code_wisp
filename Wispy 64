@@ -292,22 +292,39 @@ function fillTriangleProjected(triangle: Triangle) {
   // Hilfsfunktion zum Berechnen von X und Z auf einer Kante für eine gegebene Y-Koordinate
 
   function interpolate(
-    y: number,
+  y: number,
+  vA: { x: number; y: number; z: number },
+  vB: { x: number; y: number; z: number },
+): { x: number; z: number } | null {
+  const epsilon = 1e-6; // Ein kleiner Wert für Fließkommavergleiche
 
-    vA: { x: number; y: number; z: number },
-
-    vB: { x: number; y: number; z: number },
-  ): { x: number; z: number } | null {
-    if (vA.y === vB.y) return null
-
-    const t = (y - vA.y) / (vB.y - vA.y)
-
-    const x = vA.x + t * (vB.x - vA.x)
-
-    const z = vA.z + t * (vB.z - vA.z)
-
-    return { x, z }
+  // Wenn die übergebene y-Koordinate sehr nahe am y-Wert von vB liegt, gib die Koordinaten von vB zurück
+  if (Math.abs(y - vB.y) < epsilon) {
+      return { x: vB.x, z: vB.z };
   }
+  // Wenn die übergebene y-Koordinate sehr nahe am y-Wert von vA liegt, gib die Koordinaten von vA zurück
+   if (Math.abs(y - vA.y) < epsilon) {
+        return { x: vA.x, z: vA.z };
+   }
+
+  // Behandlung von streng horizontalen Kanten (Unterschied in y ist nahe Null)
+   if (Math.abs(vA.y - vB.y) < epsilon) {
+       return null; // Interpolation basierend auf y nicht sinnvoll für horizontale Kanten
+  }
+
+
+  const t = (y - vA.y) / (vB.y - vA.y);
+
+  // Stelle sicher, dass t im gültigen Bereich [0, 1] liegt (mit Toleranz)
+   if (t < -epsilon || t > 1 + epsilon) return null;
+
+
+  const x = vA.x + t * (vB.x - vA.x);
+  const z = vA.z + t * (vB.z - vA.z);
+
+
+  return { x, z };
+}
 
   // Durchlaufe die oberen und unteren Hälften des Dreiecks
 
