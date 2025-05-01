@@ -49,18 +49,24 @@ const rotationSpeed = 2 // In Radian
 
 const projectionDistance = 1
 
-function project(vertex: Vector3): { x: number; y: number; z: number } {
+function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   let worldX = vertex.x - camera.x
   let worldY = vertex.y - camera.y
   let worldZ = vertex.z - camera.z
 
   // Rotation um die Y-Achse (Yaw)
-  const cosYaw = Math.cos(camera.yaw)
-  const sinYaw = Math.sin(camera.yaw)
+  const yawInRadians = camera.yaw
+  const cosYaw = Math.cos(yawInRadians)
+  const sinYaw = Math.sin(yawInRadians)
   const rotatedX = cosYaw * worldX + sinYaw * worldZ
   const rotatedZ = -sinYaw * worldX + cosYaw * worldZ
   worldX = rotatedX
   worldZ = rotatedZ
+
+  // Vermeide Division durch Null und Clipping von Punkten hinter der Kamera
+  if (worldZ <= 0.001) {
+    return null // Oder eine andere geeignete Behandlung, z.B. ein Punkt außerhalb des Bildschirms
+  }
 
   // Perspektivische Division
   const screenX = (projectionDistance * worldX) / worldZ
@@ -79,7 +85,13 @@ function project(vertex: Vector3): { x: number; y: number; z: number } {
 }
 
 function drawTriangleProjected(triangle: Triangle) {
-  const projectedVertices = triangle.vertices.map(project)
+  const projectedVertices = triangle.vertices
+    .map(project)
+    .filter((v) => v !== null)
+
+  if (projectedVertices.length < 3) {
+    return // Wenn weniger als 3 projizierte Vertices übrig sind, zeichne das Dreieck nicht
+  }
 
   // Zeichne Linien zwischen den projizierten Vertices
   drawLine(
@@ -87,7 +99,7 @@ function drawTriangleProjected(triangle: Triangle) {
     Math.round(projectedVertices[0].y),
     Math.round(projectedVertices[1].x),
     Math.round(projectedVertices[1].y),
-    projectedVertices[0].z, // Durchschnittliche Z-Tiefe für den Z-Buffer (kann später verbessert werden)
+    projectedVertices[0].z,
     triangle.color,
   )
   drawLine(
@@ -329,10 +341,10 @@ function updateCamera() {
     camera.y -= moveSpeed
   }
   if (Keyboard.keyHeld(Key.ArrowLeft)) {
-    camera.yaw -= rotationSpeed
+    camera.yaw += rotationSpeed
   }
   if (Keyboard.keyHeld(Key.ArrowRight)) {
-    camera.yaw += rotationSpeed
+    camera.yaw -= rotationSpeed
   }
   if (Keyboard.keyHeld(Key.ArrowUp)) {
     camera.pitch -= rotationSpeed
