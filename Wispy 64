@@ -1,0 +1,369 @@
+if (document.querySelectorAll("canvas").length > 1) {
+  document.querySelectorAll("canvas")[0].parentElement.children[1].remove()
+} //inject Sprites into the game screen by @decmant
+let gamecan = document.querySelector("canvas")
+let canvas = document.createElement("canvas")
+canvas.height = gamecan.height
+canvas.width = gamecan.width
+canvas.style.height = gamecan.style.height
+canvas.style.width = gamecan.style.width
+canvas.style.position = "relative"
+canvas.style.top = `${0 - Number(gamecan.style.height.match(/\d*/))}px`
+canvas.style.left = `0px`
+gamecan.parentElement.append(canvas)
+let ctx = canvas.getContext("2d")
+sprite.visible = false
+
+let lastFrameTime = performance.now()
+let fps = 0
+let smoothFPS = 0
+
+const screenDimensions = {
+  width: 480,
+  height: 360,
+  halfwidth: 240,
+  halfheight: 180,
+}
+let zBuffer = new Float32Array(screenDimensions.width * screenDimensions.height)
+
+enum levels {
+  castle_grounds,
+  inside_castle,
+}
+let level = levels.castle_grounds
+let skybox = new Image()
+updateSkyBox()
+
+const camera = {
+  x: 0,
+  y: 0,
+  z: -3,
+  yaw: 0, // Drehung um die Y-Achse (in Grad oder Radian)
+  pitch: 0, // Drehung um die X-Achse
+}
+
+let horizontalSpeed = 0
+let playerRotation = 0
+const moveSpeed = 0.1
+const rotationSpeed = 2 // In Radian
+
+const projectionDistance = 1
+
+function project(vertex: Vector3): { x: number; y: number; z: number } {
+  let worldX = vertex.x - camera.x
+  let worldY = vertex.y - camera.y
+  let worldZ = vertex.z - camera.z
+
+  // Rotation um die Y-Achse (Yaw)
+  const cosYaw = Math.cos(camera.yaw)
+  const sinYaw = Math.sin(camera.yaw)
+  const rotatedX = cosYaw * worldX + sinYaw * worldZ
+  const rotatedZ = -sinYaw * worldX + cosYaw * worldZ
+  worldX = rotatedX
+  worldZ = rotatedZ
+
+  // Perspektivische Division
+  const screenX = (projectionDistance * worldX) / worldZ
+  const screenY = (projectionDistance * worldY) / worldZ
+
+  const canvasX =
+    screenDimensions.halfwidth + screenX * screenDimensions.halfwidth
+  const canvasY =
+    screenDimensions.halfheight - screenY * screenDimensions.halfheight
+
+  return {
+    x: canvasX,
+    y: canvasY,
+    z: worldZ,
+  }
+}
+
+function drawTriangleProjected(triangle: Triangle) {
+  const projectedVertices = triangle.vertices.map(project)
+
+  // Zeichne Linien zwischen den projizierten Vertices
+  drawLine(
+    Math.round(projectedVertices[0].x),
+    Math.round(projectedVertices[0].y),
+    Math.round(projectedVertices[1].x),
+    Math.round(projectedVertices[1].y),
+    projectedVertices[0].z, // Durchschnittliche Z-Tiefe für den Z-Buffer (kann später verbessert werden)
+    triangle.color,
+  )
+  drawLine(
+    Math.round(projectedVertices[1].x),
+    Math.round(projectedVertices[1].y),
+    Math.round(projectedVertices[2].x),
+    Math.round(projectedVertices[2].y),
+    projectedVertices[1].z,
+    triangle.color,
+  )
+  drawLine(
+    Math.round(projectedVertices[2].x),
+    Math.round(projectedVertices[2].y),
+    Math.round(projectedVertices[0].x),
+    Math.round(projectedVertices[0].y),
+    projectedVertices[2].z,
+    triangle.color,
+  )
+}
+
+function drawLine(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  z: number,
+  color: string,
+) {
+  const dx = Math.abs(x2 - x1)
+  const dy = Math.abs(y2 - y1)
+  const sx = x1 < x2 ? 1 : -1
+  const sy = y1 < y2 ? 1 : -1
+  let err = dx - dy
+
+  while (true) {
+    setPixel(x1, y1, z, color) // Hier verwenden wir die Z-Tiefe des Startpunkts (kann verbessert werden)
+
+    if (x1 === x2 && y1 === y2) break
+
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x1 += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y1 += sy
+    }
+  }
+}
+
+class Vector3 {
+  x: number
+  y: number
+  z: number
+
+  constructor(x: number = 0, y: number = 0, z: number = 0) {
+    this.x = x
+    this.y = y
+    this.z = z
+  }
+}
+
+function fillTriangleProjected(triangle: Triangle) {
+  const projectedVertices = triangle.vertices.map(project)
+
+  // Sortiere die Vertices nach Y-Koordinate
+  projectedVertices.sort((a, b) => a.y - b.y)
+
+  const v1 = projectedVertices[0]
+  const v2 = projectedVertices[1]
+  const v3 = projectedVertices[2]
+
+  function fillScanline(
+    y: number,
+    x1: number,
+    x2: number,
+    z1: number,
+    z2: number,
+    color: string,
+  ) {
+    const steps = x2 - x1
+    for (let x = x1; x <= x2; x++) {
+      const t = (x - x1) / steps
+      const z = z1 * (1 - t) + z2 * t // Lineare Interpolation der Z-Tiefe
+      setPixel(Math.round(x), Math.round(y), z, color)
+    }
+  }
+
+  // Hilfsfunktion zum Berechnen von X und Z auf einer Kante für eine gegebene Y-Koordinate
+  function interpolate(
+    y: number,
+    vA: { x: number; y: number; z: number },
+    vB: { x: number; y: number; z: number },
+  ): { x: number; z: number } | null {
+    if (vA.y === vB.y) return null
+    const t = (y - vA.y) / (vB.y - vA.y)
+    const x = vA.x + t * (vB.x - vA.x)
+    const z = vA.z + t * (vB.z - vA.z)
+    return { x, z }
+  }
+
+  // Durchlaufe die oberen und unteren Hälften des Dreiecks
+  for (let y = Math.round(v1.y); y <= Math.round(v3.y); y++) {
+    const p1 = interpolate(y, v1, v3)
+    let p2: { x: number; z: number } | null = null
+
+    if (y < v2.y) {
+      p2 = interpolate(y, v1, v2)
+    } else {
+      p2 = interpolate(y, v2, v3)
+    }
+
+    if (p1 !== null && p2 !== null) {
+      if (p1.x < p2.x) {
+        fillScanline(y, p1.x, p2.x, p1.z, p2.z, triangle.color)
+      } else {
+        fillScanline(y, p2.x, p1.x, p2.z, p1.z, triangle.color)
+      }
+    }
+  }
+}
+
+class Triangle {
+  vertices: [Vector3, Vector3, Vector3]
+  color: string
+
+  constructor(v1: Vector3, v2: Vector3, v3: Vector3, color: string = "white") {
+    this.vertices = [v1, v2, v3]
+    this.color = color
+  }
+}
+
+// Beispiel für ein Dreieck
+const triangle = new Triangle(
+  new Vector3(0, 1, 0), // Spitze oben
+  new Vector3(-1, -1, 0), // Links unten
+  new Vector3(1, -1, 0), // Rechts unten
+  "red",
+)
+
+const triangle2 = new Triangle(
+  new Vector3(-1, 0, 0.5), // Etwas nach hinten und versetzt
+  new Vector3(1, 1, 0.5),
+  new Vector3(2, -1, 0.5),
+  "blue",
+)
+
+const scene: Triangle[] = [triangle, triangle2] // Eine Liste von Objekten in unserer Szene
+
+forever(function () {
+  gameLoop()
+})
+
+function drawFrame() {
+  ctx.clearRect(0, 0, gamecan.width, gamecan.height)
+  for (let i = 0; i < zBuffer.length; i++) {
+    zBuffer[i] = Infinity
+  }
+  //drawSkyBox();
+  drawFPS()
+
+  // Zeichne unsere 3D-Szene
+  scene.forEach((triangle) => {
+    fillTriangleProjected(triangle)
+  })
+}
+
+// Wir müssen drawFrame jetzt regelmäßig aufrufen, z.B. mit requestAnimationFrame
+function gameLoop() {
+  updateCamera()
+  drawFrame()
+  //requestAnimationFrame(gameLoop);
+}
+
+function drawSkyBox() {
+  const scaleFactor = screenDimensions.height / skybox.height
+  ctx.drawImage(
+    skybox,
+    0,
+    0,
+    skybox.width * scaleFactor,
+    skybox.height * scaleFactor,
+  )
+}
+
+function setPixel(x: any, y: any, z: any, color: any) {
+  if (
+    x < 0 ||
+    y < 0 ||
+    x >= screenDimensions.width ||
+    y >= screenDimensions.height
+  )
+    return
+
+  const index = y * screenDimensions.width + x
+
+  if (z < zBuffer[index]) {
+    zBuffer[index] = z
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, 1, 1)
+  }
+}
+
+function drawFPS() {
+  const now = performance.now()
+  const delta = now - lastFrameTime
+  lastFrameTime = now
+
+  fps = 1000 / delta
+  smoothFPS = smoothFPS * 0.9 + fps * 0.1
+  ctx.fillStyle = "black"
+  ctx.fillRect(0, 0, 150, 40) // Hintergrund für bessere Lesbarkeit
+  ctx.fillStyle = "lime"
+  ctx.font = "bold 14px monospace"
+  ctx.fillText("FPS: " + Math.round(smoothFPS), 5, 15)
+  ctx.fillText(`X: ${camera.x.toFixed(2)}`, 5, 30)
+  ctx.fillText(`Y: ${camera.y.toFixed(2)}`, 70, 30)
+  ctx.fillText(`Z: ${camera.z.toFixed(2)}`, 135, 30)
+}
+
+function updateSkyBox() {
+  switch (level) {
+    case levels.castle_grounds:
+      //Credits: https://www.textures-resource.com/nintendo_64/mario64/texture/1315/
+      skybox.src = "https://i.postimg.cc/s2J6Lz4J/castle-grounds.png"
+      break
+  }
+}
+
+function updateCamera() {
+  //const yawInRadians = (camera.yaw * Math.PI) / 180;
+
+  horizontalSpeed = 0
+  if (Keyboard.keyHeld(Key.Space)) {
+    camera.y += moveSpeed
+  }
+  if (Keyboard.keyHeld(Key.Shift)) {
+    camera.y -= moveSpeed
+  }
+  if (Keyboard.keyHeld(Key.ArrowLeft)) {
+    camera.yaw -= rotationSpeed
+  }
+  if (Keyboard.keyHeld(Key.ArrowRight)) {
+    camera.yaw += rotationSpeed
+  }
+  if (Keyboard.keyHeld(Key.ArrowUp)) {
+    camera.pitch -= rotationSpeed
+  }
+  if (Keyboard.keyHeld(Key.ArrowDown)) {
+    camera.pitch += rotationSpeed
+  }
+  if (Keyboard.keyHeld(Key.W)) {
+    horizontalSpeed += moveSpeed
+    playerRotation = camera.yaw
+  }
+  if (Keyboard.keyHeld(Key.A)) {
+    horizontalSpeed += moveSpeed
+    playerRotation = camera.yaw + 90
+  }
+  if (Keyboard.keyHeld(Key.S)) {
+    horizontalSpeed += moveSpeed
+    playerRotation = camera.yaw - 180
+  }
+  if (Keyboard.keyHeld(Key.D)) {
+    horizontalSpeed += moveSpeed
+    playerRotation = camera.yaw - 90
+  }
+
+  if (horizontalSpeed > 0.2) horizontalSpeed = 0.2
+
+  const dirX = -Math.sin(playerRotation)
+  const dirZ = Math.cos(playerRotation)
+  camera.x += dirX * horizontalSpeed
+  camera.z += dirZ * horizontalSpeed
+
+  // Begrenze den Pitch-Winkel (optional)
+  camera.pitch = Math.max(-89, Math.min(89, camera.pitch))
+}
