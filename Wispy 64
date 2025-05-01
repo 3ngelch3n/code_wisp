@@ -530,6 +530,18 @@ class collisionTriangle {
   }
 }
 
+const LEVEL_BOUNDARY_MAX = 200
+
+const CELL_SIZE = 40
+
+const LEVEL_DIMENSION = LEVEL_BOUNDARY_MAX * 2
+
+const NUM_CELLS_PER_DIMENSION = Math.ceil(LEVEL_DIMENSION / CELL_SIZE)
+
+const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION
+
+const staticSurfacePartition: collisionTriangle[][] = []
+
 const collisionTriangles: collisionTriangle[] = [
   new collisionTriangle(
     new Vector3(10, 0, 0),
@@ -543,6 +555,59 @@ const collisionTriangles: collisionTriangle[] = [
   ),
 ]
 initCollisions()
+
+function initializeSpatialPartition() {
+  for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
+    // Erstelle die innere Array-Dimension für diese Z-Reihe
+    staticSurfacePartition[z] = []
+    for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
+      // Erstelle das Array, das die Dreiecke für diese Zelle speichern wird
+      staticSurfacePartition[z][x] = []
+    }
+  }
+}
+
+function addTriangleToPartition(triangle: collisionTriangle): void {
+  // === Bestimme die Zelle(n), in die das Dreieck gehört ===
+  // Die einfachste Methode ist, die Zelle zu finden, die den Mittelpunkt des Dreiecks enthält.
+  // Eine präzisere Methode (für grosse Dreiecke, die Zellgrenzen überschreiten)
+  // wäre, die Bounding Box des Dreiecks zu berechnen und alle überlappenden Zellen zu identifizieren.
+  // Wir nutzen hier die einfache Mittelpunkt-Methode:
+
+  // Berechne den Mittelpunkt des Dreiecks (Durchschnitt der Eckpunkte) - muss im Weltraum sein!
+  const center = new Vector3(
+    (triangle.vertices[0].x + triangle.vertices[1].x + triangle.vertices[2].x) /
+      3,
+    (triangle.vertices[0].y + triangle.vertices[1].y + triangle.vertices[2].y) /
+      3,
+    (triangle.vertices[0].z + triangle.vertices[1].z + triangle.vertices[2].z) /
+      3,
+  )
+
+  // Berechne die Zell-Indizes basierend auf dem Mittelpunkt
+  // Verschiebe die Koordinate um LEVEL_BOUNDARY_MAX, um sie in den positiven Bereich zu bringen (von 0 bis LevelDimension)
+  const cellX = Math.floor((center.x + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
+  const cellZ = Math.floor((center.z + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
+
+  // === Füge das Dreieck der Zelle hinzu ===
+  // Prüfe, ob die berechneten Zell-Indizes im gültigen Bereich des Grids liegen
+  if (
+    cellX >= 0 &&
+    cellX < NUM_CELLS_PER_DIMENSION &&
+    cellZ >= 0 &&
+    cellZ < NUM_CELLS_PER_DIMENSION
+  ) {
+    // Füge einen Verweis auf das collisionTriangle dem Array in dieser Zelle hinzu
+    staticSurfacePartition[cellZ][cellX].push(triangle)
+    // console.log(`Dreieck zu Zelle [${cellZ}][${cellX}] hinzugefügt.`);
+  } else {
+    // Behandle Fälle, in denen das Dreieck ausserhalb der definierten Grid-Grenzen liegt
+    console.warn(
+      `Dreieck-Mittelpunkt (${center.x.toFixed(1)}, ${center.y.toFixed(1)}, ${center.z.toFixed(1)}) außerhalb der räumlichen Partition. Zelle [${cellZ}][${cellX}]`,
+    )
+    // Du könntest diese Dreiecke in einer separaten Liste speichern oder ignorieren, je nach Bedarf.
+  }
+}
 
 function initCollisions() {
   collisionTriangles.forEach((triangle) => {
@@ -1177,8 +1242,6 @@ function loadModel(model: Triangle[], modelUrl: string) {
     })
 }
 
-
-
 function updatePlayer() {
   const isIdle = player.forwardVel == 0
   player_actions_moving(isIdle)
@@ -1445,4 +1508,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO 16:57
+//LATESTBACKUO 22:16 with half collisions
