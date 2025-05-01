@@ -17,6 +17,8 @@ let leftSide = -screenWidth / 2
 let rightSide = screenWidth / 2
 let topSide = screenHeight / 2
 let bottomSide = -screenHeight / 2
+let screenWidthHalf = screenWidth / 2
+let screenHeightHalf = screenHeight / 2
 
 //__TEXT__
 let TextWidth = 0
@@ -41,7 +43,6 @@ let fov = 90
 let aspect_ratio = screenWidth / screenHeight
 let near_plane = 0
 let FL = 0
-let zBuffer = 0
 let sinX = 0
 let sinY = 0
 let cosX = 0
@@ -54,15 +55,12 @@ let y2 = 0
 let z1 = 0
 let z2 = 0
 
-let renderLayer = { GameFrame: 0, DynamicUI: 5, StaticUI: 10 }
+let zBuffer = {}
 
 //__GAME_VARIABLES__
 let lives = 3
 let coins = 0
 let playerSize = 5.0 / 2
-
-let update_UI = 2
-let update_Game = 2
 
 //__PLAYER_VARIABLES__
 let playerPos = { x: 0, y: 0, z: 0 }
@@ -114,60 +112,28 @@ let maxVelY = -7.5
 let moveS = 0.25
 let rotS = 5
 
-let currentFrame = 0
-
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
-  let type = Math.round(clone.transparency)
-  clone.transparency = 0
   clone.visible = true
-  if (type == 0) {
-    onMessage("deleteFrameA", function () {
-      clone.delete()
-    })
-  } else if (type == 1) {
-    onMessage("deleteFrameB", function () {
-      clone.delete()
-    })
-  } else if (type == 5) {
-    onMessage("deleteDynamicUIA", function () {
-      clone.delete()
-    })
-  } else if (type == 6) {
-    onMessage("deleteDynamicUIB", function () {
-      clone.delete()
-    })
-  } else if (type == 10 || type == 11) {
-    onMessage("deleteStaticUI", function () {
-      clone.delete()
-    })
-  }
+  wait(0.08)
+  clone.delete()
 })
 
 init()
 
 //__MAIN_LOOP__
 forever(function () {
-  currentFrame = 1 - currentFrame
-  if (currentFrame == 1) {
-    sendMessage("deleteFrameA")
-    sendMessage("deleteDynamicUIA")
-  } else {
-    sendMessage("deleteFrameB")
-    sendMessage("deleteDynamicUIB")
-  }
   inputs()
   movePlayer()
   moveCam()
-  drawGame()
-  drawUI()
-  drawStaticUI()
+  calculateZBuffer()
+  draw()
+  draw_ui()
   wait(frameTime)
 })
 
 //__DRAWING THE GAME UI__
-function drawUI() {
-  sprite.transparency = renderLayer.DynamicUI + currentFrame
+function draw_ui() {
   DrawBigNumberInt(
     leftSide,
     160,
@@ -187,10 +153,6 @@ function drawUI() {
     ["S", ":", " "],
     [],
   )
-}
-
-function drawStaticUI() {
-  sprite.transparency = renderLayer.StaticUI + currentFrame
 }
 
 function moveCam() {
@@ -369,8 +331,7 @@ function init() {
 }
 let xs = 0
 
-function drawGame() {
-  sprite.transparency = renderLayer.GameFrame + currentFrame
+function calculateZBuffer() {
   InitTrigonometry()
 
   let s = playerSize
@@ -378,6 +339,8 @@ function drawGame() {
   let y = playerPos.y
   let z = playerPos.z
 
+  DrawFace(-s + x, -s + y, -s + z, s + x, -s + y, -s + z, s + x, -s + y, s + z)
+  
   /*Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, s + y, -s + z)
   Draw3dLine(s + x, s + y, -s + z, -s + x, s + y, -s + z)
@@ -391,13 +354,23 @@ function drawGame() {
   Draw3dLine(-s + x, -s + y, -s + z, -s + x, -s + y, s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, -s + y, s + z)
   Draw3dLine(s + x, s + y, -s + z, s + x, s + y, s + z)
-  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)*/
+  Draw3dLine(-s + x, s + y, -s + z, -s + x, s + y, s + z)
 
   Draw3dLine(0, -2, -240, 0, -2, 240)
   Draw3dLine(-240, -2, 0, 240, -2, 0)
   //Draw3dLine(0, -24, 0, 0, -24, 0)
 
-  RenderComplexShape()
+  RenderComplexShape()*/
+}
+
+function draw() {
+  //Drawing The lines
+}
+
+function DrawFace(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, x3: number, y3: number, z3: number) {
+  Draw3dLine(x1, y1, z1, x2, y2, z2)
+  Draw3dLine(x2, y2, z2, x3, y3, z3)
+  Draw3dLine(x1, y1, z1, x3, y3, z3)
 }
 
 function SetPoint1(x: number, y: number, z: number) {
@@ -504,10 +477,10 @@ function clipLineToScreen(x1: number, y1: number, x2: number, y2: number) {
   const BOTTOM = 4
   const TOP = 8
 
-  const xmin = -screenWidth / 2
-  const xmax = screenWidth / 2
-  const ymin = -screenHeight / 2
-  const ymax = screenHeight / 2
+  const xmin = -screenWidthHalf
+  const xmax = screenWidthHalf
+  const ymin = -screenHeightHalf
+  const ymax = screenHeightHalf
 
   let x: number
   let y: number
@@ -1569,5 +1542,3 @@ function DrawText(RenderX: number, RenderY: number, text: string[]) {
     }
   }
 }
-
-//TEMP 
