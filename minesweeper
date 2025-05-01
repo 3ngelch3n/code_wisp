@@ -1,0 +1,875 @@
+//____YOU_CAN_CHANGE_THE_GAME_SETTINGS_BELOW______
+let minefieldsize = 10
+let mineCount = 20
+/*___________________
+Hover over a tile and left-click or press Space to uncover it.
+Press F to place a flag. The number of remaining flags to place
+is shown in the top left. Good luck!
+___________________*/
+//__SETUP__
+sprite.brightness = -100
+sprite.size = 2.5
+sprite.visible = false
+
+let flagCount = mineCount
+let fieldsTotalWoMines = minefieldsize * minefieldsize - mineCount
+let openedTiles = 0
+
+//__LINE_RENDERER__
+let lineSize = 10.5
+let halfLineSize = 5.25
+let errorMargin = 1.5
+
+sprite.brightness = -100
+
+//__GAME_SETTINGS__
+let frameTime = 0.1
+frameTime *= 1
+let screenWidth = 640
+let screenHeight = 480
+let leftSide = -screenWidth / 2
+let rightSide = screenWidth / 2
+let topSide = screenHeight / 2
+let bottomSide = -screenHeight / 2
+
+//__TEXT__
+let TextWidth = 0
+let LetterWidth = lineSize
+let LetterHeight = lineSize * 2
+let LetterSpacing = lineSize / 1.5
+
+let minefieldBoxsize = lineSize * 2.5
+
+let tileSpacing = minefieldBoxsize * 1.2
+
+let won = false
+let lose = false
+
+//__LINE_OBJECTS__
+onCloneStart(function (clone) {
+  clone.visible = true
+  onMessage("deleteClones", function () {
+    clone.delete()
+  })
+})
+let boardChanged = false
+let revealed: number[][] = []
+let minefield: number[][] = []
+let generated = false
+init()
+draw()
+draw_ui()
+//__MAIN_LOOP__
+forever(function () {
+  inputs()
+  if (boardChanged) {
+    sendMessage("deleteClones")
+    draw()
+    draw_ui()
+    boardChanged = false
+  }
+  wait(frameTime)
+})
+
+//__DRAWING THE GAME UI__
+function draw_ui() {
+  sprite.brightness = 50
+  DrawBigNumberInt(
+    -screenWidth / 2 + 10,
+    screenHeight / 2 - 10,
+    flagCount,
+    1,
+    ["F", " "],
+    [],
+  )
+  DrawBigNumberInt(
+    -LetterWidth * 3 - LetterSpacing * 3,
+    -screenHeight / 2 + 28,
+    openedTiles,
+    1,
+    [],
+    [],
+  )
+  DrawText(0, -screenHeight / 2 + 28, ["/"])
+  DrawBigNumberInt(
+    LetterWidth + LetterSpacing,
+    -screenHeight / 2 + 28,
+    fieldsTotalWoMines,
+    1,
+    [],
+    [],
+  )
+}
+
+function generateField() {
+  minefield = []
+  for (let y = 0; y < minefieldsize; y++) {
+    let row: number[] = []
+    for (let x = 0; x < minefieldsize; x++) {
+      row.push(0)
+    }
+    minefield.push(row)
+  }
+  let placed = 0
+  while (placed < mineCount) {
+    let x = Math.floor(Math.random(0, 1) * minefieldsize)
+    let y = Math.floor(Math.random(0, 1) * minefieldsize)
+    if (minefield[y][x] !== -1) {
+      minefield[y][x] = -1
+      placed++
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          let nx = x + dx
+          let ny = y + dy
+          if (
+            nx >= 0 &&
+            nx < minefieldsize &&
+            ny >= 0 &&
+            ny < minefieldsize &&
+            minefield[ny][nx] !== -1
+          ) {
+            minefield[ny][nx]++
+          }
+        }
+      }
+    }
+  }
+}
+
+function inputs() {
+  if (!lose) {
+    if (Mouse.isDown(MouseButton.Left) || Keyboard.keyDown(Key.Space)) {
+      let tileX = Math.floor(
+        (Mouse.x + (minefieldsize * tileSpacing) / 2) / tileSpacing,
+      )
+      let tileY = Math.floor(
+        ((minefieldsize * tileSpacing) / 2 - Mouse.y) / tileSpacing,
+      )
+
+      if (
+        tileX >= 0 &&
+        tileX < minefieldsize &&
+        tileY >= 0 &&
+        tileY < minefieldsize
+      ) {
+        if (!generated) {
+          generateField()
+          while (minefield[tileY][tileX] != 0) {
+            generateField()
+          }
+          generated = true
+          reveal(tileX, tileY)
+        } else {
+          reveal(tileX, tileY)
+        }
+      }
+    }
+    if (Keyboard.keyDown(Key.F)) {
+      let tileX = Math.floor(
+        (Mouse.x + (minefieldsize * tileSpacing) / 2) / tileSpacing,
+      )
+      let tileY = Math.floor(
+        ((minefieldsize * tileSpacing) / 2 - Mouse.y) / tileSpacing,
+      )
+
+      if (
+        tileX >= 0 &&
+        tileX < minefieldsize &&
+        tileY >= 0 &&
+        tileY < minefieldsize
+      ) {
+        flag(tileX, tileY)
+      }
+    }
+  }
+}
+
+function flag(x: number, y: number) {
+  if (revealed[y][x] == 1) return
+  if (revealed[y][x] == 2) {
+    revealed[y][x] = 0
+    flagCount++
+    boardChanged = true
+  } else if (flagCount > 0) {
+    revealed[y][x] = 2
+    flagCount--
+    boardChanged = true
+  }
+}
+
+function reveal(x: number, y: number) {
+  if (revealed[y][x] == 1) return
+  boardChanged = true
+  if (revealed[y][x] == 2) {
+    if (minefield[y][x] == 0) {
+      flagCount++
+    } else {
+      return
+    }
+  }
+  revealed[y][x] = 1
+  openedTiles++
+
+  if (minefield[y][x] === -1) {
+    lose = true
+  } else if (minefield[y][x] === 0) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        let nx = x + dx
+        let ny = y + dy
+        if (nx >= 0 && nx < minefieldsize && ny >= 0 && ny < minefieldsize) {
+          reveal(nx, ny)
+        }
+      }
+    }
+  }
+  if (openedTiles >= fieldsTotalWoMines) {
+    won = true
+  }
+}
+
+function GetTextWidth(text: string[]) {
+  TextWidth = text.length * LetterWidth + text.length * LetterSpacing
+  return TextWidth
+}
+
+function init() {
+  won = false
+  lose = false
+  if (minefieldsize > 13) minefieldsize = 13
+  revealed = [] // reset
+  for (let y = 0; y < minefieldsize; y++) {
+    let row: number[] = []
+    for (let x = 0; x < minefieldsize; x++) {
+      row.push(0) // alles zu Beginn verdeckt
+    }
+    revealed.push(row)
+  }
+}
+
+function draw() {
+  wait(0.01)
+  drawGrid()
+  drawMinefield()
+  if (lose) {
+    let lose_text = ["0", "V", "E", "R"]
+    let xT = GetTextWidth(lose_text)
+    DrawText(-xT / 2, screenHeight / 2 - 10, lose_text)
+  }
+  if (won) {
+    let win_text = ["Y", "0", "U", " ", "W", "0", "N"]
+    let xT = GetTextWidth(win_text)
+    DrawText(-xT / 2, screenHeight / 2 - 10, win_text)
+  }
+}
+
+function drawGrid() {
+  let startX = -((minefieldsize * tileSpacing) / 2)
+  let startY = (minefieldsize * tileSpacing) / 2
+  let endX = startX + tileSpacing * minefieldsize
+  let endY = startY - tileSpacing * minefieldsize
+  sprite.brightness = -100
+  for (let y = 0; y <= minefieldsize; y++) {
+    let yPos = startY - y * tileSpacing
+    DrawLine(startX, yPos, endX, yPos)
+  }
+
+  for (let x = 0; x <= minefieldsize; x++) {
+    let xPos = startX + x * tileSpacing
+    DrawLine(xPos, startY, xPos, endY)
+  }
+}
+
+function drawMinefield() {
+  let startX = -((minefieldsize * tileSpacing) / 2) - 6
+  let startY = (minefieldsize * tileSpacing) / 2 - 6
+
+  for (let y = 0; y < minefieldsize; y++) {
+    for (let x = 0; x < minefieldsize; x++) {
+      if (revealed[y][x] == 1) {
+        let tileX = startX + x * tileSpacing
+        let tileY = startY - y * tileSpacing
+        // Wenn das Feld eine Mine hat (wird als -1 dargestellt), zeichne ein "F"
+        if (minefield[y][x] === -1) {
+          DrawText(tileX, tileY, ["M"])
+        } else {
+          // Andernfalls die Zahl der benachbarten Minen anzeigen
+          DrawText(tileX, tileY, ["" + minefield[y][x]])
+        }
+      } else if (revealed[y][x] == 2) {
+        let tileX = startX + x * tileSpacing
+        let tileY = startY - y * tileSpacing
+        DrawText(tileX, tileY, ["F"])
+      }
+    }
+  }
+}
+
+function DrawLine(x1: number, y1: number, x2: number, y2: number) {
+  sprite.x = x1
+  sprite.y = y1
+  sprite.pointTowards(x2, y2)
+  let vx = Math.cos(sprite.rotation)
+  let vy = Math.sin(sprite.rotation)
+  sprite.rotation += 90
+  let linelength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
+  sprite.x += vx * halfLineSize
+  sprite.y -= vy * halfLineSize
+  createClone()
+  linelength -= lineSize
+  while (linelength > errorMargin) {
+    sprite.x += vx * lineSize
+    sprite.y -= vy * lineSize
+    createClone()
+    linelength -= lineSize
+  }
+}
+
+function DrawBigNumberInt(
+  RenderX: number,
+  RenderY: number,
+  number: number,
+  scale: number,
+  beforeText: string[],
+  afterText: string[],
+) {
+  let renderNumber = Math.round(number * scale)
+  let renderArray: string[] = beforeText
+
+  if (renderNumber < 0) {
+    renderArray.push("-")
+    renderNumber = -renderNumber
+  }
+
+  if (renderNumber === 0) {
+    renderArray.push("0")
+  } else {
+    let digits: string[] = []
+    while (renderNumber > 0) {
+      let digit = renderNumber % 10
+      digits.push("" + digit)
+      renderNumber = Math.floor(renderNumber / 10)
+    }
+
+    for (let i = digits.length - 1; i >= 0; i--) {
+      renderArray.push(digits[i])
+    }
+  }
+  if (afterText.length != 0) {
+    for (let i = 0; i < afterText.length; i++) {
+      renderArray.push(afterText[i])
+    }
+  }
+  DrawText(RenderX, RenderY, renderArray)
+}
+
+function DrawText(RenderX: number, RenderY: number, text: string[]) {
+  for (let i = 0; i < text.length; i++) {
+    let DrawStartPos = {
+      x: RenderX + (i + 1) * LetterWidth + (i + 1) * LetterSpacing,
+      y: RenderY,
+    }
+    sprite.brightness = -100
+    switch (text[i]) {
+      case " ":
+        break
+
+      case "M":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "F":
+        sprite.brightness = 25
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize * 0.7,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        break
+      case "0":
+        sprite.brightness = -85
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + LetterWidth / 1.5,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "E":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize * 0.7,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "R":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "V":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        break
+      case "1":
+        sprite.brightness = -70
+        DrawLine(
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "/":
+        DrawLine(
+          DrawStartPos.x + 1,
+          DrawStartPos.y - LetterHeight + 1,
+          DrawStartPos.x + lineSize - 1,
+          DrawStartPos.y - 1,
+        )
+        break
+      case "2":
+        sprite.brightness = -55
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "3":
+        sprite.brightness = -40
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "4":
+        sprite.brightness = -25
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "5":
+        sprite.brightness = -20
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "6":
+        sprite.brightness = -15
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        break
+      case "7":
+        sprite.brightness = -10
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "8":
+        sprite.brightness = -5
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "Y":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "W":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize / 2,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + halfLineSize / 2,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x + halfLineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + halfLineSize + halfLineSize / 2,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + halfLineSize + halfLineSize / 2,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        break
+      case "U":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight + 3,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight + 3,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight + 3,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight + 3,
+        )
+        break
+      case "N":
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - halfLineSize / 2,
+          DrawStartPos.x + LetterWidth / 1.5,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        break
+      case "9":
+        sprite.brightness = 0
+        DrawLine(
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x,
+          DrawStartPos.y - LetterHeight / 2,
+        )
+        DrawLine(
+          DrawStartPos.x,
+          DrawStartPos.y,
+          DrawStartPos.x + lineSize,
+          DrawStartPos.y,
+        )
+        break
+    }
+  }
+}
+/*___________________
+Hover over a tile and left-click or press Space to uncover it.
+Press F to place a flag. The number of remaining flags to place
+is shown in the top left. Good luck!
+___________________*/
+//Scroll to the top to adjust the number of mines or the size of the field
