@@ -64,7 +64,7 @@ let playerPos = { x: 0, y: 0, z: 0 }
 let playerRotation = 0
 let playerSpeedVertical = 0
 let playerSpeedHorizontal = 0
-let playerWalkSpeed = 0.7
+let playerWalkSpeed = 0.4
 enum playerStates {
   "idle",
   "run",
@@ -89,13 +89,16 @@ let upwards_velocities = {
   wallkick: 6.2,
 }
 
+let playerAirSpeed = 0.1
+
 let jumpingThisFrame = false
 let onGround = true
 let movedThisFrame = false
 let airHandling = 0
 
-let airX = 0
-let airZ = 0
+let playerAirSpeedHorizontal = 0
+let playerAirRotation = 0
+let playerAirSpeedHard = 1.1
 
 let groundsoftVelX = 3.2
 let groundhardVelX = 4.8
@@ -127,28 +130,6 @@ forever(function () {
 
 //__DRAWING THE GAME UI__
 function draw_ui() {
-  /*
-  DrawText(-screenWidth / 2, screenHeight / 2 - 20, [
-    "L",
-    "I",
-    "V",
-    "E",
-    "S",
-    " ",
-    "" + lives,
-    " ",
-    " ",
-    " ",
-    " ",
-    "C",
-    "O",
-    "I",
-    "N",
-    "S",
-    " ",
-    "" + coins,
-  ])*/
-
   DrawBigNumberInt(
     leftSide,
     160,
@@ -159,6 +140,15 @@ function draw_ui() {
   )
   DrawBigNumberInt(leftSide, 130, cameraRot.y, 10, ["Y", ":", " "], [])
   DrawBigNumberInt(leftSide, 100, playerRotation, 10, ["R", ":", " "], [])
+  DrawBigNumberInt(leftSide, -70, playerAirRotation, 10, ["A", ":", " "], [])
+  DrawBigNumberInt(
+    leftSide,
+    -100,
+    playerAirSpeedHorizontal,
+    10,
+    ["S", ":", " "],
+    [],
+  )
 }
 
 function moveCam() {
@@ -219,16 +209,27 @@ function movePlayer() {
     }
   } else {
     if (Keyboard.keyHeld(Key.W)) {
-      airZ
+      playerAirRotation = LerpAngle(playerAirRotation, cameraRot.y, 0.8)
+      playerAirSpeedHorizontal += playerAirSpeed
+      movedThisFrame = true
     }
     if (Keyboard.keyHeld(Key.S)) {
-      airZ
+      playerAirRotation = LerpAngle(playerAirRotation, cameraRot.y - 180, 0.8)
+      playerAirSpeedHorizontal += playerAirSpeed
+      movedThisFrame = true
     }
     if (Keyboard.keyHeld(Key.D)) {
-      airX
+      playerAirRotation = LerpAngle(playerAirRotation, cameraRot.y - 90, 0.8)
+      playerAirSpeedHorizontal += playerAirSpeed
+      movedThisFrame = true
     }
     if (Keyboard.keyHeld(Key.A)) {
-      airX
+      playerAirRotation = LerpAngle(playerAirRotation, cameraRot.y + 90, 0.8)
+      playerAirSpeedHorizontal += playerAirSpeed
+      movedThisFrame = true
+    }
+    if (playerAirSpeedHorizontal > playerAirSpeedHard) {
+      playerAirSpeedHorizontal = playerAirSpeedHard
     }
   }
 
@@ -239,14 +240,16 @@ function movePlayer() {
   playerPos.z += dirZ * playerSpeedHorizontal
 
   if (!onGround) {
-    playerSpeedVertical += gravity // Anwendungs von Gravitation
-    playerSpeedVertical = Math.max(playerSpeedVertical, maxVelY) // Maximalwert der Geschwindigkeit
+    playerPos.x += -Math.sin(playerAirRotation) * playerAirSpeedHorizontal
+    playerPos.z += Math.cos(playerAirRotation) * playerAirSpeedHorizontal
+    playerSpeedVertical += gravity
+    playerSpeedVertical = Math.max(playerSpeedVertical, maxVelY)
   }
 
-  // Wenn der Spieler auf dem Boden ist
   if (onGround) {
     if (Keyboard.keyDown(Key.Space)) {
-      // Wenn der Spieler springt
+      playerAirSpeedHorizontal = 0
+      playerAirRotation = playerRotation
       playerSpeedVertical = upwards_velocities.single_jump
       jumpingThisFrame = true
       onGround = false
@@ -273,7 +276,8 @@ function checkGroundCollision() {
   if (playerPos.y <= 0) {
     onGround = true
     playerPos.y = 0
-    playerSpeedVertical = 0 // Stoppe die vertikale Geschwindigkeit, wenn der Spieler den Boden berührt
+    playerSpeedVertical = 0
+    playerAirSpeedHorizontal = 0
   }
 }
 
