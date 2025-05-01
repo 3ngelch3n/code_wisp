@@ -59,6 +59,9 @@ let lives = 3
 let coins = 0
 let playerSize = 5.0 / 2
 
+let update_UI:boolean = true
+let update_Game:boolean = true
+
 //__PLAYER_VARIABLES__
 let playerPos = { x: 0, y: 0, z: 0 }
 let playerRotation = 0
@@ -112,8 +115,17 @@ let rotS = 5
 //__LINE_OBJECTS__
 onCloneStart(function (clone) {
   clone.visible = true
-  wait(0.08)
-  clone.delete()
+  let type = Math.round(clone.transparency)
+  if (type == 0) {
+    onMessage('deleteFrame', function() {
+      clone.delete()
+    })
+  }
+  if (type == 1) {
+    onMessage('delteUI', function() {
+      clone.delete()
+    })
+  }
 })
 
 init()
@@ -123,13 +135,20 @@ forever(function () {
   inputs()
   movePlayer()
   moveCam()
-  draw()
-  draw_ui()
+  if (update_Game) {
+    sendMessage('deleteFrame')
+    draw_game()
+  }
+  if (update_UI) {
+    sendMessage('deleteUI')  
+    draw_ui()
+  }
   wait(frameTime)
 })
 
 //__DRAWING THE GAME UI__
 function draw_ui() {
+  sprite.transparency = 1
   DrawBigNumberInt(
     leftSide,
     160,
@@ -327,7 +346,7 @@ function init() {
 }
 let xs = 0
 
-function draw() {
+function draw_game() {
   InitTrigonometry()
 
   let s = playerSize
@@ -335,6 +354,7 @@ function draw() {
   let y = playerPos.y
   let z = playerPos.z
 
+  sprite.transparency = 0
   Draw3dLine(-s + x, -s + y, -s + z, s + x, -s + y, -s + z)
   Draw3dLine(s + x, -s + y, -s + z, s + x, s + y, -s + z)
   Draw3dLine(s + x, s + y, -s + z, -s + x, s + y, -s + z)
