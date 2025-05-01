@@ -320,6 +320,19 @@ function fillTriangleProjected(triangle: Triangle) {
   if (projectedVertices.some((v) => v === null)) {
     return
   }
+
+  const cameraForward = new Vector3(
+    Math.cos(camera.yaw - 90) * Math.cos(camera.pitch),
+    Math.sin(camera.pitch),
+    Math.sin(camera.yaw - 90) * Math.cos(camera.pitch),
+  )
+
+  const dot = triangle.normal.dot(cameraForward)
+
+  if (dot <= -0.3) {
+    return
+  }
+
   projectedVertices.sort((a, b) => a.y - b.y)
   const v1 = projectedVertices[0]
   const v2 = projectedVertices[1]
@@ -584,17 +597,35 @@ function drawFrame() {
     .forEach((triangle) => {
       const scaledV1 = scaleVector3(
         triangle.vertices[0],
-        playerCenter.add(new Vector3(player.position.x, player.position.y+5, player.position.z)),
+        playerCenter.add(
+          new Vector3(
+            player.position.x,
+            player.position.y + 5,
+            player.position.z,
+          ),
+        ),
         outlineScaleFactor,
       )
       const scaledV2 = scaleVector3(
         triangle.vertices[1],
-        playerCenter.add(new Vector3(player.position.x, player.position.y+5, player.position.z)),
+        playerCenter.add(
+          new Vector3(
+            player.position.x,
+            player.position.y + 5,
+            player.position.z,
+          ),
+        ),
         outlineScaleFactor,
       )
       const scaledV3 = scaleVector3(
         triangle.vertices[2],
-        playerCenter.add(new Vector3(player.position.x, player.position.y+5, player.position.z)),
+        playerCenter.add(
+          new Vector3(
+            player.position.x,
+            player.position.y + 5,
+            player.position.z,
+          ),
+        ),
         outlineScaleFactor,
       )
 
@@ -1008,9 +1039,8 @@ function updatePlayer() {
   player_actions_moving()
   if (player.forwardVel == 0) {
     playerAnimIdle()
-  }
-  else {
-    playerAnimRunning(player.forwardVel/5)
+  } else {
+    playerAnimRunning(player.forwardVel / 5)
   }
 }
 
@@ -1262,4 +1292,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO
+//LATESTBACKUO 9:02
