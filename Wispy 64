@@ -394,6 +394,8 @@ let player = {
   yaw: 0,
   pitch: 0,
   forwardVel: 0,
+  slideVelX: 0,
+  slideVelZ: 0,
   verticalVel: 0,
   intendedYaw: 0,
   animWannaState: 0,
@@ -1708,7 +1710,7 @@ function setPlayerFloor() {
 function playerSetAir() {
   if (player.state != state.air) {
     setPlayerAnimation(animations.fall)
-  } //!!
+  } 
   player.state = state.air
 }
 
@@ -1766,25 +1768,34 @@ function player_actions_moving(was_standing_still: boolean) {
   }
   function updateAirMovement() {
     const gravityMult = 2
-    const dragThreshold = 1.6
+    const dragThreshold = 32
+    let sidewaysSpeed = 0
     player.forwardVel = approach(player.forwardVel, 0, 0.175, 0.175)
-    if (intendedX != 0 && intendedY != 0) {
+    if (intendedX != 0 || intendedY != 0) {
       const intendedDYaw = player.intendedYaw - player.yaw
       const intendedMagThis = intendedMag / 32
-      player.forwardVel += intendedMagThis * Math.cos(intendedDYaw) * 1.5
-      sidewaysSpeed = intededMag * Math.sin
+      player.forwardVel += intendedMagThis * Math.cos(intendedDYaw) * 0.75
+      sidewaysSpeed = intendedMagThis * Math.sin(intendedDYaw) * 5
     }
+      if (player.forwardVel > dragThreshold) {
+        player.forwardVel -= 1
+      }
+      if (player.forwardVel < -dragThreshold/2) {
+        player.forwardVel += 2
+      }
+      player.slideVelX = player.forwardVel * Math.sin(player.yaw)
+      player.slideVelZ = player.forwardVel * Math.cos(player.yaw)
+
+      player.slideVelX += sidewaysSpeed * Math.sin(player.yaw + 90)
+      player.slideVelZ += sidewaysSpeed * Math.cos(player.yaw + 90)
+
+      player.position.x += player.slideVelX / 32
+      player.position.z += player.slideVelZ / 32
+    
     if (player.verticalVel > -1.875 / gravityMult)
       player.verticalVel += gravity / gravityMult
     player.position.y += player.verticalVel
-    const speed = player.forwardVel
-    const yawDegrees = player.yaw
 
-    const deltaX = speed * Math.sin(yawDegrees)
-    const deltaZ = speed * Math.cos(yawDegrees)
-
-    player.position.x += deltaX / 32
-    player.position.z += deltaZ / 32
   }
 
   function updateGroundMovement() {
@@ -1846,13 +1857,15 @@ function player_actions_moving(was_standing_still: boolean) {
   }
 }
 
-function approach(from: number, to:number, incPos: number, decPos: number) {
-  const fromTo = to-from
-  if (fromTo > 0) {
-    return from - decPos
-  }else
-    return from + incPos
-  return from
+function approach(current: number, target: number, incStep: number, decStep: number): number {
+    const diff = target - current;
+    if (diff > 0) { // Ziel ist größer
+        return current + Math.min(diff, incStep);
+    } else if (diff < 0) { // Ziel ist kleiner
+        return current + Math.max(diff, -decStep);
+    } else { // Ziel ist erreicht
+        return target;
+    }
 }
 
 function playerJump() {
@@ -2100,4 +2113,5 @@ function playerAnimJumpStart() {
   if (animationTimer == animationTime)
     player.currentAnimation = animations.single_jumping_fall
 }
-//LATESTBACKUO FUNCTIONING 14:09 01.05
+//LATESTBACKUO FUNCTIONING 21:33 01.05 gravity + jumping
+ 
