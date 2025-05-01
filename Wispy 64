@@ -1120,7 +1120,7 @@ function drawFrame() {
 
   const outlineScaleFactor = 1.1
   const outlineColor = "#333333"
-  const off = 4
+  const off = 0
 
   scene
     .filter((triangle) => triangle.isPlayer)
@@ -1586,13 +1586,13 @@ function updatePlayer() {
         animTime = 0
         animTime2 = 0
       }
-      playerAnimIdle()
+      playerFreeFall()
     } else {
       if (isIdle) {
         animTime = 0
         animTime2 = 0
       }
-      playerAnimRunning(player.forwardVel / 3, 0)
+      //playerAnimRunning(player.forwardVel / 3, 0)
     }
   }
   //highlightPlayerGridCell()
@@ -1603,7 +1603,6 @@ function setPlayerFloor() {
   const playerX = player.position.x
   const playerZ = player.position.z
 
-  const FLOOR_LOWER_LIMIT = -1
   const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
   const playerCellX = cellIndices.cellX
   const playerCellZ = cellIndices.cellZ
@@ -1984,25 +1983,23 @@ function playerFreeFall() {
   const timeSinAbs = Math.abs(timeSin)
   const timeSinAbs4 = Math.abs(timeSin) / 4
   const timeSin2 = Math.sin(animTime2)
-  player.animWannaState = (player.animWannaState + 1) % 270
-  playerObj.rightArm.rotation = new rotation(0, timeSin, -timeSinAbs)
-  playerObj.rightArm.position = new Vector3(0, -timeSinAbs4, 0)
-  playerObj.leftArm.rotation = new rotation(0, timeSin, -timeSinAbs)
-  playerObj.leftArm.position = new Vector3(0, -timeSinAbs4, 0)
+  
+  playerObj.rightArm.rotation = new rotation(10, 5, 200)
+  playerObj.rightArm.position = new Vector3(-1.5, 8.5, -0.5)
+  playerObj.leftArm.rotation = new rotation(10, 5, 200)
+  playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
 
-  playerObj.leftLeg.rotation = new rotation(0, 0, -timeSin * 3)
+  playerObj.leftLeg.rotation = new rotation(0, 0, 0)
   playerObj.leftLeg.position = new Vector3(0, 0, 0)
-  playerObj.rightLeg.rotation = new rotation(0, 0, timeSin * 3)
+  playerObj.rightLeg.rotation = new rotation(0, 0, 0)
   playerObj.rightLeg.position = new Vector3(0, 0, 0)
 
-  playerObj.Body.rotation = new rotation(0, 0, 0)
-  playerObj.Body.position = new Vector3(0, -timeSinAbs4, 0)
-  if (player.animWannaState > 90) {
-    playerObj.Head.rotation = new rotation(timeSin2 * 28, 0, timeSinAbs)
-  } else {
-    playerObj.Head.rotation = new rotation(timeSin2 / 2, 0, timeSinAbs)
-  }
-  playerObj.Head.position = new Vector3(0, -timeSinAbs4, 0)
+  playerObj.Body.rotation = new rotation(0, 0, 8)
+  playerObj.Body.position = new Vector3(0.8, 0, 0)
+
+  playerObj.Head.rotation = new rotation(0, 0, 13)
+  playerObj.Head.position = new Vector3(1.2, 0, 0)
+
   const diff = Math.random(-0.3, 0.3)
   animTime = (animTime + 3 + diff) % 360
   animTime2 = (animTime2 + 2 - diff) % 360
