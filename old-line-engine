@@ -94,6 +94,9 @@ let onGround = true
 let movedThisFrame = false
 let airHandling = 0
 
+let airX = 0
+let airZ = 0
+
 let groundsoftVelX = 3.2
 let groundhardVelX = 4.8
 
@@ -189,7 +192,7 @@ function movePlayer() {
       movedThisFrame = true
     }
     if (Keyboard.keyHeld(Key.S)) {
-      playerRotation = LerpAngle(playerRotation, cameraRot.y -180, 0.5)
+      playerRotation = LerpAngle(playerRotation, cameraRot.y - 180, 0.5)
       playerSpeedHorizontal += playerWalkSpeed
       movedThisFrame = true
     }
@@ -205,23 +208,36 @@ function movePlayer() {
     }
 
     if (movedThisFrame) {
-    if (playerSpeedHorizontal > groundsoftVelX) {
-      playerSpeedHorizontal = Math.round(playerSpeedHorizontal * 40) / 100
-      if (playerSpeedHorizontal > groundhardVelX) {
-        playerSpeedHorizontal = groundhardVelX
+      if (playerSpeedHorizontal > groundsoftVelX) {
+        playerSpeedHorizontal = Math.round(playerSpeedHorizontal * 40) / 100
+        if (playerSpeedHorizontal > groundhardVelX) {
+          playerSpeedHorizontal = groundhardVelX
+        }
       }
+    } else {
+      playerSpeedHorizontal = Math.round(playerSpeedHorizontal * 60) / 100
     }
   } else {
-    playerSpeedHorizontal = Math.round(playerSpeedHorizontal * 60) / 100
-  }
+    if (Keyboard.keyHeld(Key.W)) {
+      airZ
+    }
+    if (Keyboard.keyHeld(Key.S)) {
+      airZ
+    }
+    if (Keyboard.keyHeld(Key.D)) {
+      airX
+    }
+    if (Keyboard.keyHeld(Key.A)) {
+      airX
+    }
   }
 
   let dirX = -Math.sin(playerRotation)
   let dirZ = Math.cos(playerRotation)
 
   playerPos.x += dirX * playerSpeedHorizontal
-    playerPos.z += dirZ * playerSpeedHorizontal
-  
+  playerPos.z += dirZ * playerSpeedHorizontal
+
   if (!onGround) {
     playerSpeedVertical += gravity // Anwendungs von Gravitation
     playerSpeedVertical = Math.max(playerSpeedVertical, maxVelY) // Maximalwert der Geschwindigkeit
