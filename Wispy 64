@@ -71,6 +71,8 @@ enum state {
 
 let currentAnimation = animations.idle
 
+const epsilon = 1e-6 
+
 resolutionScale = Math.max(resolutionScale, 1)
 
 if (document.querySelectorAll("canvas").length > 1) {
@@ -328,7 +330,7 @@ function interpolate(
   vA: { x: number; y: number; z: number },
   vB: { x: number; y: number; z: number },
 ): { x: number; z: number } | null {
-  const epsilon = 1e-6 // Kleiner Wert für Toleranzvergleiche
+  // Kleiner Wert für Toleranzvergleiche
   const yDiff = vB.y - vA.y
 
   if (Math.abs(yDiff) < epsilon) {
@@ -526,6 +528,13 @@ class collisionTriangle {
     this.vertices = worldVertices // Aktualisiere die Eckpunkte auf Weltraum-Koordinaten
     this.normal = worldNormal.normalize() // Aktualisiere und normalisiere die Normale im Weltraum
 
+    if (this.normal.y > 0.01) {
+      this.collisionType = collisionTypes.floor
+    } else if (this.normal.y < -0.01) {
+      this.collisionType = collisionTypes.ceiling
+    } else {
+      this.collisionType = collisionTypes.wall
+    }
     this.originOffset = -this.normal.dot(this.vertices[0])
   }
 }
@@ -540,9 +549,30 @@ const NUM_CELLS_PER_DIMENSION = Math.ceil(LEVEL_DIMENSION / CELL_SIZE)
 
 const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION
 
-const staticSurfacePartition: collisionTriangle[][] = []
+const staticSurfacePartition: collisionTriangle[][][] = []
 
-const collisionTriangles: collisionTriangle[] = [
+const tv1 = new Vector3(30, 0, 20)
+const tv2 = new Vector3(10, 0, 10)
+const tv3 = new Vector3(10, 0, 30)
+
+let scene: Triangle[] = [new Triangle(
+  tv1,
+  tv2,
+  tv3,
+  "#AAFFFF",
+  calculateNormal(
+    tv1,
+    tv2,
+    tv3,
+  ),
+  false
+)]
+
+const allStaticCollisionTriangles: collisionTriangle[] = [];
+
+setupStaticCollisionGeometry()
+console.log(staticSurfacePartition)
+/*const collisionTriangles: collisionTriangle[] = [
   new collisionTriangle(
     new Vector3(10, 0, 0),
     new Vector3(-10, 0, -10),
@@ -553,73 +583,123 @@ const collisionTriangles: collisionTriangle[] = [
       new Vector3(-10, 0, 10),
     ),
   ),
-]
-initCollisions()
+]*/
+
 
 function initializeSpatialPartition() {
-  for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
-    // Erstelle die innere Array-Dimension für diese Z-Reihe
-    staticSurfacePartition[z] = []
-    for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
-      // Erstelle das Array, das die Dreiecke für diese Zelle speichern wird
-      staticSurfacePartition[z][x] = []
+    for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
+        staticSurfacePartition[z] = new Array<collisionTriangle[]>(NUM_CELLS_PER_DIMENSION);
+
+        for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
+
+            staticSurfacePartition[z][x] = [] as collisionTriangle[];
+        }
     }
-  }
+    console.log(`Räumliche Partition initialisiert: ${NUM_CELLS_PER_DIMENSION}x${NUM_CELLS_PER_DIMENSION} Zellen.`);
 }
 
-function addTriangleToPartition(triangle: collisionTriangle): void {
-  // === Bestimme die Zelle(n), in die das Dreieck gehört ===
-  // Die einfachste Methode ist, die Zelle zu finden, die den Mittelpunkt des Dreiecks enthält.
-  // Eine präzisere Methode (für grosse Dreiecke, die Zellgrenzen überschreiten)
-  // wäre, die Bounding Box des Dreiecks zu berechnen und alle überlappenden Zellen zu identifizieren.
-  // Wir nutzen hier die einfache Mittelpunkt-Methode:
+function setupStaticCollisionGeometry() {
+    // 1. Initialisiere das Grid (Muss VOR dem Hinzufügen von Dreiecken passieren!)
+    initializeSpatialPartition();
 
-  // Berechne den Mittelpunkt des Dreiecks (Durchschnitt der Eckpunkte) - muss im Weltraum sein!
-  const center = new Vector3(
-    (triangle.vertices[0].x + triangle.vertices[1].x + triangle.vertices[2].x) /
-      3,
-    (triangle.vertices[0].y + triangle.vertices[1].y + triangle.vertices[2].y) /
-      3,
-    (triangle.vertices[0].z + triangle.vertices[1].z + triangle.vertices[2].z) /
-      3,
-  )
+    // 2. Lade oder erstelle deine statischen Kollisionsdreiecke
+    // In deinem Beispiel hattest du ein Array collisionTriangles deklariert.
+    // Hier würden die Dreiecke normalerweise aus einer Modelldatei geladen und erstellt werden.
 
-  // Berechne die Zell-Indizes basierend auf dem Mittelpunkt
-  // Verschiebe die Koordinate um LEVEL_BOUNDARY_MAX, um sie in den positiven Bereich zu bringen (von 0 bis LevelDimension)
-  const cellX = Math.floor((center.x + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
-  const cellZ = Math.floor((center.z + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
+    const rawCollisionTrianglesData = [
+        // Beispiel: Ein Dreieck im Modellraum (oder direkt im Weltraum, je nach deiner Datenquelle)
+        {
+            vertices: [tv1, tv2, tv3],
+            // Normale berechnen, sollte auch im richtigen Raum sein (Modell oder Weltraum)
+            normal: calculateNormal(tv1, tv2, tv3)
+        },
+        // Füge hier weitere Dreiecke hinzu
+    ];
 
-  // === Füge das Dreieck der Zelle hinzu ===
-  // Prüfe, ob die berechneten Zell-Indizes im gültigen Bereich des Grids liegen
-  if (
-    cellX >= 0 &&
-    cellX < NUM_CELLS_PER_DIMENSION &&
-    cellZ >= 0 &&
-    cellZ < NUM_CELLS_PER_DIMENSION
-  ) {
-    // Füge einen Verweis auf das collisionTriangle dem Array in dieser Zelle hinzu
-    staticSurfacePartition[cellZ][cellX].push(triangle)
-    // console.log(`Dreieck zu Zelle [${cellZ}][${cellX}] hinzugefügt.`);
-  } else {
-    // Behandle Fälle, in denen das Dreieck ausserhalb der definierten Grid-Grenzen liegt
-    console.warn(
-      `Dreieck-Mittelpunkt (${center.x.toFixed(1)}, ${center.y.toFixed(1)}, ${center.z.toFixed(1)}) außerhalb der räumlichen Partition. Zelle [${cellZ}][${cellX}]`,
-    )
-    // Du könntest diese Dreiecke in einer separaten Liste speichern oder ignorieren, je nach Bedarf.
-  }
+    rawCollisionTrianglesData.forEach(data => {
+        // Erstelle ein collisionTriangle Objekt
+        const colTriangle = new collisionTriangle(data.vertices[0], data.vertices[1], data.vertices[2], data.normal);
+
+        // Wenn deine Daten bereits im Weltraum sind (wie in deinem Snippet):
+        const worldVertices = data.vertices; // Nutze die vorhandenen
+        const worldNormal = data.normal; // Nutze die vorhandenen
+
+        // Aktualisiere die Kollisionsdaten mit den Weltraum-Daten
+        // Dies setzt auch originOffset und collisionType korrekt
+        colTriangle.updateCollisionData(worldVertices as [Vector3, Vector3, Vector3], worldNormal);
+
+
+        // 4. Füge das korrekt aktualisierte Dreieck zum Grid hinzu
+        addTriangleToPartition_BoundingBox(colTriangle);
+    });
+
+    console.log("Statische Kollisionsgeometrie im Grid eingerichtet.");
+
 }
 
-function initCollisions() {
-  collisionTriangles.forEach((triangle) => {
-    if (triangle.normal.y > 0.01) {
-      triangle.collisionType = collisionTypes.floor
-    } else if (triangle.normal.y < -0.01) {
-      triangle.collisionType = collisionTypes.ceiling
-    } else {
-      triangle.collisionType = collisionTypes.wall
+function getWorldCoordsCellIndices(worldX: number, worldZ: number): { cellX: number, cellZ: number } {
+    const cellX = Math.floor((worldX + LEVEL_BOUNDARY_MAX) / CELL_SIZE);
+    const cellZ = Math.floor((worldZ + LEVEL_BOUNDARY_MAX) / CELL_SIZE);
+
+    return { cellX: cellX, cellZ: cellZ };
+}
+
+function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
+    // === Berechne die 2D-Bounding Box des Dreiecks (auf der XZ-Ebene) ===
+    // Finde die min/max X und Z Koordinaten der 3 Vertices im Weltraum
+    const minX = Math.min(triangle.vertices[0].x, triangle.vertices[1].x, triangle.vertices[2].x);
+    const maxX = Math.max(triangle.vertices[0].x, triangle.vertices[1].x, triangle.vertices[2].x);
+    const minZ = Math.min(triangle.vertices[0].z, triangle.vertices[1].z, triangle.vertices[2].z);
+    const maxZ = Math.max(triangle.vertices[0].z, triangle.vertices[1].z, triangle.vertices[2].z);
+    // === Ende Bounding Box ===
+
+
+    // === Bestimme den Bereich der Zellen, die die Bounding Box überlappt ===
+    // Finde den Index der Start-Zelle (unten links auf der XZ-Ebene)
+    const startCellIndices = getWorldCoordsCellIndices(minX, minZ);
+    const startCellX = startCellIndices.cellX;
+    const startCellZ = startCellIndices.cellZ;
+
+    // Finde den Index der End-Zelle (oben rechts auf der XZ-Ebene)
+    const endCellIndices = getWorldCoordsCellIndices(maxX, maxZ);
+    const endCellX = endCellIndices.cellX;
+    const endCellZ = endCellIndices.cellZ;
+    // === Ende Zellbereich ===
+
+
+    // === Iteriere über alle Zellen in diesem Bereich und füge das Dreieck hinzu ===
+    // Stelle sicher, dass die Zell-Indizes innerhalb der Grid-Grenzen liegen!
+    const clampedStartCellX = Math.max(0, startCellX);
+    const clampedEndCellX = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellX);
+    const clampedStartCellZ = Math.max(0, startCellZ);
+    const clampedEndCellZ = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellZ);
+
+
+    for (let z = clampedStartCellZ; z <= clampedEndCellZ; z++) {
+        for (let x = clampedStartCellX; x <= clampedEndCellX; x++) {
+             // Füge einen Verweis auf das Dreieck zu jeder dieser Zellen hinzu
+
+             // === ZUSÄTZLICHE LOG-AUSGABEN ZUR FEHLERSUCHE ===
+             // Prüfe, ob es wirklich ein Array ist (sollte es nach initializeSpatialPartition sein)
+             if (Array.isArray(staticSurfacePartition[z][x])) {
+                 console.log(`DEBUG: Vor push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`);
+                 console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle); // Zeige das Objekt, das du hinzufügen willst
+
+                 // Führe den push aus
+                 staticSurfacePartition[z][x].push(triangle);
+
+                 console.log(`DEBUG: Nach push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`);
+                 // console.log(`DEBUG: Inhalt der Zelle [${z}][${x}] nach push: `, staticSurfacePartition[z][x]); // Kann viel Output geben!
+
+             } else {
+                 console.error(`FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z][x]}`, staticSurfacePartition[z][x]);
+             }
+             // === ENDE ZUSÄTZLICHE LOG-AUSGABEN ===
+
+             // Deine ursprüngliche Log-Zeile (jetzt im DEBUG-Block oben)
+             // console.log(`Dreieck zu Zelle [${z}][${x}] hinzugefügt. Anzahl Dreiecke in Zelle: ${staticSurfacePartition[z][x].length}`);
+        }
     }
-    triangle.originOffset = -triangle.normal.dot(triangle.vertices[0])
-  })
 }
 
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
@@ -675,7 +755,7 @@ let playerObj: {
   rightLeg: resetAnimatableObject(), // Initialisiere direkt
 }
 
-let scene: Triangle[] = []
+
 
 //__ Fetch Model Data __
 const mario_model =
@@ -696,7 +776,7 @@ let playerCenter = new Vector3(0, 0, 0)
 let playerCount = 0
 
 importPlayer()
-loadModel(scene, test_map)
+//loadModel(scene, test_map)
 /*let scale = 3
 const v1 = new Vector3(10*scale,0,10*scale)
 const v2 = new Vector3(-10*scale,0,10*scale)
@@ -1259,7 +1339,85 @@ function updatePlayer() {
     }
     playerAnimRunning(player.forwardVel / 3, 0)
   }
+  highlightPlayerGridCell()
+  checkForFloor()
 }
+
+function checkForFloor() {
+  const playerX = player.position.x;
+  const playerZ = player.position.z;
+
+  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ);
+  const playerCellX = cellIndices.cellX;
+  const playerCellZ = cellIndices.cellZ;
+  let trianglesInPlayerCell: collisionTriangle[] = []
+  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX];
+  let inTriangle: collisionTriangle[] = []
+  trianglesInPlayerCell.filter((triangle) => triangle.collisionType === collisionTypes.floor).forEach((triangle) => {
+    const v1 = triangle.vertices[0];
+    const v2 = triangle.vertices[1];
+    const v3 = triangle.vertices[2];
+
+    const cross_v1_v2 = (v2.z - v1.z) * (playerX - v1.x) - (v2.x - v1.x) * (playerZ - v1.z);
+    const cross_v2_v3 = (v3.z - v2.z) * (playerX - v2.x) - (v3.x - v2.x) * (playerZ - v2.z);
+    const cross_v3_v1 = (v1.z - v3.z) * (playerX - v3.x) - (v1.x - v3.x) * (playerZ - v3.z);
+
+    const isInside2D = (cross_v1_v2 >= -epsilon && cross_v2_v3 >= -epsilon && cross_v3_v1 >= -epsilon) ||
+                   (cross_v1_v2 <= epsilon && cross_v2_v3 <= epsilon && cross_v3_v1 <= epsilon);
+    
+    if (!isInside2D)
+      return -1000
+
+    const nx = triangle.normal.x;
+    const ny = triangle.normal.y; 
+    const nz = triangle.normal.z;
+    const oo = triangle.originOffset; 
+
+    if (Math.abs(ny) < epsilon) {
+      return -1000
+    }
+
+    const heightAtPoint = -(playerX * nx + nz * playerZ + oo) / ny;
+    return heightAtPoint
+    
+  })
+
+}
+
+function highlightPlayerGridCell() {
+  const playerX = player.position.x;
+  const playerZ = player.position.z;
+  const gridY = 0.2;
+
+  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ);
+  const playerCellX = cellIndices.cellX;
+  const playerCellZ = cellIndices.cellZ;
+  let trianglesInPlayerCell: collisionTriangle[] = []
+  trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX];
+  
+  if (playerCellX >= 0 && playerCellX < NUM_CELLS_PER_DIMENSION && playerCellZ >= 0 && playerCellZ < NUM_CELLS_PER_DIMENSION) {
+  const worldX_min = playerCellX * CELL_SIZE - LEVEL_BOUNDARY_MAX;
+  const worldX_max = (playerCellX + 1) * CELL_SIZE - LEVEL_BOUNDARY_MAX;
+  const worldZ_min = playerCellZ * CELL_SIZE - LEVEL_BOUNDARY_MAX;
+  const worldZ_max = (playerCellZ + 1) * CELL_SIZE - LEVEL_BOUNDARY_MAX;
+
+  const v1 = new Vector3(worldX_min, gridY, worldZ_min);
+  const v2 = new Vector3(worldX_max, gridY, worldZ_min);
+  const v3 = new Vector3(worldX_max, gridY, worldZ_max);
+  const v4 = new Vector3(worldX_min, gridY, worldZ_max);
+
+  if (trianglesInPlayerCell.length > 0) {
+    scene.push(new Triangle(v1, v2, v3, "#00FF00", new Vector3(0,1,0), false, true))
+    scene.push(new Triangle(v1, v4, v3, "#009900", new Vector3(0,1,0), false, true))
+  }else {
+    scene.push(new Triangle(v1, v2, v3, "#000088", new Vector3(0,1,0), false, true))
+    scene.push(new Triangle(v1, v4, v3, "#000066", new Vector3(0,1,0), false, true))
+  }
+  }else {
+        
+    }
+}
+
 
 function player_actions_moving(was_standing_still: boolean) {
   updateGroundMovement()
@@ -1508,4 +1666,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO 22:16 with half collisions
+//LATESTBACKUO 22:21 29.04
