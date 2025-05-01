@@ -12,7 +12,7 @@ const camera = {
 
 const light = {
   yaw: 45,
-  pitch: 45,
+  pitch: -45,
 }
 
 let horizontalSpeed = 0
@@ -24,6 +24,8 @@ const moveSpeed = 0.1
 const rotationSpeed = -2
 
 const projectionDistance = 1
+
+let lightDir: Vector3
 
 if (document.querySelectorAll("canvas").length > 1) {
   document.querySelectorAll("canvas")[0].parentElement.children[1].remove()
@@ -283,14 +285,17 @@ function fillTriangleProjected(triangle: Triangle) {
       p2 = interpolate(y, v2, v3)
     }
     if (p1 !== null && p2 !== null) {
-      let colors = { r: 0, g: 0, b: 0 }
-      colors = hexToRgb(triangle.color)
-      const lightLevels = calculateLightLevel(triangle.normal)
-      //console.log(colors)
-      colors.r += Math.round((lightLevels / 8) * 10) / 10
-      colors.g += Math.round((lightLevels / 8) * 10) / 10
-      colors.b += Math.round((lightLevels / 8) * 10) / 10
-      const fillColor = rgbToHex(colors.r, colors.g, colors.b)
+      let fillColor = triangle.color
+      if (!triangle.bakedLight) {
+        let colors = hexToRgb(triangle.color)
+        const lightLevels = calculateLightLevel(triangle.normal)
+        if (colors != null) {
+          colors.r += lightLevels
+          colors.g += lightLevels
+          colors.b += lightLevels
+          fillColor = rgbToHex(colors.r, colors.g, colors.b)
+        }
+      }
       if (p1.x < p2.x) {
         fillScanline(y, p1.x, p2.x, p1.z, p2.z, fillColor)
       } else {
@@ -304,43 +309,50 @@ class Triangle {
   vertices: [Vector3, Vector3, Vector3]
   color: string
   normal: Vector3
+  bakedLight: boolean
   constructor(
     v1: Vector3,
     v2: Vector3,
     v3: Vector3,
     color: string = "white",
     normal: Vector3,
+    bakedLight: boolean,
   ) {
     this.vertices = [v1, v2, v3]
     this.color = color
     this.normal = normal
+    this.bakedLight = bakedLight
   }
 }
 
-function calculateLightLevel(normal: Vector3) {
-  const light3D = new Vector3(light.yaw, light.pitch, 0)
+function calculateLightDirection(yaw: number, pitch: number): Vector3 {
+  let dir = new Vector3(0, 0, 1)
 
-  const lightLength2DSq = light.yaw * light.yaw + light.pitch * light.pitch
+  const cosPitch = Math.cos(pitch)
+  const sinPitch = Math.sin(pitch)
+  const pitchedY = dir.y * cosPitch - dir.z * sinPitch
+  const pitchedZ = dir.y * sinPitch + dir.z * cosPitch
+  dir.y = pitchedY
+  dir.z = pitchedZ
 
-  if (lightLength2DSq === 0) {
-    return 1.0
-  }
+  const cosYaw = Math.cos(yaw)
+  const sinYaw = Math.sin(yaw)
+  const yawedX = dir.x * cosYaw + dir.z * sinYaw
+  const yawedZ = dir.z * cosYaw - dir.x * sinYaw
+  dir.x = yawedX
+  dir.z = yawedZ
 
-  const lightLength2D = Math.sqrt(lightLength2DSq)
+  return dir.normalize() // Stelle sicher, dass der Vektor normalisiert ist
+}
 
-  const normalizedLight3D = new Vector3(
-    light.yaw / lightLength2D,
-    light.pitch / lightLength2D,
-    0,
-  )
+function calculateLightLevel(normal: Vector3): number {
+  const lightDirection = calculateLightDirection(light.yaw, light.pitch)
 
-  const normalizedNormal = normal.normalize()
+  const dot = normal.dot(lightDirection)
 
-  const dotProduct = normalizedNormal.dot(normalizedLight3D)
+  const levelFloat = dot + 1.0
 
-  const lightingFactor = dotProduct + 1.0
-
-  return lightingFactor
+  return levelFloat
 }
 
 function getRandomColor() {
@@ -390,7 +402,14 @@ fetch(mario_test)
         const b = (normal.z + 1) / 2
         const faceColor = rgbToHex(r, g, b)*/
 
-        const triangle = new Triangle(v1_3D, v2_3D, v3_3D, faceColor, normal)
+        const triangle = new Triangle(
+          v1_3D,
+          v2_3D,
+          v3_3D,
+          faceColor,
+          normal,
+          false,
+        )
         scene.push(triangle)
       }
     }
@@ -470,8 +489,13 @@ function drawFrame() {
 
 function gameLoop() {
   updateCamera()
+  updateLight()
   drawFrame()
   //requestAnimationFrame(gameLoop);
+}
+
+function updateLight() {
+  lightDir = 
 }
 
 function drawSkyBox() {
@@ -589,4 +613,3 @@ function updateCamera() {
 
   camera.pitch = Math.max(-89, Math.min(89, camera.pitch))
 }
- 
