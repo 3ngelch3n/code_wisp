@@ -28,6 +28,7 @@ const light = {
 let intendedY = 0
 let intendedX = 0
 let intendedMag = 0
+let intendedSpace = false
 const moveSpeed = 0.1
 const gravity = -0.1
 const enable_outlines = true
@@ -1420,6 +1421,7 @@ function rotateTowardsAngleDegrees(
 function inputs() {
   intendedX = 0
   intendedY = 0
+  intendedSpace = false
   if (!camera.turningYaw) {
     if (Keyboard.keyDown(Key.ArrowRight)) {
       camera.targetYaw = camera.targetYaw - camera.stepAngle
@@ -1443,6 +1445,9 @@ function inputs() {
   }
   if (Keyboard.keyHeld(Key.W)) {
     intendedX += 32
+  }
+  if (Keyboard.keyDown(Key.Space)) {
+    intendedSpace = true
   }
   intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
   player.intendedYaw = -camera.yaw + atan2(intendedX, intendedY)
@@ -1586,9 +1591,14 @@ function updatePlayer() {
     } else {
       setPlayerAnimation(animations.running)
     }
-  }else if (player.state == state.air) {
-    if (player.currentAnimation == animations.fall || player.currentAnimation == animations.single_jumping_fall)
-    {} else {setPlayerAnimation(animations.fall)}
+  } else if (player.state == state.air) {
+    if (
+      player.currentAnimation == animations.fall ||
+      player.currentAnimation == animations.single_jumping_fall
+    ) {
+    } else {
+      setPlayerAnimation(animations.fall)
+    }
   }
   updatePlayerAnimations()
   //highlightPlayerGridCell()
@@ -1597,10 +1607,10 @@ function updatePlayer() {
 
 function setPlayerAnimation(animationSet: animations) {
   if (player.currentAnimation != animationSet) {
-  player.currentAnimation = animationSet
-  player.animWannaState = 0
-  animTime = 0
-  animTime2 = 0
+    player.currentAnimation = animationSet
+    player.animWannaState = 0
+    animTime = 0
+    animTime2 = 0
   }
 }
 
@@ -1697,7 +1707,7 @@ function setPlayerFloor() {
 
 function playerSetAir() {
   if (player.state != state.air) {
-    player.verticalVel = 0
+    setPlayerAnimation(animations.fall)
   } //!!
   player.state = state.air
 }
@@ -1752,12 +1762,20 @@ function player_actions_moving(was_standing_still: boolean) {
   if (player.state == state.ground) {
     updateGroundMovement()
   } else if (player.state == state.air) {
-    //updateGroundMovement()
     updateAirMovement()
   }
   function updateAirMovement() {
     const gravityMult = 2
-    if (player.verticalVel > -1.875/gravityMult) player.verticalVel += gravity/gravityMult
+    const dragThreshold = 1.6
+    player.forwardVel = approach(player.forwardVel, 0, 0.175, 0.175)
+    if (intendedX != 0 && intendedY != 0) {
+      const intendedDYaw = player.intendedYaw - player.yaw
+      const intendedMagThis = intendedMag / 32
+      player.forwardVel += intendedMagThis * Math.cos(intendedDYaw) * 1.5
+      sidewaysSpeed = intededMag * Math.sin
+    }
+    if (player.verticalVel > -1.875 / gravityMult)
+      player.verticalVel += gravity / gravityMult
     player.position.y += player.verticalVel
     const speed = player.forwardVel
     const yawDegrees = player.yaw
@@ -1821,9 +1839,27 @@ function player_actions_moving(was_standing_still: boolean) {
     player.position.x += deltaX / 32
     player.position.z += deltaZ / 32
 
+    if (intendedSpace)
+      playerJump()
     // Anmerkung: Vertikale Bewegung (Y-Achse) wie Schwerkraft oder Sprünge
     // müsste separat behandelt werden. Diese Funktion macht nur die Bewegung in der XZ-Ebene.
   }
+}
+
+function approach(from: number, to:number, incPos: number, decPos: number) {
+  const fromTo = to-from
+  if (fromTo > 0) {
+    return from - decPos
+  }else
+    return from + incPos
+  return from
+}
+
+function playerJump() {
+  player.verticalVel = 2.1/2
+  setPlayerAnimation(animations.single_jumping_fall)
+  player.state = state.air
+  player.position.y += player.verticalVel
 }
 
 function importPlayer() {
@@ -1942,11 +1978,7 @@ function playerAnimRunning(runSpeed: number) {
     0,
   )
   playerObj.rightArm.position = new Vector3(-timeSin2 * 1.3, -0.5, -3)
-  playerObj.leftArm.rotation = new rotation(
-    timeSin * 32 + 10,
-    -40 - timeSin,
-    0,
-  )
+  playerObj.leftArm.rotation = new rotation(timeSin * 32 + 10, -40 - timeSin, 0)
   playerObj.leftArm.position = new Vector3(timeSin * 1.3, -0.5, 3)
 
   playerObj.leftLeg.rotation = new rotation(0, 0, timeSin2 * 60)
@@ -2007,7 +2039,7 @@ function playerAnimFreeFall() {
   playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
 
   playerObj.leftLeg.rotation = new rotation(0, 5, -15)
-  playerObj.leftLeg.position = new Vector3(0, .2, 0)
+  playerObj.leftLeg.position = new Vector3(0, 0.2, 0)
   playerObj.rightLeg.rotation = new rotation(0, 0, -13)
   playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
 
@@ -2024,20 +2056,20 @@ function playerAnimFreeFall() {
 
 function playerAnimSingleJump() {
   playerObj.rightArm.rotation = new rotation(-30, 0, -10)
-  playerObj.rightArm.position = new Vector3(-1,-.3,-.6)
+  playerObj.rightArm.position = new Vector3(-1, -0.3, -0.6)
   playerObj.leftArm.rotation = new rotation(-10, 0, 200)
   playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
 
-  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
-  playerObj.leftLeg.position = new Vector3(0, .2, 0)
-  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
-  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
+  playerObj.leftLeg.rotation = new rotation(0, 5, -48)
+  playerObj.leftLeg.position = new Vector3(-0.9, 0.4, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, 43)
+  playerObj.rightLeg.position = new Vector3(0.8, 0.4, 0)
 
   playerObj.Body.rotation = new rotation(0, 0, 0)
   playerObj.Body.position = new Vector3(0, 0, 0)
 
   playerObj.Head.rotation = new rotation(-5, 0, 3)
-  playerObj.Head.position = new Vector3(0.3, .1, 0)
+  playerObj.Head.position = new Vector3(0.3, 0.1, 0)
 
   animTime = 0
   animTime2 = 0
@@ -2065,6 +2097,7 @@ function playerAnimJumpStart() {
   playerObj.Head.position = new Vector3(0, 0 + animationTimer, 0)
 
   if (animationTimer < animationTime) animationTimer++
-  if (animationTimer == animationTime) player.currentAnimation = animations.single_jumping_fall
+  if (animationTimer == animationTime)
+    player.currentAnimation = animations.single_jumping_fall
 }
 //LATESTBACKUO FUNCTIONING 14:09 01.05
