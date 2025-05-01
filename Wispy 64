@@ -25,12 +25,11 @@ const light = {
   pitch: -45,
 }
 
-let horizontalSpeed = 0
-let playerRotation = 0
 let intendedY = 0
 let intendedX = 0
 let intendedMag = 0
 const moveSpeed = 0.1
+const gravity = -0.1
 const enable_outlines = true
 const rotationSpeed = -2
 const projectionDistance = 1
@@ -112,6 +111,7 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   worldY = rotatedY
   worldZ = rotatedZ2
 
+  
   if (worldZ <= 0.1) {
     return null // Vertex is behind the camera
   }
@@ -200,6 +200,7 @@ let player = {
   yaw: 0,
   pitch: 0,
   forwardVel: 0,
+  verticalVel: 0,
   intendedYaw: 0,
   animWannaState: 0,
   state: state.ground,
@@ -304,22 +305,30 @@ function interpolate(
 function fillTriangleProjected(triangle: Triangle) {
   // Project the triangle's vertices to screen space
   const projectedVertices = triangle.vertices.map(project)
-
-  // If any vertex is behind the camera, the triangle is culled
+  if (!triangle.isPlayer)
+        console.log("filltriangle no player!!")
+  
   if (projectedVertices.some((v) => v === null)) {
     return
   }
-
-  /*
-  const cameraPos = new Vector3(camera.x, camera.y, camera.z)
-  const vertexPos = triangle.vertices[0]
-  const camToVertex = vertexPos.subtract(cameraPos)
+  if (!triangle.isPlayer)
+        console.log("projectedVertices.some!!")
+  const cosYaw = Math.cos(camera.yaw);
+  const sinYaw = Math.sin(camera.yaw);
+  const cosPitch = Math.cos(camera.pitch);
+  const sinPitch = Math.sin(camera.pitch);
+  const cameraForward = new Vector3(
+    cosYaw * cosPitch,
+    sinPitch,
+    sinYaw * cosPitch
+  );
   // Back-face culling: check if the triangle normal faces away from the camera
-  const dotCulling = triangle.normal.dot(camToVertex)
+  const dotCulling = triangle.normal.dot(cameraForward)
   if (dotCulling >= 0 && !triangle.isPlayer) {
     return
   }
-  */
+  if (!triangle.isPlayer)
+        console.log("dotCulling >= 0!!")
 
   // Sort vertices by Y-coordinate for scanline rasterization
   projectedVertices.sort((a, b) => a.y - b.y)
@@ -350,6 +359,8 @@ function fillTriangleProjected(triangle: Triangle) {
   const gByte = Math.floor(gFloat * 255)
   const bByte = Math.floor(bFloat * 255)
 
+  if (!triangle.isPlayer)
+        console.log("Start interpolate for loop!!")
   // Rasterize the triangle by filling horizontal scanlines
   for (let y = Math.round(v1.y); y <= Math.round(v3.y); y++) {
     // Find the intersection points on the left and right edges of the triangle
@@ -365,6 +376,8 @@ function fillTriangleProjected(triangle: Triangle) {
 
     if (p1 !== null && p2 !== null) {
       // Ensure p1.x is the left point and p2.x is the right point
+      if (!triangle.isPlayer)
+        console.log("fillscanline no player!!")
       if (p1.x < p2.x) {
         fillScanline(
           y,
@@ -473,12 +486,22 @@ const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION // Alias for clarity
 // Each cell can store a list of collision triangles that intersect it.
 const staticSurfacePartition: collisionTriangle[][][] = []
 
-const tv1 = new Vector3(30, 10, 20)
-const tv2 = new Vector3(10, 0, 10)
-const tv3 = new Vector3(10, 0, 30)
+const tv1 = new Vector3(10, 7, 10);
+const tv2 = new Vector3(-10, 0, -20); // Der Wert, der vorher tv3 zugewiesen war
+const tv3 = new Vector3(-10, 0, 10)
+
+const tv11 = new Vector3(30, 0, 30);
+const tv21 = new Vector3(-30, 0, -30); // Der Wert, der vorher tv3 zugewiesen war
+const tv31 = new Vector3(-30, 0, 30)
+
+const tv12 = new Vector3(-30, 0, -30);
+const tv22 = new Vector3(30, 0, 30); // Der Wert, der vorher tv3 zugewiesen war
+const tv32 = new Vector3(30, 0, -30)
 
 let scene: Triangle[] = [
-  new Triangle(tv1, tv2, tv3, "#AAFFFF", calculateNormal(tv1, tv2, tv3), false),
+  new Triangle(tv1, tv2, tv3, "#00FFFF", calculateNormal(tv1, tv2, tv3), false),
+  new Triangle(tv11, tv21, tv31, "#00FFFF", calculateNormal(tv11, tv21, tv31), false),
+  new Triangle(tv12, tv22, tv32, "#00FFFF", calculateNormal(tv12, tv22, tv32), false),
 ]
 
 const allStaticCollisionTriangles: collisionTriangle[] = []
@@ -511,6 +534,14 @@ function setupStaticCollisionGeometry() {
     {
       vertices: [tv1, tv2, tv3],
       normal: calculateNormal(tv1, tv2, tv3),
+    },
+    {
+      vertices: [tv11, tv21, tv31],
+      normal: calculateNormal(tv11, tv21, tv31),
+    },
+    {
+      vertices: [tv11, tv21, tv31],
+      normal: calculateNormal(tv11, tv21, tv31),
     },
     // Add more raw collision data here as needed
   ]
@@ -771,6 +802,7 @@ function drawFrame() {
   scene
     .filter((triangle) => !triangle.isPlayer)
     .forEach((triangle) => {
+      console.log("drewTriangle")
       fillTriangleProjected(triangle)
     })
 
@@ -849,6 +881,8 @@ function gameLoop() {
   updateCamera()
   updateLight()
   updateAnimations()
+  console.log("---")
+  console.log(scene)
   drawFrame()
   //requestAnimationFrame(gameLoop);
 }
@@ -1239,6 +1273,7 @@ function loadModel(model: Triangle[], modelUrl: string) {
 function updatePlayer() {
   const isIdle = player.forwardVel == 0
   player_actions_moving(isIdle)
+  if (player.state == state.ground) {
   if (player.forwardVel == 0) {
     if (!isIdle) {
       player.animWannaState = 0
@@ -1253,11 +1288,12 @@ function updatePlayer() {
     }
     playerAnimRunning(player.forwardVel / 3, 0)
   }
+  }
   highlightPlayerGridCell()
-  player.position.y = checkForFloor()
+  setPlayerFloor()
 }
 
-function checkForFloor(): number {
+function setPlayerFloor() {
   const playerX = player.position.x
   const playerZ = player.position.z
 
@@ -1268,6 +1304,7 @@ function checkForFloor(): number {
   let trianglesInPlayerCell: collisionTriangle[] = []
   trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
   let heightList: number[] = []
+  //console.log(trianglesInPlayerCell)
   trianglesInPlayerCell
     .filter((triangle) => triangle.collisionType === collisionTypes.floor)
     .forEach((triangle) => {
@@ -1291,7 +1328,6 @@ function checkForFloor(): number {
           cross_v3_v1 <= epsilon)
 
       if (!isInside2D) return
-
       const nx = triangle.normal.x
       const ny = triangle.normal.y
       const nz = triangle.normal.z
@@ -1302,11 +1338,22 @@ function checkForFloor(): number {
       }
 
       const heightAtPoint = -(playerX * nx + nz * playerZ + oo) / ny
-      heightList.push(heightAtPoint)
+      if (player.state == state.ground) {
+        if (player.position.y <= heightAtPoint+10 && player.position.y >= heightAtPoint)
+          heightList.push(heightAtPoint)
+      }
+      if (player.position.y + 3 >= heightAtPoint 
+          && player.position.y <= heightAtPoint)
+        heightList.push(heightAtPoint)
     })
 
-  //!!
-  return heightList.length > 0 ? Math.max(...heightList) : FLOOR_LOWER_LIMIT
+  console.log(heightList)
+  if (heightList.length == 0) {
+    player.state = state.air
+  }else {
+    player.state = state.ground
+    player.position.y = Math.max(...heightList)
+  }
 }
 
 function highlightPlayerGridCell() {
@@ -1353,10 +1400,26 @@ function highlightPlayerGridCell() {
     }
   } else {
   }
-}
+}//!!
 
 function player_actions_moving(was_standing_still: boolean) {
+  if (player.state == state.ground) {
   updateGroundMovement()
+  }else if (player.state == state.air) {
+    //updateGroundMovement()
+    if (Keyboard.keyDown(Key.T))
+      player.position.y -= 0.1
+    if (Keyboard.keyDown(Key.Z))
+      player.position.y += 0.1
+    updateAirMovement()
+  }
+  function updateAirMovement() {
+    if (player.verticalVel > -1.875)
+      player.verticalVel += gravity
+    player.position.y += player.verticalVel
+    
+  }
+  
   function updateGroundMovement() {
     const currentYaw = player.yaw
     const intendedYaw = player.intendedYaw
@@ -1602,4 +1665,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO 23:10 29.04 (Commented)
+//LATESTBACKUO 19:21 30.04
