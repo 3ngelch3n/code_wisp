@@ -397,7 +397,7 @@ let player = {
   intendedYaw: 0,
   animWannaState: 0,
   state: state.ground,
-  currentAnimation = animations.idle,
+  currentAnimation: animations.idle,
 }
 
 class AnimatableObject {
@@ -1587,7 +1587,7 @@ function updatePlayer() {
       setPlayerAnimation(animations.running)
     }
   }else if (player.state == state.air) {
-    if (player.currentAnimation == animations.fall || player.currentAnimation == animations.jumping_fall)
+    if (player.currentAnimation == animations.fall || player.currentAnimation == animations.single_jumping_fall)
     {} else {setPlayerAnimation(animations.fall)}
   }
   updatePlayerAnimations()
@@ -1698,8 +1698,7 @@ function setPlayerFloor() {
 function playerSetAir() {
   if (player.state != state.air) {
     player.verticalVel = 0
-    if (//!!)
-  }
+  } //!!
   player.state = state.air
 }
 
@@ -2066,6 +2065,6 @@ function playerAnimJumpStart() {
   playerObj.Head.position = new Vector3(0, 0 + animationTimer, 0)
 
   if (animationTimer < animationTime) animationTimer++
-  if (animationTimer == animationTime) player.currentAnimation = animations.jumping_fall
+  if (animationTimer == animationTime) player.currentAnimation = animations.single_jumping_fall
 }
 //LATESTBACKUO FUNCTIONING 14:09 01.05
