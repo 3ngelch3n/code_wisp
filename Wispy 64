@@ -350,7 +350,7 @@ function calculateLightLevel(normal: Vector3): number {
 
   const levelFloat = dot + 0.5
 
-  return levelFloat/8
+  return levelFloat / 8
 }
 
 function getRandomColor() {
@@ -427,7 +427,7 @@ function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
 //__ RGB zu Hex Konverter __
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (c: number): string => {
-    const clampedC = Math.max(0, Math.min(1, c));
+    const clampedC = Math.max(0, Math.min(1, c))
     const hex = Math.floor(clampedC * 255).toString(16)
     return hex.length === 1 ? "0" + hex : hex
   }
@@ -612,3 +612,4 @@ function updateCamera() {
 
   camera.pitch = Math.max(-89, Math.min(89, camera.pitch))
 }
+//backup 11:18
