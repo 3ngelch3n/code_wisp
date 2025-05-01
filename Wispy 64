@@ -1,4 +1,4 @@
-let resolutionScale = 2
+let resolutionScale = 1
 //This can be any number bigger than 1 - 1 is the highest resolution
 
 let camera = {
@@ -106,6 +106,8 @@ const screenDimensions = {
 }
 
 let zBuffer = new Float32Array(screenDimensions.width * screenDimensions.height)
+let imageData = ctx.createImageData(screenDimensions.width, screenDimensions.height);
+let pixelBuffer = imageData.data;
 
 enum levels {
   castle_grounds,
@@ -163,62 +165,6 @@ function project(vertex: Vector3): { x: number; y: number; z: number } | null {
   }
 }
 
-function drawTriangleProjected(triangle: Triangle) {
-  const projectedVertices = triangle.vertices.map(project)
-  drawLine(
-    Math.round(projectedVertices[0].x),
-    Math.round(projectedVertices[0].y),
-    Math.round(projectedVertices[1].x),
-    Math.round(projectedVertices[1].y),
-    projectedVertices[0].z,
-    triangle.color,
-  )
-  drawLine(
-    Math.round(projectedVertices[1].x),
-    Math.round(projectedVertices[1].y),
-    Math.round(projectedVertices[2].x),
-    Math.round(projectedVertices[2].y),
-    projectedVertices[1].z,
-    triangle.color,
-  )
-  drawLine(
-    Math.round(projectedVertices[2].x),
-    Math.round(projectedVertices[2].y),
-    Math.round(projectedVertices[0].x),
-    Math.round(projectedVertices[0].y),
-    projectedVertices[2].z,
-    triangle.color,
-  )
-}
-
-function drawLine(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  z: number,
-  color: string,
-) {
-  const dx = Math.abs(x2 - x1)
-  const dy = Math.abs(y2 - y1)
-  const sx = x1 < x2 ? 1 : -1
-  const sy = y1 < y2 ? 1 : -1
-  let err = dx - dy
-  while (true) {
-    setPixel(x1, y1, z, color)
-    if (x1 === x2 && y1 === y2) break
-    const e2 = 2 * err
-    if (e2 > -dy) {
-      err -= dy
-      x1 += sx
-    }
-
-    if (e2 < dx) {
-      err += dx
-      y1 += sy
-    }
-  }
-}
 
 class rotation {
   pitch: number
@@ -315,93 +261,182 @@ function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
   return center.add(scaledDiff) // <-- Füge eine Add-Methode zur Vector3-Klasse hinzu, falls noch nicht vorhanden
 }
 
+function fillScanline(
+  y: number, // Dies sollte bereits ein Integer sein (gerundet von aussen)
+  x1: number, // Dies sind Gleitkommazahlen aus interpolate
+  x2: number, // Dies sind Gleitkommazahlen aus interpolate
+  z1: number,
+  z2: number,
+  // Akzeptiere RGB-Byte-Werte (0-255) direkt
+  rByte: number,
+  gByte: number,
+  bByte: number,
+  applyZBias: boolean, // Wird weiterhin benötigt, um Z1/Z2 mit Bias zu berechnen
+) {
+  // Runde x1 und x2 einmal, bevor die Schleife beginnt
+  const ix1 = Math.round(x1);
+  const ix2 = Math.round(x2);
+  // y sollte bereits von aussen gerundet sein, sicherheitshalber
+  const iy = Math.round(y);
+
+
+  let steps = ix2 - ix1; // Anzahl der Schritte (Pixel) auf dieser Scanline
+
+
+   // Füge applyZBias zum Z-Wert hinzu, bevor du ihn interpolierst/nutzt
+   const biasedZ1 = z1 + (applyZBias ? 3 : 0);
+   const biasedZ2 = z2 + (applyZBias ? 3 : 0);
+
+
+  if (steps === 0) { // Handle vertikale Linien (einzelner Pixel)
+     // setPixel(ix1, iy, biasedZ1, rByte, gByte, bByte, 255); // y ist jetzt iy
+       setPixel(ix1, iy, biasedZ1, rByte, gByte, bByte, 255); // Aufruf des globalen setPixel
+    return;
+  }
+
+  // Inkrementelle Z-Interpolation für die biased Z-Werte
+  let currentZ = biasedZ1;
+  const zStep = (biasedZ2 - biasedZ1) / steps;
+
+  // Iteriere mit gerundeten Integer-Koordinaten (ix)
+  for (let ix = ix1; ix <= ix2; ix++) { // Loop von gerundetem x1 bis gerundetem x2
+    if (ix > screenDimensions.width || ix < -screenDimensions.width)
+      return
+    // Call the global setPixel with integer coordinates, biased Z, and byte colors
+      setPixel(ix, iy, currentZ, rByte, gByte, bByte, 255); // Aufruf des globalen setPixel
+    currentZ += zStep; // Inkrementiere den Z-Wert für den nächsten Pixel
+  }
+}
+
+// PASSE interpolate AN (falls nötig) und ziehe sie heraus
+function interpolate(
+  y: number,
+  vA: { x: number; y: number; z: number },
+  vB: { x: number; y: number; z: number },
+): { x: number; z: number } | null {
+  const epsilon = 1e-6; // Kleiner Wert für Toleranzvergleiche
+  const yDiff = vB.y - vA.y;
+
+  if (Math.abs(yDiff) < epsilon) {
+     if (Math.abs(y - vA.y) < epsilon) {
+         return { x: vA.x, z: vA.z }; // y ist auf gleicher Höhe, gib Punkt A zurück
+     }
+    return null; // Horizontale Kante, aber y liegt nicht auf dieser Höhe
+  }
+
+  // Berechne den Interpolationsparameter t
+  const t = (y - vA.y) / yDiff;
+
+  // Prüfe, ob t innerhalb des Segments liegt [0, 1] mit Toleranz
+  if (t < -epsilon || t > 1 + epsilon) return null;
+
+  // Interpoliere X und Z linear basierend auf t
+  const x = vA.x + t * (vB.x - vA.x);
+  const z = vA.z + t * (vB.z - vA.z); // Linear interpolation of Z in screen space
+
+  return { x, z }; // Gib ein Objektliteral zurück
+}
+
+// --- ENDE HERAUSGELÖSTE HILFSFUNKTIONEN ---
+
+
+// --- OPTIMIERTE fillTriangleProjected FUNKTION ---
 function fillTriangleProjected(triangle: Triangle) {
-  const projectedVertices = triangle.vertices.map(project)
+  // Projiziere Eckpunkte ins 2D Bildschirm-System + behalte Z (Kameraraum)
+  const projectedVertices = triangle.vertices.map(project); // 'project' erstellt Vektoren
+
+  // Wenn irgendein Eckpunkt geclipped wurde (hinter Near Plane oder hinter Far Plane in 'project'), überspringe das Dreieck komplett
   if (projectedVertices.some((v) => v === null)) {
-    return
+    return;
   }
 
-  const cameraForward = new Vector3(
-    Math.cos(camera.yaw - 90) * Math.cos(camera.pitch),
-    Math.sin(camera.pitch),
-    Math.sin(camera.yaw - 90) * Math.cos(camera.pitch),
-  )
+  // --- KORRIGIERTES BACKFACE CULLING mit Vektor vom Kamera zum Vertex ---
+  // Nutze die Normale im Weltraum (triangle.normal) und den Vektor von der Kamera zu einem Vertex
+  // Hier wird angenommen, dass triangle.normal die transformierte Normale für animierte Objekte ist
 
-  const dot = triangle.normal.dot(cameraForward)
+  const cameraPos = new Vector3(camera.x, camera.y, camera.z); // Erstellt einen neuen Vektor
+  const vertexPos = triangle.vertices[0]; // Nutze den ersten Vertex im Weltraum
+  const camToVertex = vertexPos.subtract(cameraPos); // Erstellt einen neuen Vektor in subtract
 
-  if (dot <= -0.3) {
-    return
-  }
+  // Berechne das Punktprodukt der Dreiecksnormale (zeigt von Vorderseite weg) und des Vektors Kamera->Vertex
+  // Wenn das Punktprodukt >= 0 ist, zeigt die Normale zur Kamera->Vertex-Richtung oder senkrecht dazu.
+  // Das bedeutet, die Vorderseite des Dreiecks schaut WEG von der Kamera (oder ist kantenweise). Cull.
+  // Wenn das Punktprodukt < 0 ist, zeigt die Normale entgegengesetzt zu Kamera->Vertex. Vorderseite schaut ZUR Kamera. Rendern.
+  const dotCulling = triangle.normal.dot(camToVertex); // Benutzt die dot-Methode
 
-  projectedVertices.sort((a, b) => a.y - b.y)
-  const v1 = projectedVertices[0]
-  const v2 = projectedVertices[1]
-  const v3 = projectedVertices[2]
-  function fillScanline(
-    y: number,
-    x1: number,
-    x2: number,
-    z1: number,
-    z2: number,
-    color: string,
-    applyZBias: boolean,
-  ) {
-    const steps = x2 - x1
-    for (let x = x1; x <= x2; x++) {
-      const t = (x - x1) / steps
-      const z = z1 * (1 - t) + z2 * t
-      setPixel(Math.round(x), Math.round(y), z, color, applyZBias)
-    }
-  }
-  function interpolate(
-    y: number,
-    vA: { x: number; y: number; z: number },
-    vB: { x: number; y: number; z: number },
-  ): { x: number; z: number } | null {
-    const epsilon = 1e-6
-    if (Math.abs(y - vB.y) < epsilon) {
-      return { x: vB.x, z: vB.z }
-    }
+  // Cull das Dreieck, wenn die Vorderseite von der Kamera weg zeigt UND es sich nicht um ein Player-Dreieck handelt
+   if (dotCulling >= 0 && !triangle.isPlayer) {
+       return; // Dreieck verwerfen
+   }
+  // --- ENDE BACKFACE CULLING ---
 
-    if (Math.abs(y - vA.y) < epsilon) {
-      return { x: vA.x, z: vA.z }
-    }
-    if (Math.abs(vA.y - vB.y) < epsilon) {
-      return null
-    }
-    const t = (y - vA.y) / (vB.y - vA.y)
-    if (t < -epsilon || t > 1 + epsilon) return null
-    const x = vA.x + t * (vB.x - vA.x)
-    const z = vA.z + t * (vB.z - vA.z)
-    return { x, z }
-  }
-  for (let y = Math.round(v1.y); y <= Math.round(v3.y); y++) {
-    const p1 = interpolate(y, v1, v3)
-    let p2: { x: number; z: number } | null = null
-    if (y < v2.y) {
-      p2 = interpolate(y, v1, v2)
-    } else {
-      p2 = interpolate(y, v2, v3)
-    }
-    if (p1 !== null && p2 !== null) {
-      let fillColor = triangle.color
+
+  // Sortiere die projizierten Eckpunkte nach ihrer Y-Koordinate (aufsteigend) für die Scanline-Füllung
+  // v1 ist oben, v3 ist unten
+  projectedVertices.sort((a, b) => a.y - b.y);
+  const v1 = projectedVertices[0]!; // Nutze Non-null assertion, da wir oben auf null geprüft haben
+  const v2 = projectedVertices[1]!;
+  const v3 = projectedVertices[2]!;
+
+  // --- FARBBERECHNUNG UND KONVERTIERUNG (Optimiert) ---
+  // Berechne die finale Farbe (mit Beleuchtung) als RGB-Floats (0-1) EINMAL vor den Scanline-Schleifen
+  let rFloat = 1.0, gFloat = 1.0, bFloat = 1.0; // Standard: Weiß
+  const initialColor = hexToRgb(triangle.color); // Erstellt ein Objekt {r, g, b} (0-1)
+
+  if (initialColor !== null) {
+      rFloat = initialColor.r;
+      gFloat = initialColor.g;
+      bFloat = initialColor.b;
+
       if (!triangle.bakedLight) {
-        let colors = hexToRgb(triangle.color)
-        const lightLevels = calculateLightLevel(triangle.normal)
-        if (colors != null) {
-          colors.r += lightLevels
-          colors.g += lightLevels
-          colors.b += lightLevels
-          fillColor = rgbToHex(colors.r, colors.g, colors.b)
-        }
+          // Nutze die transformierte Normale, die in triangle.normal gespeichert sein sollte
+          const lightLevels = calculateLightLevel(triangle.normal); // Gibt einen Float zurück
+          rFloat = Math.max(0, Math.min(1, rFloat + lightLevels));
+          gFloat = Math.max(0, Math.min(1, gFloat + lightLevels));
+          bFloat = Math.max(0, Math.min(1, bFloat + lightLevels));
       }
+  }
+
+  // Konvertiere die finale Farbe zu RGB-Bytes (0-255) EINMAL für die Scanline-Funktion
+  // Math.floor ist notwendig, um Integer-Werte zu erhalten, die in den Uint8ClampedArray passen
+  const rByte = Math.floor(rFloat * 255); // Math.round geht auch, floor ist oft minimal schneller
+  const gByte = Math.floor(gFloat * 255);
+  const bByte = Math.floor(bFloat * 255);
+  // --- ENDE FARBBERECHNUNG ---
+
+
+  // --- HAUPT SCANLINE SCHLEIFE ---
+  // Iteriere über jede horizontale Scanline von der Oberkante des Dreiecks (gerundet von v1.y)
+  // bis zur Unterkante (gerundet von v3.y)
+  for (let y = Math.round(v1.y); y <= Math.round(v3.y); y++) { // Äussere Schleife liefert gerundetes y
+
+    // Interpoliere den Schnittpunkt der Scanline (y) mit der linken Kante des Dreiecks (v1-v3)
+    const p1 = interpolate(y, v1, v3); // Ruft die herausgelöste interpolate Funktion auf
+
+    // Interpoliere den Schnittpunkt der Scanline (y) mit der rechten Kante des Dreiecks
+    // Die rechte Kante ist entweder v1-v2 (oberer Teil des Dreiecks) oder v2-v3 (unterer Teil)
+    let p2: { x: number; z: number } | null = null;
+    if (y < v2.y) {
+      p2 = interpolate(y, v1, v2); // Ruft die herausgelöste interpolate Funktion auf
+    } else {
+      p2 = interpolate(y, v2, v3); // Ruft die herausgelöste interpolate Funktion auf
+    }
+
+    // Wenn beide Schnittpunkte (p1 und p2) für diese Scanline gültig sind (y schneidet beide Kanten)
+    if (p1 !== null && p2 !== null) {
+      // Stelle sicher, dass der erste X-Wert (x1) kleiner oder gleich dem zweiten (x2) ist
+      // Dies stellt sicher, dass die fillScanline Schleife korrekt läuft (von links nach rechts)
       if (p1.x < p2.x) {
-        fillScanline(y, p1.x, p2.x, p1.z, p2.z, fillColor, triangle.applyZBias)
+        // Ruf die herausgelöste fillScanline Funktion auf
+        // Übergib y, die X-Koordinaten, die Z-Werte und die vorberechneten Byte-Farben sowie applyZBias
+        fillScanline(y, p1.x, p2.x, p1.z, p2.z, rByte, gByte, bByte, triangle.applyZBias);
       } else {
-        fillScanline(y, p2.x, p1.x, p2.z, p1.z, fillColor, triangle.applyZBias)
+        // Tausche p1 und p2, falls p2 weiter links liegt als p1
+        fillScanline(y, p2.x, p1.x, p2.z, p1.z, rByte, gByte, bByte, triangle.applyZBias);
       }
     }
   }
+  // --- ENDE HAUPT SCANLINE SCHLEIFE ---
 }
 
 class Triangle {
@@ -580,9 +615,8 @@ forever(function () {
 
 function drawFrame() {
   ctx.clearRect(0, 0, gamecan.width, gamecan.height)
-  for (let i = 0; i < zBuffer.length; i++) {
-    zBuffer[i] = Infinity
-  }
+  zBuffer.fill(Infinity)
+  pixelBuffer.fill(0);
 
   scene
     .filter((triangle) => !triangle.isPlayer)
@@ -648,7 +682,7 @@ function drawFrame() {
       // Beleuchtung wird in fillTriangleProjected angewendet, da bakedLight false ist
       fillTriangleProjected(triangle)
     })
-
+  ctx.putImageData(imageData, 0, 0);
   drawFPS()
 
   scene
@@ -714,11 +748,14 @@ function setAnimationTypePositionsRotations(
 
   anim.model?.forEach((triangle) => {
     const transformedVerts: Vector3[] = triangle.vertices.map((v) => {
-      const rotated = applyRotation(v, anim.rotation)
+      const rotated = applyRotation(v, new rotation(
+        anim.rotation.yaw + player.yaw + 90,
+        anim.rotation.pitch + player.pitch,
+        anim.rotation.roll
+      ))
       return rotated.add(anim.position.add(player.position))
     })
 
-    // Neues Dreieck erstellen mit transformierten Punkten
     const transformedTriangle = new Triangle(
       transformedVerts[0],
       transformedVerts[1],
@@ -783,8 +820,11 @@ function setPixel(
   x: number,
   y: number,
   z: number,
-  color: string,
-  applyZBias: boolean,
+  rByte: number,
+  gByte: number,
+  bByte: number,
+  aByte: number = 255,
+  applyZBias: boolean = false,
 ) {
   const ix = Math.round(x)
   const iy = Math.round(y)
@@ -802,13 +842,11 @@ function setPixel(
   const biasedZ = z + bias
   if (biasedZ < zBuffer[index]) {
     zBuffer[index] = biasedZ
-    ctx.fillStyle = color
-    ctx.fillRect(
-      ix * resolutionScale,
-      iy * resolutionScale,
-      1 * resolutionScale,
-      1 * resolutionScale,
-    )
+    const pixelIndex = index * 4; // Jeder Pixel braucht 4 Bytes (R, G, B, A)
+    pixelBuffer[pixelIndex] = rByte;     // Rot
+    pixelBuffer[pixelIndex + 1] = gByte; // Grün
+    pixelBuffer[pixelIndex + 2] = bByte; // Blau
+    pixelBuffer[pixelIndex + 3] = aByte;
   }
 }
 
@@ -1292,4 +1330,4 @@ function playerAnimJumpStart() {
   if (animationTimer < animationTime) animationTimer++
   if (animationTimer == animationTime) currentAnimation = animations.idle
 }
-//LATESTBACKUO 9:02
+//LATESTBACKUO 12:00
