@@ -401,6 +401,8 @@ let player = {
   animWannaState: 0,
   state: state.ground,
   currentAnimation: animations.idle,
+  height: 8,
+  radius: 2.5
 }
 
 class AnimatableObject {
@@ -804,6 +806,10 @@ const tv12 = new Vector3(-30, 0, -30)
 const tv22 = new Vector3(30, 0, 30) // Der Wert, der vorher tv3 zugewiesen war
 const tv32 = new Vector3(30, 0, -30)
 
+const tv13 = new Vector3(30, 0, -30)
+const tv23 = new Vector3(30, 40, -30) // Der Wert, der vorher tv3 zugewiesen war
+const tv33 = new Vector3(-30, 0, -30)
+
 let scene: Triangle[] = [
   new Triangle(tv1, tv2, tv3, "#00FFFF", calculateNormal(tv1, tv2, tv3), false),
   new Triangle(
@@ -819,6 +825,14 @@ let scene: Triangle[] = [
     tv22,
     tv32,
     "#006666",
+    calculateNormal(tv12, tv22, tv32),
+    false,
+  ),
+  new Triangle(
+    tv13,
+    tv23,
+    tv33,
+    "#006633",
     calculateNormal(tv12, tv22, tv32),
     false,
   ),
@@ -858,6 +872,10 @@ function setupStaticCollisionGeometry() {
     {
       vertices: [tv12, tv22, tv32],
       normal: calculateNormal(tv12, tv22, tv32),
+    },
+    {
+      vertices: [tv13, tv23, tv33],
+      normal: calculateNormal(tv13, tv23, tv33),
     },
     // Add more raw collision data here as needed
   ]
@@ -1649,9 +1667,7 @@ function setPlayerFloor() {
       })
     }
   }
-  //trianglesInPlayerCell = staticSurfacePartition[playerCellZ][playerCellX]
   let heightList: number[] = []
-  //console.log(trianglesInPlayerCell)
   trianglesInPlayerCell
     .filter((triangle) => triangle.collisionType === collisionTypes.floor)
     .forEach((triangle) => {
@@ -1709,8 +1725,9 @@ function setPlayerFloor() {
 
 function playerSetAir() {
   if (player.state != state.air) {
+    player.verticalVel = Math.max(player.verticalVel, 0)
     setPlayerAnimation(animations.fall)
-  } 
+  }
   player.state = state.air
 }
 
@@ -1777,25 +1794,23 @@ function player_actions_moving(was_standing_still: boolean) {
       player.forwardVel += intendedMagThis * Math.cos(intendedDYaw) * 0.75
       sidewaysSpeed = intendedMagThis * Math.sin(intendedDYaw) * 5
     }
-      if (player.forwardVel > dragThreshold) {
-        player.forwardVel -= 1
-      }
-      if (player.forwardVel < -dragThreshold/2) {
-        player.forwardVel += 2
-      }
-      player.slideVelX = player.forwardVel * Math.sin(player.yaw)
-      player.slideVelZ = player.forwardVel * Math.cos(player.yaw)
+    if (player.forwardVel > dragThreshold) {
+      player.forwardVel -= 1
+    }
+    if (player.forwardVel < -dragThreshold / 2) {
+      player.forwardVel += 2
+    }
+    player.slideVelX = player.forwardVel * Math.sin(player.yaw)
+    player.slideVelZ = player.forwardVel * Math.cos(player.yaw)
 
-      player.slideVelX += sidewaysSpeed * Math.sin(player.yaw + 90)
-      player.slideVelZ += sidewaysSpeed * Math.cos(player.yaw + 90)
+    player.slideVelX += sidewaysSpeed * Math.sin(player.yaw + 90)
+    player.slideVelZ += sidewaysSpeed * Math.cos(player.yaw + 90)
 
-      player.position.x += player.slideVelX / 32
-      player.position.z += player.slideVelZ / 32
-    
+    movePlayerHorizontal(player.slideVelX, player.slideVelZ)
+
     if (player.verticalVel > -1.875 / gravityMult)
       player.verticalVel += gravity / gravityMult
     player.position.y += player.verticalVel
-
   }
 
   function updateGroundMovement() {
@@ -1847,29 +1862,137 @@ function player_actions_moving(was_standing_still: boolean) {
     const deltaX = speed * Math.sin(yawDegrees)
     const deltaZ = speed * Math.cos(yawDegrees)
 
-    player.position.x += deltaX / 32
-    player.position.z += deltaZ / 32
+    movePlayerHorizontal(deltaX, deltaZ)
 
-    if (intendedSpace)
-      playerJump()
-    // Anmerkung: Vertikale Bewegung (Y-Achse) wie Schwerkraft oder Sprünge
-    // müsste separat behandelt werden. Diese Funktion macht nur die Bewegung in der XZ-Ebene.
+    if (intendedSpace) playerJump()
   }
 }
 
-function approach(current: number, target: number, incStep: number, decStep: number): number {
-    const diff = target - current;
-    if (diff > 0) { // Ziel ist größer
-        return current + Math.min(diff, incStep);
-    } else if (diff < 0) { // Ziel ist kleiner
-        return current + Math.max(diff, -decStep);
-    } else { // Ziel ist erreicht
-        return target;
+function movePlayerHorizontal(x: number, z: number) {
+  const moveX = x / 128
+  const moveZ = z / 128
+  for (let i = 0; i < 3; i++) {
+    player.position.x += moveX
+    player.position.z += moveZ
+    checkWallCollisions()
+  }
+}
+
+
+
+function checkWallCollisions() {
+  const playerX = player.position.x;
+  const playerZ = player.position.z;
+  const playerY = player.position.y;
+
+  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ);
+  const playerCellX = cellIndices.cellX;
+  const playerCellZ = cellIndices.cellZ;
+
+  let trianglesInNearbyCells: collisionTriangle[] = [];
+  let processedTriangleIndices: { [index: number]: boolean } = {};
+
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const checkCellX = playerCellX + dx;
+      const checkCellZ = playerCellZ + dz;
+
+      if (
+        checkCellX >= 0 && checkCellX < NUM_CELLS_PER_DIMENSION &&
+        checkCellZ >= 0 && checkCellZ < NUM_CELLS_PER_DIMENSION
+      ) {
+        const cellTriangleIndices = staticSurfacePartition[checkCellZ]?.[checkCellX];
+
+        if (cellTriangleIndices && Array.isArray(cellTriangleIndices)) {
+          cellTriangleIndices.forEach(index => {
+            if (index >= 0 && index < staticSurfacePartitionTriangles.length) {
+              if (processedTriangleIndices[index] === undefined) {
+                processedTriangleIndices[index] = true;
+                const tri = staticSurfacePartitionTriangles[index];
+                trianglesInNearbyCells.push(tri);
+              }
+            } else {
+              console.warn(`handlePlayerCollision: Invalid triangle index: ${index}`);
+            }
+          });
+        }
+      }
     }
+  }
+
+  let accumulatedWallPush = new Vector3(0, 0, 0);
+  let wallCollisionOccurred = false;
+
+  trianglesInNearbyCells
+    .filter(triangle => triangle.collisionType === collisionTypes.wall)
+    .forEach(wallTriangle => {
+      const normal = wallTriangle.normal;
+      const originOffset = wallTriangle.originOffset;
+
+      const distBottom = player.position.dot(normal) + originOffset;
+      const playerTopPos = player.position.add(new Vector3(0, player.height, 0));
+      const distTop = playerTopPos.dot(normal) + originOffset;
+
+      const minProjectedDistance = Math.min(distBottom, distTop);
+      const maxProjectedDistance = Math.max(distBottom, distTop);
+
+      const overlapsPlaneDepth = (minProjectedDistance <= player.radius + epsilon) && (maxProjectedDistance >= -player.radius - epsilon);
+
+      const wallMinY = Math.min(wallTriangle.vertices[0].y, wallTriangle.vertices[1].y, wallTriangle.vertices[2].y);
+      const wallMaxY = Math.max(wallTriangle.vertices[0].y, wallTriangle.vertices[1].y, wallTriangle.vertices[2].y);
+      const playerMinY = player.position.y;
+      const playerMaxY = player.position.y + player.height;
+
+      const yOverlap = Math.max(0, Math.min(playerMaxY, wallMaxY) - Math.max(playerMinY, wallMinY));
+
+      if (overlapsPlaneDepth && yOverlap > epsilon) {
+        wallCollisionOccurred = true;
+
+        const penetrationDepth = player.radius - minProjectedDistance;
+
+        if (penetrationDepth > epsilon) {
+             const push = new Vector3(
+                 normal.x * penetrationDepth,
+                 normal.y * penetrationDepth,
+                 normal.z * penetrationDepth
+             );
+             accumulatedWallPush = accumulatedWallPush.add(push);
+        }
+      }
+    });
+
+  if (accumulatedWallPush.magnitude() > epsilon) {
+    player.position = player.position.add(accumulatedWallPush);
+  }
+
+  if (wallCollisionOccurred) {
+    player.forwardVel = 0;
+  }
+}
+
+
+
+function approach(
+  current: number,
+  target: number,
+  incStep: number,
+  decStep: number,
+): number {
+  const diff = target - current
+  if (diff > 0) {
+    // Ziel ist größer
+    return current + Math.min(diff, incStep)
+  } else if (diff < 0) {
+    // Ziel ist kleiner
+    return current + Math.max(diff, -decStep)
+  } else {
+    // Ziel ist erreicht
+    return target
+  }
 }
 
 function playerJump() {
-  player.verticalVel = 2.1/2
+  player.verticalVel = 2.1 / 2
   setPlayerAnimation(animations.single_jumping_fall)
   player.state = state.air
   player.position.y += player.verticalVel
@@ -2113,5 +2236,4 @@ function playerAnimJumpStart() {
   if (animationTimer == animationTime)
     player.currentAnimation = animations.single_jumping_fall
 }
-//LATESTBACKUO FUNCTIONING 21:33 01.05 gravity + jumping
- 
+//LATESTBACKUO FUNCTIONING 14:09 01.05
