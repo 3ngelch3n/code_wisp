@@ -92,8 +92,6 @@ updateSkyBox()
 
 const nearZ = 0.1
 
-
-
 function worldToView(vertex: Vector3): Vector3 {
   // Translation: Verschiebe den Punkt relativ zur Kamera
   let viewX = vertex.x - camera.x
@@ -392,7 +390,6 @@ class Vector3 {
   }
 }
 
-
 let player = {
   position: new Vector3(0, 0, 0),
   yaw: 0,
@@ -406,7 +403,7 @@ let player = {
   state: state.ground,
   currentAnimation: animations.idle,
   height: 8,
-  radius: 2.5
+  radius: 2.5,
 }
 
 class AnimatableObject {
@@ -439,15 +436,12 @@ function scaleVector3(vec: Vector3, center: Vector3, factor: number): Vector3 {
   )
   return center.add(scaledDiff)
 }
-
-// Fills a horizontal line of pixels (scanline) between two x-coordinates
-// at a given y-coordinate, performing Z-buffering and linear Z interpolation.
 function fillScanline(
   y: number,
-  x1: number, // Linke X Koordinate der Scanline (kann außerhalb des Bildschirms sein)
-  x2: number, // Rechte X Koordinate der Scanline (kann außerhalb des Bildschirms sein)
-  z1: number, // Z (Tiefe) Wert bei x1
-  z2: number, // Z (Tiefe) Wert bei x2
+  x1: number,
+  x2: number,
+  z1: number,
+  z2: number,
   rByte: number,
   gByte: number,
   bByte: number,
@@ -455,76 +449,52 @@ function fillScanline(
 ) {
   const iy = Math.round(y)
 
-  // Sicherstellen, dass die Scanline-Y-Koordinate im gültigen Bereich liegt.
-  // Dies sollte zwar schon durch den Y-Loop in fillTriangleProjected geklemmt sein,
-  // aber eine zusätzliche Prüfung schadet nicht.
   if (iy < 0 || iy >= screenDimensions.height) {
     return
   }
 
-  // Runde die X-Koordinaten für die Pixel-Indizierung.
-  // Diese können immer noch außerhalb des Bildschirms liegen.
   let ix1 = Math.round(x1)
   let ix2 = Math.round(x2)
 
-  // Berechne die ursprüngliche Breite der Scanline für die Z-Interpolation.
-  // Dies ist der Abstand in Pixeln zwischen ix1 und ix2 VOR dem Clipping.
   const originalWidth = ix2 - ix1
 
-  // Klemme die X-Koordinaten auf die Bildschirmgrenzen [0, screenDimensions.width - 1].
   const screenWidth = screenDimensions.width
   const clippedIx1 = Math.max(0, Math.min(screenWidth - 1, ix1))
   const clippedIx2 = Math.max(0, Math.min(screenWidth - 1, ix2))
 
-  // Wenn nach dem Klemmmen der Start-X-Wert größer ist als der End-X-Wert,
-  // liegt die gesamte Scanline außerhalb des Bildschirms (horizontal).
   if (clippedIx1 > clippedIx2) {
     return
   }
 
-  // Berechne die Z-Werte (Tiefen) an den Start- und Endpunkten der *geklippten* Scanline.
-  // Wir müssen basierend auf dem Abstand entlang der *ursprünglichen* Scanline interpolieren.
   let clippedZ1 = z1
   let clippedZ2 = z2
 
-  // Vermeide Division durch Null bei vertikalen Linien oder Punkten
   if (originalWidth !== 0) {
-    // Anteil der ursprünglichen Breite bis zum Start des geklippten Segments.
     const t1 = (clippedIx1 - ix1) / originalWidth
-    clippedZ1 = z1 + t1 * (z2 - z1) // Interpoliere Z
+    clippedZ1 = z1 + t1 * (z2 - z1)
 
-    // Anteil der ursprünglichen Breite bis zum Ende des geklippten Segments.
     const t2 = (clippedIx2 - ix1) / originalWidth
-    clippedZ2 = z1 + t2 * (z2 - z1) // Interpoliere Z
+    clippedZ2 = z1 + t2 * (z2 - z1)
   }
 
-  // Wende einen kleinen Z-Bias an, um die Zeichenreihenfolge zu beeinflussen (z.B. für Outlines).
-  // Der Bias wird auf die Z-Werte der geklippten Endpunkte angewendet.
   const biasedZ1 = clippedZ1 + (applyZBias ? 3 : 0)
   const biasedZ2 = clippedZ2 + (applyZBias ? 3 : 0)
 
-  // Berechne den Z-Schritt (Delta Z pro Pixel) entlang der *geklippten* Scanline.
   const clippedWidth = clippedIx2 - clippedIx1
   let zStep = 0
 
   if (clippedWidth > 0) {
-    // Vermeide Division durch Null für einzelne Pixel
     zStep = (biasedZ2 - biasedZ1) / clippedWidth
   }
 
-  // Starte die Z-Interpolation am Z-Wert des geklippten Startpunkts.
   let currentZ = biasedZ1
 
-  // Schleife über die Pixel des *geklippten* horizontalen Bereichs [clippedIx1, clippedIx2].
   for (let ix = clippedIx1; ix <= clippedIx2; ix++) {
-    // setPixel führt die Bounds-Checks erneut durch (sicher ist sicher) und macht das Z-Buffering.
     setPixel(ix, iy, currentZ, rByte, gByte, bByte, 255)
-    currentZ += zStep // Inkrementiere Z für das nächste Pixel auf der Scanline
+    currentZ += zStep
   }
 }
 
-// Linearly interpolates between two 2D points based on a target y-coordinate,
-// also interpolating the associated Z value. Used for finding points on triangle edges.
 function interpolate(
   y: number,
   vA: { x: number; y: number; z: number },
@@ -536,108 +506,55 @@ function interpolate(
     if (Math.abs(y - vA.y) < epsilon) {
       return { x: vA.x, z: vA.z }
     }
-    return null // Linie ist horizontal, aber die gesuchte Y-Koordinate liegt nicht darauf
+    return null
   }
 
   const t = (y - vA.y) / yDiff
   if (t < -epsilon || t > 1 + epsilon) return null
 
-  // MODIFIED: Diese Überprüfung wurde entfernt. Sie verhinderte, dass
-  // Punkte außerhalb des Segments korrekt berechnet werden, was für Dreiecke
-  // am Bildschirmrand notwendig ist. Das Clipping wird in fillScanline gehandhabt.
-  // if (t < -epsilon || t > 1 + epsilon) return null
-
   const x = vA.x + t * (vB.x - vA.x)
-  const z = vA.z + t * (vB.z - vA.z) // Interpoliere Z (Tiefe) genauso
-  return { x, z } // Gibt den 2D Punkt mit Z zurück
+  const z = vA.z + t * (vB.z - vA.z)
+  return { x, z }
 }
 
-// Renders a projected triangle to the screen using scanline filling and Z-buffering.
-// Handles sorting vertices by Y and splitting complex triangles.
 function fillTriangleProjected(triangle: Triangle) {
-  // Input triangle ist in World Space
-
-  // 1. Transformiere das Dreieck von Welt-Koordinaten in Kamera-Koordinaten (View Space)
-  // Rufe die neue worldToView Funktion für jeden Eckpunkt auf.
   const v1View = worldToView(triangle.vertices[0])
   const v2View = worldToView(triangle.vertices[1])
   const v3View = worldToView(triangle.vertices[2])
-  // Erstelle ein Dreieck-Array für die Clipping-Funktionen.
   const viewTriangle: ViewSpaceTriangle = [v1View, v2View, v3View]
 
-  // 2. Back-face Culling (oft in View Space nach Transformation)
-  // Berechne die Normale in View Space aus den View Space Eckpunkten.
   const v1v2View = v2View.subtract(v1View)
   const v1v3View = v3View.subtract(v1View)
   const normalView = v1v2View.cross(v1v3View).normalize()
 
-  // Annahme: Kamera blickt in +Z Richtung in View Space.
   const cameraForwardViewActual = new Vector3(0, 0, 1)
 
-  // Berechne das Skalarprodukt zwischen der Normalen im View Space und der Blickrichtung.
   const dotCullingCorrectedView = normalView.dot(cameraForwardViewActual)
 
-  // Korrigiertes Back-face Culling: Blende aus, wenn die Normale vom Blickvektor weg zeigt.
-  // Wenn die Normale von der Vorderseite des Dreiecks weg zeigt und normalView.dot(cameraForwardViewActual) > epsilon ist,
-  // dann zeigt die VORDERSEITE vom Betrachter weg. Verwende epsilon für einen robusten Float-Vergleich.
-  // Blende aus, wenn dotProduct > epsilon und es KEIN Spieler-Dreieck ist.
   if (dotCullingCorrectedView > epsilon && !triangle.isPlayer) {
-    // console.log("Culling backface (korrigiert)"); // Debugging
-    return // Blende diese Rückseite aus
+    return
   }
 
-  // 3. Clipping gegen Nah-Ebene (und dann ggf. weitere Ebenen)
-  // DIESER SCHRITT ERSETZT den alten Check 'if (projectedVertices.some((v) => v === null))'.
-  // Rufe die Clipping-Funktion für die Nah-Ebene mit dem View Space Dreieck auf.
-  // Die Funktion gibt eine Liste von 0, 1 oder 2 Dreiecken in View Space zurück.
   let clippedTrianglesView = clipTriangleAgainstNearPlane(viewTriangle)
 
-  // TODO: Wenn du Clipping gegen weitere Ebenen (Fern, Links, Rechts, Oben, Unten) implementierst,
-  // würde hier eine Kaskade von Clipping-Aufrufen folgen. Jede Stufe nimmt die Dreiecke der vorherigen.
-  // Z.B.:
-  // let finalClippedTriangles: ViewSpaceTriangle[] = [];
-  // clippedTrianglesView.forEach(tri => {
-  //    const clippedAgainstFar = clipTriangleAgainstFar(tri); // clipTriangleAgainstFar muss implementiert werden
-  //    clippedAgainstFar.forEach(farTri => {
-  //        const clippedAgainstLeft = clipTriangleAgainstLeft(farTri); // clipTriangleAgainstLeft muss implementiert werden
-  //        clippedAgainstLeft.forEach(leftTri => {
-  //            // ... usw. bis alle 6 Ebenen durch sind ...
-  //            finalClippedTriangles.push(...ergebnis);
-  //        });
-  //    });
-  // });
+  let finalClippedTriangles = clippedTrianglesView
 
-  // Für diese Implementierung (nur Near-Clipping) sind die Ergebnisse von clipTriangleAgainstNearPlane
-  // die finalen geklippten Dreiecke, die weiterverarbeitet werden.
-  let finalClippedTriangles = clippedTrianglesView // Die Liste der Dreiecke nach Near-Clipping
-
-  // 4. Projektion auf 2D Bildschirm-Koordinaten und Rasterisierung
-  // Gehe durch JEDES der resultierenden geklippten Dreiecke (0, 1 oder 2 Stück).
   finalClippedTriangles.forEach((clippedTriView) => {
-    // Iteriere über die geklippten Dreiecke (in View Space)
-
-    // Für jedes geklippte Dreieck: Projiziere seine 3 Eckpunkte von View Space nach Screen Space
-    // Verwende die viewToScreen Funktion, die KEINEN Z<=0.1 Check macht, da Punkte geklippt sind.
-    const p1 = viewToScreen(clippedTriView[0]) // Aufruf der viewToScreen Funktion
+    const p1 = viewToScreen(clippedTriView[0])
     const p2 = viewToScreen(clippedTriView[1])
     const p3 = viewToScreen(clippedTriView[2])
 
-    // Nun folgt deine bisherige Rasterisierungslogik, die mit diesen 2D-projizierten Punkten arbeitet.
-    // Diese Punkte p1, p2, p3 sind die {x, y, z} Objekte, die du bisher von project bekommen hast.
+    const projectedPoints2D = [p1, p2, p3]
+    projectedPoints2D.sort((a, b) => a.y - b.y)
 
-    // Sortiere die 3 projizierten Eckpunkte nach ihrer 2D y-Koordinate für die Scanline-Füllung
-    const projectedPoints2D = [p1, p2, p3] // Dies sind {x, y, z} Objekte nach Projektion
-    projectedPoints2D.sort((a, b) => a.y - b.y) // Sortiere nach der 2D y-Koordinate
+    const pp1 = projectedPoints2D[0]
+    const pp2 = projectedPoints2D[1]
+    const pp3 = projectedPoints2D[2]
 
-    const pp1 = projectedPoints2D[0] // Der oberste Punkt
-    const pp2 = projectedPoints2D[1] // Der mittlere Punkt
-    const pp3 = projectedPoints2D[2] // Der unterste Punkt
-
-    // Bestimme die Farbe und Beleuchtung für dieses Dreieck
     let rFloat = 1.0,
       gFloat = 1.0,
       bFloat = 1.0
-    const initialColor = hexToRgb(triangle.color) // Nutze die Farbe des Originaldreiecks
+    const initialColor = hexToRgb(triangle.color)
 
     if (initialColor !== null) {
       rFloat = initialColor.r
@@ -645,9 +562,6 @@ function fillTriangleProjected(triangle: Triangle) {
       bFloat = initialColor.b
 
       if (!triangle.bakedLight) {
-        // Beleuchtung: Nutze die Normale des Originaldreiecks für diffuse Beleuchtung.
-        // Eine präzisere Implementierung würde die Normale des geklippten Dreiecks verwenden,
-        // falls sich die Orientierung signifikant ändert. Hier verwenden wir die Originalnormale.
         const lightLevels = calculateLightLevel(triangle.normal)
         rFloat = Math.max(0, Math.min(1, rFloat + lightLevels))
         gFloat = Math.max(0, Math.min(1, gFloat + lightLevels))
@@ -659,12 +573,9 @@ function fillTriangleProjected(triangle: Triangle) {
     const gByte = Math.floor(gFloat * 255)
     const bByte = Math.floor(bFloat * 255)
 
-    // Rasterisiere das Dreieck, indem horizontale Scanlines gefüllt werden.
-    // Gehe durch die Y-Koordinaten (Pixelreihen) von der oberen Spitze zur unteren Spitze.
     const startY = Math.round(pp1.y)
     const endY = Math.round(pp3.y)
 
-    // Klemme den Y-Loop-Bereich an die Bildschirmhöhe, um Robustheit zu gewährleisten.
     const clampedStartY = Math.max(
       0,
       Math.min(screenDimensions.height - 1, startY),
@@ -672,24 +583,16 @@ function fillTriangleProjected(triangle: Triangle) {
     const clampedEndY = Math.max(0, Math.min(screenDimensions.height - 1, endY))
 
     for (let y = clampedStartY; y <= clampedEndY; y++) {
-      // Finde die Schnittpunkte dieser horizontalen Scanline (bei Y) mit den Kanten des geklippten, projizierten Dreiecks.
-      // Nutze die interpolate Funktion (die für Scanlines), die x und z interpoliert.
-      // Die Kanten sind V1-V3 (immer) und entweder V1-V2 (obere Hälfte) oder V2-V3 (untere Hälfte).
-      const scanlineP1 = interpolate(y, pp1, pp3) // Schnittpunkt mit der Kante von oberster zu unterster Spitze
+      const scanlineP1 = interpolate(y, pp1, pp3)
 
       let scanlineP2 = null
       if (y < pp2.y) {
-        // Wenn die Scanline in der oberen Hälfte des Dreiecks ist, schneidet sie die Kante V1-V2.
         scanlineP2 = interpolate(y, pp1, pp2)
       } else {
-        // Wenn die Scanline in der unteren Hälfte ist (oder genau auf pp2.y), schneidet sie die Kante V2-V3.
         scanlineP2 = interpolate(y, pp2, pp3)
       }
 
-      // Wenn gültige Schnittpunkte für diese Scanline gefunden wurden (sollte meist der Fall sein im geklemmten Bereich):
       if (scanlineP1 !== null && scanlineP2 !== null) {
-        // Sicherstellen, dass scanlineP1 der linkere und scanlineP2 der rechtere Punkt ist.
-        // fillScanline erwartet dies.
         if (scanlineP1.x < scanlineP2.x) {
           fillScanline(
             y,
@@ -717,7 +620,7 @@ function fillTriangleProjected(triangle: Triangle) {
         }
       }
     }
-  }) // Ende der Schleife über die resultierenden geklippten Dreiecke
+  })
 }
 
 // Represents a renderable triangle with color, normal, and lighting properties.
@@ -803,17 +706,17 @@ let scene: Triangle[] = []
 let collisionMap: collisionTriangle[] = []
 let playerCenter = new Vector3(0, 0, 0)
 let playerCount = 0
-const wispy = "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
-const collisionMapModel = 
-"https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/collision_map_test"
-  
+const wispy =
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
+const collisionMapModel =
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/collision_map_test"
+
 async function loadResources() {
   loadCollisionMap()
   importPlayer()
   //wait(0.5)
 }
 loadResources()
-
 
 function initializeSpatialPartition() {
   for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
@@ -832,8 +735,6 @@ function setupStaticCollisionGeometry() {
   initializeSpatialPartition()
 
   collisionMap.forEach((colTriangle) => {
-
-
     const worldVertices = colTriangle.vertices
     const worldNormal = colTriangle.normal
 
@@ -896,11 +797,9 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
   for (let z = clampedStartCellZ; z <= clampedEndCellZ; z++) {
     for (let x = clampedStartCellX; x <= clampedEndCellX; x++) {
       if (Array.isArray(staticSurfacePartition[z]?.[x])) {
-
         staticSurfacePartition[z][x].push(
           staticSurfacePartitionTriangles.length - 1,
         )
-
       } else {
         console.error(
           `FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z]?.[x]}`,
@@ -963,8 +862,6 @@ let playerObj: {
   leftLeg: resetAnimatableObject(),
   rightLeg: resetAnimatableObject(),
 }
-
-
 
 function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
   const ir = Math.floor(Math.max(0.0, Math.min(1.0, r)) * 255 + 0.5)
@@ -1775,102 +1672,114 @@ function movePlayerHorizontal(x: number, z: number) {
   }
 }
 
-
-
 function checkWallCollisions() {
-  const playerX = player.position.x;
-  const playerZ = player.position.z;
-  const playerY = player.position.y;
+  const playerX = player.position.x
+  const playerZ = player.position.z
+  const playerY = player.position.y
 
-  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ);
-  const playerCellX = cellIndices.cellX;
-  const playerCellZ = cellIndices.cellZ;
+  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
+  const playerCellX = cellIndices.cellX
+  const playerCellZ = cellIndices.cellZ
 
-  let trianglesInNearbyCells: collisionTriangle[] = [];
-  let processedTriangleIndices: { [index: number]: boolean } = {};
+  let trianglesInNearbyCells: collisionTriangle[] = []
+  let processedTriangleIndices: { [index: number]: boolean } = {}
 
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
-      const checkCellX = playerCellX + dx;
-      const checkCellZ = playerCellZ + dz;
+      const checkCellX = playerCellX + dx
+      const checkCellZ = playerCellZ + dz
 
       if (
-        checkCellX >= 0 && checkCellX < NUM_CELLS_PER_DIMENSION &&
-        checkCellZ >= 0 && checkCellZ < NUM_CELLS_PER_DIMENSION
+        checkCellX >= 0 &&
+        checkCellX < NUM_CELLS_PER_DIMENSION &&
+        checkCellZ >= 0 &&
+        checkCellZ < NUM_CELLS_PER_DIMENSION
       ) {
-        const cellTriangleIndices = staticSurfacePartition[checkCellZ]?.[checkCellX];
+        const cellTriangleIndices =
+          staticSurfacePartition[checkCellZ]?.[checkCellX]
 
         if (cellTriangleIndices && Array.isArray(cellTriangleIndices)) {
-          cellTriangleIndices.forEach(index => {
+          cellTriangleIndices.forEach((index) => {
             if (index >= 0 && index < staticSurfacePartitionTriangles.length) {
               if (processedTriangleIndices[index] === undefined) {
-                processedTriangleIndices[index] = true;
-                const tri = staticSurfacePartitionTriangles[index];
-                trianglesInNearbyCells.push(tri);
+                processedTriangleIndices[index] = true
+                const tri = staticSurfacePartitionTriangles[index]
+                trianglesInNearbyCells.push(tri)
               }
             } else {
-              console.warn(`handlePlayerCollision: Invalid triangle index: ${index}`);
+              console.warn(
+                `handlePlayerCollision: Invalid triangle index: ${index}`,
+              )
             }
-          });
+          })
         }
       }
     }
   }
 
-  let accumulatedWallPush = new Vector3(0, 0, 0);
-  let wallCollisionOccurred = false;
+  let accumulatedWallPush = new Vector3(0, 0, 0)
+  let wallCollisionOccurred = false
 
   trianglesInNearbyCells
-    .filter(triangle => triangle.collisionType === collisionTypes.wall)
-    .forEach(wallTriangle => {
-      const normal = wallTriangle.normal;
-      const originOffset = wallTriangle.originOffset;
+    .filter((triangle) => triangle.collisionType === collisionTypes.wall)
+    .forEach((wallTriangle) => {
+      const normal = wallTriangle.normal
+      const originOffset = wallTriangle.originOffset
 
-      const distBottom = player.position.dot(normal) + originOffset;
-      const playerTopPos = player.position.add(new Vector3(0, player.height, 0));
-      const distTop = playerTopPos.dot(normal) + originOffset;
+      const distBottom = player.position.dot(normal) + originOffset
+      const playerTopPos = player.position.add(new Vector3(0, player.height, 0))
+      const distTop = playerTopPos.dot(normal) + originOffset
 
-      const minProjectedDistance = Math.min(distBottom, distTop);
-      const maxProjectedDistance = Math.max(distBottom, distTop);
+      const minProjectedDistance = Math.min(distBottom, distTop)
+      const maxProjectedDistance = Math.max(distBottom, distTop)
 
-      const overlapsPlaneDepth = (minProjectedDistance <= player.radius + epsilon) && (maxProjectedDistance >= -player.radius - epsilon);
+      const overlapsPlaneDepth =
+        minProjectedDistance <= player.radius + epsilon &&
+        maxProjectedDistance >= -player.radius - epsilon
 
-      const wallMinY = Math.min(wallTriangle.vertices[0].y, wallTriangle.vertices[1].y, wallTriangle.vertices[2].y);
-      const wallMaxY = Math.max(wallTriangle.vertices[0].y, wallTriangle.vertices[1].y, wallTriangle.vertices[2].y);
-      const playerMinY = player.position.y + 1.9; //TT
-      const playerMaxY = player.position.y + player.height;
+      const wallMinY = Math.min(
+        wallTriangle.vertices[0].y,
+        wallTriangle.vertices[1].y,
+        wallTriangle.vertices[2].y,
+      )
+      const wallMaxY = Math.max(
+        wallTriangle.vertices[0].y,
+        wallTriangle.vertices[1].y,
+        wallTriangle.vertices[2].y,
+      )
+      const playerMinY = player.position.y + 1.9 //TT
+      const playerMaxY = player.position.y + player.height
 
-      const yOverlap = Math.max(0, Math.min(playerMaxY, wallMaxY) - Math.max(playerMinY, wallMinY));
+      const yOverlap = Math.max(
+        0,
+        Math.min(playerMaxY, wallMaxY) - Math.max(playerMinY, wallMinY),
+      )
 
       if (overlapsPlaneDepth && yOverlap > epsilon) {
-        wallCollisionOccurred = true;
+        wallCollisionOccurred = true
 
-        const penetrationDepth = player.radius - minProjectedDistance;
+        const penetrationDepth = player.radius - minProjectedDistance
 
         if (penetrationDepth > epsilon) {
-          let div = 6
-          if (player.forwardVel > 10)
-            div = 1
-             const push = new Vector3(
-                 normal.x * penetrationDepth / div,
-                 normal.y * penetrationDepth / div,
-                 normal.z * penetrationDepth / div
-             );
-             accumulatedWallPush = accumulatedWallPush.add(push);
+          const div = (-5 / 32) * Math.abs(player.forwardVel) + 8
+          const push = new Vector3(
+            (normal.x * penetrationDepth) / div,
+            (normal.y * penetrationDepth) / div,
+            (normal.z * penetrationDepth) / div,
+          )
+          accumulatedWallPush = accumulatedWallPush.add(push)
         }
       }
-    });
+    })
 
   if (accumulatedWallPush.magnitude() > epsilon) {
-    player.position = player.position.add(accumulatedWallPush);
+    player.position = player.position.add(accumulatedWallPush)
   }
 
-  /*if (wallCollisionOccurred) {
-    player.forwardVel = 0;
-  }*/
+  if (wallCollisionOccurred) {
+    player.forwardVel /= 1.25
+  }
 }
-
-
 
 function approach(
   current: number,
@@ -1892,7 +1801,7 @@ function approach(
 }
 
 function playerJump() {
-  player.verticalVel = 2.1 / 2 + player.forwardVel/128
+  player.verticalVel = 2.1 / 2 + player.forwardVel / 256
   setPlayerAnimation(animations.single_jumping_fall)
   player.state = state.air
   player.position.y += player.verticalVel
@@ -2143,7 +2052,7 @@ function loadCollisionMap() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
+
       return response.json()
     })
     .then((data) => {
@@ -2161,7 +2070,7 @@ function loadCollisionMap() {
             v1_3D,
             v2_3D,
             v3_3D,
-            normal
+            normal,
           )
           const renderTri = new Triangle(
             v1_3D,
@@ -2169,7 +2078,7 @@ function loadCollisionMap() {
             v3_3D,
             getRandomColor(),
             normal,
-            true
+            true,
           )
           collisionMap.push(collisionTriangleThis)
           scene.push(renderTri)
@@ -2183,5 +2092,4 @@ function loadCollisionMap() {
     })
 }
 
-
-//LATESTBACKUO FUNCTIONING 14:09 01.05
+//LATESTBACKUO FUNCTIONING 23:18 02.05
