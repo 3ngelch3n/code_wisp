@@ -85,11 +85,14 @@ enum levels {
 
   inside_castle,
 }
+
 let level = levels.castle_grounds
 let skybox = new Image()
 updateSkyBox()
 
 const nearZ = 0.1
+
+
 
 function worldToView(vertex: Vector3): Vector3 {
   // Translation: Verschiebe den Punkt relativ zur Kamera
@@ -388,6 +391,7 @@ class Vector3 {
     return this.x * other.x + this.y * other.y + this.z * other.z
   }
 }
+
 
 let player = {
   position: new Vector3(0, 0, 0),
@@ -794,60 +798,29 @@ const NUM_CELLS_INDEX = NUM_CELLS_PER_DIMENSION // Alias for clarity
 let staticSurfacePartitionTriangles: collisionTriangle[] = []
 const staticSurfacePartition: number[][][] = []
 
-const tv1 = new Vector3(10, 7, 10)
-const tv2 = new Vector3(-10, 0, -20) // Der Wert, der vorher tv3 zugewiesen war
-const tv3 = new Vector3(-10, 0, 10)
+let scene: Triangle[] = []
 
-const tv11 = new Vector3(30, 0, 30)
-const tv21 = new Vector3(-30, 0, -30) // Der Wert, der vorher tv3 zugewiesen war
-const tv31 = new Vector3(-30, 0, 30)
+let collisionMap: collisionTriangle[] = []
+let playerCenter = new Vector3(0, 0, 0)
+let playerCount = 0
+const wispy = "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
+const collisionMapModel = 
+"https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/collision_map_test"
+  
+async function loadResources() {
+  loadCollisionMap()
+  importPlayer()
+  //wait(0.5)
+}
+loadResources()
 
-const tv12 = new Vector3(-30, 0, -30)
-const tv22 = new Vector3(30, 0, 30) // Der Wert, der vorher tv3 zugewiesen war
-const tv32 = new Vector3(30, 0, -30)
-
-const tv13 = new Vector3(30, 0, -30)
-const tv23 = new Vector3(30, 40, -30) // Der Wert, der vorher tv3 zugewiesen war
-const tv33 = new Vector3(-30, 0, -30)
-
-let scene: Triangle[] = [
-  new Triangle(tv1, tv2, tv3, "#00FFFF", calculateNormal(tv1, tv2, tv3), false),
-  new Triangle(
-    tv11,
-    tv21,
-    tv31,
-    "#009999",
-    calculateNormal(tv11, tv21, tv31),
-    false,
-  ),
-  new Triangle(
-    tv12,
-    tv22,
-    tv32,
-    "#006666",
-    calculateNormal(tv12, tv22, tv32),
-    false,
-  ),
-  new Triangle(
-    tv13,
-    tv23,
-    tv33,
-    "#006633",
-    calculateNormal(tv12, tv22, tv32),
-    false,
-  ),
-]
-
-setupStaticCollisionGeometry()
-console.log(staticSurfacePartition)
-console.log(staticSurfacePartitionTriangles)
 
 function initializeSpatialPartition() {
   for (let z = 0; z < NUM_CELLS_PER_DIMENSION; z++) {
     staticSurfacePartition[z] = new Array<number[]>(NUM_CELLS_PER_DIMENSION)
 
     for (let x = 0; x < NUM_CELLS_PER_DIMENSION; x++) {
-      staticSurfacePartition[z][x] = [] as number[] // Ensure each cell is an array
+      staticSurfacePartition[z][x] = [] as number[]
     }
   }
   console.log(
@@ -855,43 +828,15 @@ function initializeSpatialPartition() {
   )
 }
 
-// Sets up the static collision geometry by creating collisionTriangle objects
-// and distributing them into the spatial partition grid.
 function setupStaticCollisionGeometry() {
-  initializeSpatialPartition() // Make sure the grid is initialized
+  initializeSpatialPartition()
 
-  const rawCollisionTrianglesData = [
-    {
-      vertices: [tv1, tv2, tv3],
-      normal: calculateNormal(tv1, tv2, tv3),
-    },
-    {
-      vertices: [tv11, tv21, tv31],
-      normal: calculateNormal(tv11, tv21, tv31),
-    },
-    {
-      vertices: [tv12, tv22, tv32],
-      normal: calculateNormal(tv12, tv22, tv32),
-    },
-    {
-      vertices: [tv13, tv23, tv33],
-      normal: calculateNormal(tv13, tv23, tv33),
-    },
-    // Add more raw collision data here as needed
-  ]
+  collisionMap.forEach((colTriangle) => {
 
-  rawCollisionTrianglesData.forEach((data) => {
-    const colTriangle = new collisionTriangle(
-      data.vertices[0],
-      data.vertices[1],
-      data.vertices[2],
-      data.normal,
-    )
 
-    const worldVertices = data.vertices
-    const worldNormal = data.normal
+    const worldVertices = colTriangle.vertices
+    const worldNormal = colTriangle.normal
 
-    // Update collision data with world coordinates (important if geometry is transformed later)
     colTriangle.updateCollisionData(
       worldVertices as [Vector3, Vector3, Vector3],
       worldNormal,
@@ -903,22 +848,17 @@ function setupStaticCollisionGeometry() {
   console.log("Statische Kollisionsgeometrie im Grid eingerichtet.")
 }
 
-// Converts world coordinates (x, z) into corresponding cell indices in the spatial partition grid.
 function getWorldCoordsCellIndices(
   worldX: number,
   worldZ: number,
 ): { cellX: number; cellZ: number } {
-  // Shift world coordinates so that (-LEVEL_BOUNDARY_MAX, -LEVEL_BOUNDARY_MAX) maps to (0, 0) in the grid
   const cellX = Math.floor((worldX + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
   const cellZ = Math.floor((worldZ + LEVEL_BOUNDARY_MAX) / CELL_SIZE)
 
   return { cellX: cellX, cellZ: cellZ }
 }
 
-// Adds a collision triangle to all grid cells that its bounding box intersects.
-// This allows for efficient querying of nearby collision triangles.
 function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
-  // Calculate the bounding box of the triangle in world space
   const minX = Math.min(
     triangle.vertices[0].x,
     triangle.vertices[1].x,
@@ -940,7 +880,6 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
     triangle.vertices[2].z,
   )
 
-  // Get the grid cell indices for the corners of the bounding box
   const startCellIndices = getWorldCoordsCellIndices(minX, minZ)
   const startCellX = startCellIndices.cellX
   const startCellZ = startCellIndices.cellZ
@@ -949,31 +888,20 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
   const endCellX = endCellIndices.cellX
   const endCellZ = endCellIndices.cellZ
 
-  // Clamp indices to be within the grid boundaries
   const clampedStartCellX = Math.max(0, startCellX)
   const clampedEndCellX = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellX)
   const clampedStartCellZ = Math.max(0, startCellZ)
   const clampedEndCellZ = Math.min(NUM_CELLS_PER_DIMENSION - 1, endCellZ)
 
-  // Iterate over all cells intersected by the bounding box and add the triangle to their list
   for (let z = clampedStartCellZ; z <= clampedEndCellZ; z++) {
     for (let x = clampedStartCellX; x <= clampedEndCellX; x++) {
-      // Basic check to ensure the cell is an array before pushing
       if (Array.isArray(staticSurfacePartition[z]?.[x])) {
-        console.log(
-          `DEBUG: Vor push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
-        )
-        console.log(`DEBUG: Objekt, das gepusht werden soll: `, triangle)
 
         staticSurfacePartition[z][x].push(
           staticSurfacePartitionTriangles.length - 1,
         )
 
-        console.log(
-          `DEBUG: Nach push - Zelle [${z}][${x}], Länge: ${staticSurfacePartition[z][x].length}`,
-        )
       } else {
-        // Error handling if a cell is not initialized correctly
         console.error(
           `FEHLER: staticSurfacePartition[${z}][${x}] ist KEIN Array! Typ: ${typeof staticSurfacePartition[z]?.[x]}`,
           staticSurfacePartition[z]?.[x],
@@ -983,13 +911,9 @@ function addTriangleToPartition_BoundingBox(triangle: collisionTriangle): void {
   }
 }
 
-// Calculates a 3D vector representing the direction of light
-// based on its yaw and pitch angles.
 function calculateLightDirection(yaw: number, pitch: number): Vector3 {
-  // Start with a vector pointing along the positive Z axis (or chosen forward direction)
   let dir = new Vector3(0, 0, 1)
 
-  // Apply pitch rotation around the X axis
   const cosPitch = Math.cos(pitch)
   const sinPitch = Math.sin(pitch)
   const pitchedY = dir.y * cosPitch - dir.z * sinPitch
@@ -997,7 +921,6 @@ function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   dir.y = pitchedY
   dir.z = pitchedZ
 
-  // Apply yaw rotation around the Y axis
   const cosYaw = Math.cos(yaw)
   const sinYaw = Math.sin(yaw)
   const yawedX = dir.x * cosYaw + dir.z * sinYaw
@@ -1005,21 +928,14 @@ function calculateLightDirection(yaw: number, pitch: number): Vector3 {
   dir.x = yawedX
   dir.z = yawedZ
 
-  return dir.normalize() // Return a unit vector
+  return dir.normalize()
 }
 
-// Calculates a light intensity factor for a surface based on its normal
-// and the global light direction using the dot product.
 function calculateLightLevel(normal: Vector3): number {
-  // Dot product gives a value between -1 (surface facing away from light)
-  // and 1 (surface facing directly at light).
   const dot = normal.dot(lightDir)
 
-  // Shift and scale the dot product to get a light level (e.g., 0 to 1 or adjusted range).
-  // Adding 0.5 shifts the range from [-1, 1] to [-0.5, 1.5].
   const levelFloat = dot + 0.5
 
-  // Dividing by 8 further scales the light level (adjust as needed for desired brightness).
   return levelFloat / 8
 }
 
@@ -1048,26 +964,7 @@ let playerObj: {
   rightLeg: resetAnimatableObject(),
 }
 
-//__ Fetch Model Data __
-const mario_model =
-  "https://api.jsonsilo.com/public/7cd9822c-f656-466c-aab5-dfc9e4cfb5eb"
-const wispy =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
-const this_will_crash =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/bob"
-const textured =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/cube_textured"
-const mario_test =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/mario_wisp_test"
-const wisp_model_01 =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_model_01"
-const test_map =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/testmap"
-let playerCenter = new Vector3(0, 0, 0)
-let playerCount = 0
 
-importPlayer()
-//loadModel(scene, test_map)
 
 function rgbToUint32(r: number, g: number, b: number, a: number = 1.0): number {
   const ir = Math.floor(Math.max(0.0, Math.min(1.0, r)) * 255 + 0.5)
@@ -1709,7 +1606,7 @@ function setPlayerFloor() {
           heightList.push(heightAtPoint)
       }
       if (
-        player.position.y >= heightAtPoint - 1.5 &&
+        player.position.y >= heightAtPoint - 2 &&
         player.position.y <= heightAtPoint
       )
         heightList.push(heightAtPoint)
@@ -1940,7 +1837,7 @@ function checkWallCollisions() {
 
       const wallMinY = Math.min(wallTriangle.vertices[0].y, wallTriangle.vertices[1].y, wallTriangle.vertices[2].y);
       const wallMaxY = Math.max(wallTriangle.vertices[0].y, wallTriangle.vertices[1].y, wallTriangle.vertices[2].y);
-      const playerMinY = player.position.y;
+      const playerMinY = player.position.y + 1.9; //TT
       const playerMaxY = player.position.y + player.height;
 
       const yOverlap = Math.max(0, Math.min(playerMaxY, wallMaxY) - Math.max(playerMinY, wallMinY));
@@ -1951,10 +1848,13 @@ function checkWallCollisions() {
         const penetrationDepth = player.radius - minProjectedDistance;
 
         if (penetrationDepth > epsilon) {
+          let div = 6
+          if (player.forwardVel > 10)
+            div = 1
              const push = new Vector3(
-                 normal.x * penetrationDepth,
-                 normal.y * penetrationDepth,
-                 normal.z * penetrationDepth
+                 normal.x * penetrationDepth / div,
+                 normal.y * penetrationDepth / div,
+                 normal.z * penetrationDepth / div
              );
              accumulatedWallPush = accumulatedWallPush.add(push);
         }
@@ -1965,9 +1865,9 @@ function checkWallCollisions() {
     player.position = player.position.add(accumulatedWallPush);
   }
 
-  if (wallCollisionOccurred) {
+  /*if (wallCollisionOccurred) {
     player.forwardVel = 0;
-  }
+  }*/
 }
 
 
@@ -1992,100 +1892,10 @@ function approach(
 }
 
 function playerJump() {
-  player.verticalVel = 2.1 / 2
+  player.verticalVel = 2.1 / 2 + player.forwardVel/128
   setPlayerAnimation(animations.single_jumping_fall)
   player.state = state.air
   player.position.y += player.verticalVel
-}
-
-function importPlayer() {
-  fetch(wispy)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      return response.json()
-    })
-    .then((data) => {
-      const vertices = data.vertices
-      const faces = data.faces
-      let sumX = 0,
-        sumY = 0,
-        sumZ = 0
-      playerCount = vertices.length
-      for (const vert of vertices) {
-        sumX += vert[0]
-        sumY += vert[1]
-        sumZ += vert[2]
-      }
-      if (playerCount > 0) {
-        playerCenter = new Vector3(
-          sumX / playerCount,
-          sumY / playerCount,
-          sumZ / playerCount,
-        )
-      }
-      for (const face of faces) {
-        const faceIndic = face[0]
-        const faceColor = face[1]
-        let appendTo = playerObj.Body.model
-        if (face[2] != null) {
-          switch (face[2]) {
-            case "Body":
-              break
-            case "LeftArm":
-              appendTo = playerObj.leftArm.model
-              break
-            case "RightArm":
-              appendTo = playerObj.rightArm.model
-              break
-            case "Head":
-              appendTo = playerObj.Head.model
-              break
-            case "LeftLeg":
-              appendTo = playerObj.leftLeg.model
-              break
-            case "RightLeg":
-              appendTo = playerObj.rightLeg.model
-              break
-          }
-        }
-        if (faceIndic.length === 3) {
-          const v1_3D = new Vector3(...vertices[faceIndic[0]])
-          const v2_3D = new Vector3(...vertices[faceIndic[1]])
-          const v3_3D = new Vector3(...vertices[faceIndic[2]])
-
-          const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
-
-          if (enable_outlines) {
-            const triangle = new Triangle(
-              v1_3D,
-              v2_3D,
-              v3_3D,
-              faceColor,
-              normal,
-              false,
-              true,
-            )
-            appendTo.push(triangle)
-          } else {
-            const triangle = new Triangle(
-              v1_3D,
-              v2_3D,
-              v3_3D,
-              faceColor,
-              normal,
-              false,
-              true,
-            )
-            appendTo.push(triangle)
-          }
-        }
-      }
-    })
-    .catch((error) => {
-      console.error("fehler beim laden der modeldata:", error)
-    })
 }
 
 function updatePlayerAnimations() {
@@ -2236,4 +2046,142 @@ function playerAnimJumpStart() {
   if (animationTimer == animationTime)
     player.currentAnimation = animations.single_jumping_fall
 }
+
+function importPlayer() {
+  fetch(wispy)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return response.json()
+    })
+    .then((data) => {
+      const vertices = data.vertices
+      const faces = data.faces
+      let sumX = 0,
+        sumY = 0,
+        sumZ = 0
+      playerCount = vertices.length
+      for (const vert of vertices) {
+        sumX += vert[0]
+        sumY += vert[1]
+        sumZ += vert[2]
+      }
+      if (playerCount > 0) {
+        playerCenter = new Vector3(
+          sumX / playerCount,
+          sumY / playerCount,
+          sumZ / playerCount,
+        )
+      }
+      for (const face of faces) {
+        const faceIndic = face[0]
+        const faceColor = face[1]
+        let appendTo = playerObj.Body.model
+        if (face[2] != null) {
+          switch (face[2]) {
+            case "Body":
+              break
+            case "LeftArm":
+              appendTo = playerObj.leftArm.model
+              break
+            case "RightArm":
+              appendTo = playerObj.rightArm.model
+              break
+            case "Head":
+              appendTo = playerObj.Head.model
+              break
+            case "LeftLeg":
+              appendTo = playerObj.leftLeg.model
+              break
+            case "RightLeg":
+              appendTo = playerObj.rightLeg.model
+              break
+          }
+        }
+        if (faceIndic.length === 3) {
+          const v1_3D = new Vector3(...vertices[faceIndic[0]])
+          const v2_3D = new Vector3(...vertices[faceIndic[1]])
+          const v3_3D = new Vector3(...vertices[faceIndic[2]])
+
+          const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
+
+          if (enable_outlines) {
+            const triangle = new Triangle(
+              v1_3D,
+              v2_3D,
+              v3_3D,
+              faceColor,
+              normal,
+              false,
+              true,
+            )
+            appendTo.push(triangle)
+          } else {
+            const triangle = new Triangle(
+              v1_3D,
+              v2_3D,
+              v3_3D,
+              faceColor,
+              normal,
+              false,
+              true,
+            )
+            appendTo.push(triangle)
+          }
+        }
+      }
+    })
+    .catch((error) => {
+      console.error("fehler beim laden der modeldata:", error)
+    })
+}
+
+function loadCollisionMap() {
+  fetch(collisionMapModel)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      return response.json()
+    })
+    .then((data) => {
+      const vertices = data.vertices
+      const faces = data.faces
+      for (const face of faces) {
+        const faceIndic = face
+        if (faceIndic.length === 3) {
+          const v1_3D = new Vector3(...vertices[faceIndic[0]])
+          const v2_3D = new Vector3(...vertices[faceIndic[1]])
+          const v3_3D = new Vector3(...vertices[faceIndic[2]])
+
+          const normal = calculateNormal(v1_3D, v2_3D, v3_3D)
+          const collisionTriangleThis = new collisionTriangle(
+            v1_3D,
+            v2_3D,
+            v3_3D,
+            normal
+          )
+          const renderTri = new Triangle(
+            v1_3D,
+            v2_3D,
+            v3_3D,
+            getRandomColor(),
+            normal,
+            true
+          )
+          collisionMap.push(collisionTriangleThis)
+          scene.push(renderTri)
+        }
+      }
+      console.log("setup")
+      setupStaticCollisionGeometry()
+    })
+    .catch((error) => {
+      console.error("fehler beim laden der modeldata:", error)
+    })
+}
+
+
 //LATESTBACKUO FUNCTIONING 14:09 01.05
