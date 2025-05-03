@@ -679,12 +679,14 @@ class collisionTriangle {
     this.vertices = worldVertices
     this.normal = worldNormal.normalize()
 
+    console.warn("FIX THIS WALL FLOOR PROBLEM")
     // Determine collision type based on the up component of the normal
     if (this.normal.y > 0.01) {
       this.collisionType = collisionTypes.floor
     } else if (this.normal.y < -0.01) {
       this.collisionType = collisionTypes.ceiling
     } else {
+      //FIXME
       this.collisionType = collisionTypes.wall
     }
     // Calculate the plane equation constant (Ax + By + Cz + D = 0, where D = -normal.dot(vertex))
@@ -708,12 +710,17 @@ let playerCenter = new Vector3(0, 0, 0)
 let playerCount = 0
 const wispy =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
+//const collisionMapModel =
+//  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/collision_map_test"
 const collisionMapModel =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/collision_map_test"
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/sm64bbb_geometry"
+const map =
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/sm64bbb_model"
 
 async function loadResources() {
   loadCollisionMap()
   importPlayer()
+  loadModel(scene, map)
   //wait(0.5)
 }
 loadResources()
@@ -1386,7 +1393,7 @@ function loadModel(model: Triangle[], modelUrl: string) {
             false,
             false,
           )
-          scene.push(triangle)
+          model.push(triangle)
           //}
         }
       }
@@ -2081,7 +2088,7 @@ function loadCollisionMap() {
             true,
           )
           collisionMap.push(collisionTriangleThis)
-          scene.push(renderTri)
+          //scene.push(renderTri)
         }
       }
       console.log("setup")
