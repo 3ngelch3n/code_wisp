@@ -399,6 +399,7 @@ let player = {
   slideVelZ: 0,
   verticalVel: 0,
   intendedYaw: 0,
+  intendedPitch: 0,
   animWannaState: 0,
   state: state.ground,
   currentAnimation: animations.idle,
@@ -1636,29 +1637,21 @@ function player_actions_moving(was_standing_still: boolean) {
         )
       }
     }
-    // Aktualisiere die Vorwärtsgeschwindigkeit basierend auf Input (intendedMag)
-    let maxTargetSpeed = 32 // Übernommen aus deiner alten update_walking_speed Logik
+    let maxTargetSpeed = 32
     let targetSpeed =
       inputMagnitude < maxTargetSpeed ? inputMagnitude : maxTargetSpeed
 
-    // Glättungsfaktor: Bestimmt, wie schnell die Geschwindigkeit den Zielwert erreicht.
-    // Passe diesen Wert an (z.B. 0.05 bis 0.2)
     const smoothingFactor = 0.1
     player.forwardVel += (targetSpeed - currentForwardVel) * smoothingFactor
 
-    // Begrenze die Maximalgeschwindigkeit (übernommen aus deiner alten update_walking_speed Logik)
     if (player.forwardVel > 48) {
       player.forwardVel = 48
     }
 
-    // Optional: Schnapp die Geschwindigkeit auf 0, wenn kein Input da ist
-    // und die Geschwindigkeit sehr nahe bei 0 liegt
     if (targetSpeed === 0 && Math.abs(player.forwardVel) < 0.5) {
       player.forwardVel = 0
     }
 
-    // Aktualisiere die Position des Spielers basierend auf forwardVel und dem aktuellen Yaw
-    // Annahme: Math.sin/cos akzeptieren Grad
     const speed = player.forwardVel
     const yawDegrees = player.yaw
 
@@ -1699,7 +1692,8 @@ function movePlayer(x: number, z: number) {
       playerSetAir()
     } else {
       player.state = state.ground
-      player.position.y = Math.max(...heightList)
+      const floor = Math.max(...heightList)
+      player.position.y = floor
     }
   }
 }
@@ -2181,4 +2175,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUO FUNCTIONING 23:18 02.05
+//LATESTBACKUO FUNCTIONING 19:58 04.05
