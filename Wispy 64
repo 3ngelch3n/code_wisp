@@ -679,14 +679,12 @@ class collisionTriangle {
     this.vertices = worldVertices
     this.normal = worldNormal.normalize()
 
-    console.warn("FIX THIS WALL FLOOR PROBLEM")
     // Determine collision type based on the up component of the normal
     if (this.normal.y > 0.01) {
       this.collisionType = collisionTypes.floor
     } else if (this.normal.y < -0.01) {
       this.collisionType = collisionTypes.ceiling
     } else {
-      //FIXME
       this.collisionType = collisionTypes.wall
     }
     // Calculate the plane equation constant (Ax + By + Cz + D = 0, where D = -normal.dot(vertex))
@@ -694,7 +692,7 @@ class collisionTriangle {
   }
 }
 
-const LEVEL_BOUNDARY_MAX = 200 // Max extent of the level in world units
+const LEVEL_BOUNDARY_MAX = 600 // Max extent of the level in world units
 const CELL_SIZE = 40 // Size of a grid cell in world units
 const LEVEL_DIMENSION = LEVEL_BOUNDARY_MAX * 2 // Total dimension of the level (e.g., 400)
 const NUM_CELLS_PER_DIMENSION = Math.ceil(LEVEL_DIMENSION / CELL_SIZE) // Number of grid cells along one dimension
@@ -710,17 +708,14 @@ let playerCenter = new Vector3(0, 0, 0)
 let playerCount = 0
 const wispy =
   "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/wisp_anim"
-//const collisionMapModel =
-//  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/collision_map_test"
 const collisionMapModel =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/sm64bbb_geometry"
-const map =
-  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/sm64bbb_model"
+  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/bbb"
+//const collisionMapModel =
+//  "https://raw.githubusercontent.com/3ngelch3n/code_wisp/refs/heads/main/map2"
 
 async function loadResources() {
   loadCollisionMap()
   importPlayer()
-  loadModel(scene, map)
   //wait(0.5)
 }
 loadResources()
@@ -1393,7 +1388,7 @@ function loadModel(model: Triangle[], modelUrl: string) {
             false,
             false,
           )
-          model.push(triangle)
+          scene.push(triangle)
           //}
         }
       }
@@ -1423,7 +1418,7 @@ function updatePlayer() {
   }
   updatePlayerAnimations()
   //highlightPlayerGridCell()
-  setPlayerFloor()
+  //setPlayerFloor()
 }
 
 function setPlayerAnimation(animationSet: animations) {
@@ -1435,41 +1430,19 @@ function setPlayerAnimation(animationSet: animations) {
   }
 }
 
-function setPlayerFloor() {
-  const playerX = player.position.x
-  const playerZ = player.position.z
-
-  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
-  const playerCellX = cellIndices.cellX
-  const playerCellZ = cellIndices.cellZ
-  let trianglesInPlayerCell: collisionTriangle[] = []
-  let processedTriangleIndices: number[] = []
-  const checkCellX = playerCellX
-  const checkCellZ = playerCellZ
-  if (
-    checkCellX >= 0 &&
-    checkCellX < NUM_CELLS_PER_DIMENSION &&
-    checkCellZ >= 0 &&
-    checkCellZ < NUM_CELLS_PER_DIMENSION
-  ) {
-    const cellTriangleIndices = staticSurfacePartition[checkCellZ]?.[checkCellX]
-    if (cellTriangleIndices && Array.isArray(cellTriangleIndices)) {
-      cellTriangleIndices.forEach((index) => {
-        if (index >= 0 && index < staticSurfacePartitionTriangles.length) {
-          if (!processedTriangleIndices.find((element) => element == index)) {
-            trianglesInPlayerCell.push(staticSurfacePartitionTriangles[index])
-            processedTriangleIndices.push(index) // Füge das Objekt zum Set hinzu
-          }
-        } else {
-          console.warn(
-            `setPlayerFloor: Ungültiger Dreiecksindex im Spatial Partition: ${index}`,
-          )
-        }
-      })
-    }
-  }
+function getFloors(
+  x: number,
+  z: number,
+  collisionTrianglesCell: collisionTriangle[] = [],
+  isPlayer: boolean = false,
+): number[] {
   let heightList: number[] = []
-  trianglesInPlayerCell
+  let collisionTriangles = collisionTrianglesCell
+  if (collisionTriangles.length == 0) {
+    collisionTriangles = getSurfaceTrianglesAt(x, z)
+    if (collisionTriangles.length == 0) return []
+  }
+  collisionTriangles
     .filter((triangle) => triangle.collisionType === collisionTypes.floor)
     .forEach((triangle) => {
       const v1 = triangle.vertices[0]
@@ -1477,11 +1450,11 @@ function setPlayerFloor() {
       const v3 = triangle.vertices[2]
 
       const cross_v1_v2 =
-        (v2.z - v1.z) * (playerX - v1.x) - (v2.x - v1.x) * (playerZ - v1.z)
+        (v2.z - v1.z) * (x - v1.x) - (v2.x - v1.x) * (z - v1.z)
       const cross_v2_v3 =
-        (v3.z - v2.z) * (playerX - v2.x) - (v3.x - v2.x) * (playerZ - v2.z)
+        (v3.z - v2.z) * (x - v2.x) - (v3.x - v2.x) * (z - v2.z)
       const cross_v3_v1 =
-        (v1.z - v3.z) * (playerX - v3.x) - (v1.x - v3.x) * (playerZ - v3.z)
+        (v1.z - v3.z) * (x - v3.x) - (v1.x - v3.x) * (z - v3.z)
 
       const isInside2D =
         (cross_v1_v2 >= -epsilon &&
@@ -1498,30 +1471,59 @@ function setPlayerFloor() {
       const oo = triangle.originOffset
 
       if (Math.abs(ny) < epsilon) {
-        return
+        return []
       }
 
-      const heightAtPoint = -(playerX * nx + nz * playerZ + oo) / ny
-      if (player.state == state.ground) {
+      const heightAtPoint = -(x * nx + nz * z + oo) / ny
+
+      if (isPlayer) {
+        if (player.state == state.ground) {
+          if (
+            player.position.y <= heightAtPoint + 5 &&
+            player.position.y >= heightAtPoint
+          )
+            heightList.push(heightAtPoint)
+        }
         if (
-          player.position.y <= heightAtPoint + 5 &&
-          player.position.y >= heightAtPoint
+          player.position.y >= heightAtPoint - 2 &&
+          player.position.y <= heightAtPoint
         )
           heightList.push(heightAtPoint)
       }
-      if (
-        player.position.y >= heightAtPoint - 2 &&
-        player.position.y <= heightAtPoint
-      )
-        heightList.push(heightAtPoint)
     })
 
-  if (heightList.length == 0) {
-    playerSetAir()
-  } else {
-    player.state = state.ground
-    player.position.y = Math.max(...heightList)
+  return heightList
+}
+
+function getSurfaceTrianglesAt(x: number, z: number): collisionTriangle[] {
+  const cellIndices = getWorldCoordsCellIndices(x, z)
+  let trianglesInCell: collisionTriangle[] = []
+  let processedTriangleIndices: number[] = []
+  const checkCellX = cellIndices.cellX
+  const checkCellZ = cellIndices.cellZ
+  if (
+    checkCellX >= 0 &&
+    checkCellX < NUM_CELLS_PER_DIMENSION &&
+    checkCellZ >= 0 &&
+    checkCellZ < NUM_CELLS_PER_DIMENSION
+  ) {
+    const cellTriangleIndices = staticSurfacePartition[checkCellZ]?.[checkCellX]
+    if (cellTriangleIndices && Array.isArray(cellTriangleIndices)) {
+      cellTriangleIndices.forEach((index) => {
+        if (index >= 0 && index < staticSurfacePartitionTriangles.length) {
+          if (!processedTriangleIndices.find((element) => element == index)) {
+            trianglesInCell.push(staticSurfacePartitionTriangles[index])
+            processedTriangleIndices.push(index)
+          }
+        } else {
+          console.warn(
+            `getSurfaceTrianglesAt: Ungültiger Dreiecksindex im Spatial Partition: ${index}`,
+          )
+        }
+      })
+    }
   }
+  return trianglesInCell
 }
 
 function playerSetAir() {
@@ -1607,7 +1609,7 @@ function player_actions_moving(was_standing_still: boolean) {
     player.slideVelX += sidewaysSpeed * Math.sin(player.yaw + 90)
     player.slideVelZ += sidewaysSpeed * Math.cos(player.yaw + 90)
 
-    movePlayerHorizontal(player.slideVelX, player.slideVelZ)
+    movePlayer(player.slideVelX, player.slideVelZ)
 
     if (player.verticalVel > -1.875 / gravityMult)
       player.verticalVel += gravity / gravityMult
@@ -1663,86 +1665,116 @@ function player_actions_moving(was_standing_still: boolean) {
     const deltaX = speed * Math.sin(yawDegrees)
     const deltaZ = speed * Math.cos(yawDegrees)
 
-    movePlayerHorizontal(deltaX, deltaZ)
+    movePlayer(deltaX, deltaZ)
 
     if (intendedSpace) playerJump()
   }
 }
 
-function movePlayerHorizontal(x: number, z: number) {
+function movePlayer(x: number, z: number) {
   const moveX = x / 128
   const moveZ = z / 128
   for (let i = 0; i < 3; i++) {
     player.position.x += moveX
     player.position.z += moveZ
-    checkWallCollisions()
+    const trianglesInPlayerCell = getSurfaceTrianglesAt(
+      player.position.x,
+      player.position.z,
+    )
+    const wallPush = getWallPush(
+      player.position,
+      player.height,
+      player.radius,
+      trianglesInPlayerCell,
+      true,
+    )
+    player.position = player.position.add(wallPush)
+    const heightList = getFloors(
+      player.position.x,
+      player.position.z,
+      trianglesInPlayerCell,
+      true,
+    )
+    if (heightList.length == 0) {
+      playerSetAir()
+    } else {
+      player.state = state.ground
+      player.position.y = Math.max(...heightList)
+    }
   }
 }
 
-function checkWallCollisions() {
-  const playerX = player.position.x
-  const playerZ = player.position.z
-  const playerY = player.position.y
+function crossProduct2D(
+  p1x: number,
+  p1y: number,
+  p2x: number,
+  p2y: number,
+): number {
+  return p1x * p2y - p2x * p1y
+}
 
-  const cellIndices = getWorldCoordsCellIndices(playerX, playerZ)
-  const playerCellX = cellIndices.cellX
-  const playerCellZ = cellIndices.cellZ
+function isPointInTriangle2D(point2D: number[], vertices2D: number[]): boolean {
+  const v1x = vertices2D[0],
+    v1y = vertices2D[1]
+  const v2x = vertices2D[2],
+    v2y = vertices2D[3]
+  const v3x = vertices2D[4],
+    v3y = vertices2D[5]
+  const px = point2D[0],
+    py = point2D[1]
 
-  let trianglesInNearbyCells: collisionTriangle[] = []
-  let processedTriangleIndices: { [index: number]: boolean } = {}
+  const cp1 = crossProduct2D(v2x - v1x, v2y - v1y, px - v1x, py - v1y)
+  const cp2 = crossProduct2D(v3x - v2x, v3y - v2y, px - v2x, py - v2y)
+  const cp3 = crossProduct2D(v1x - v3x, v1y - v3y, px - v3x, py - v3y)
 
-  for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const checkCellX = playerCellX + dx
-      const checkCellZ = playerCellZ + dz
+  const has_neg = cp1 < -epsilon || cp2 < -epsilon || cp3 < -epsilon
+  const has_pos = cp1 > epsilon || cp2 > epsilon || cp3 > epsilon
 
-      if (
-        checkCellX >= 0 &&
-        checkCellX < NUM_CELLS_PER_DIMENSION &&
-        checkCellZ >= 0 &&
-        checkCellZ < NUM_CELLS_PER_DIMENSION
-      ) {
-        const cellTriangleIndices =
-          staticSurfacePartition[checkCellZ]?.[checkCellX]
+  return !(has_neg && has_pos)
+}
 
-        if (cellTriangleIndices && Array.isArray(cellTriangleIndices)) {
-          cellTriangleIndices.forEach((index) => {
-            if (index >= 0 && index < staticSurfacePartitionTriangles.length) {
-              if (processedTriangleIndices[index] === undefined) {
-                processedTriangleIndices[index] = true
-                const tri = staticSurfacePartitionTriangles[index]
-                trianglesInNearbyCells.push(tri)
-              }
-            } else {
-              console.warn(
-                `handlePlayerCollision: Invalid triangle index: ${index}`,
-              )
-            }
-          })
-        }
-      }
-    }
+function getWallPush(
+  startpos: Vector3,
+  objHeight: number,
+  r: number,
+  collisionTrianglesCell: collisionTriangle[] = [],
+  isPlayer: boolean = false,
+): Vector3 {
+  let collisionTriangles = collisionTrianglesCell
+  if (collisionTriangles.length == 0) {
+    collisionTriangles = getSurfaceTrianglesAt(startpos.x, startpos.z)
+    if (collisionTriangles.length == 0) return new Vector3(0, 0, 0)
+  }
+
+  const wallTriangles = collisionTriangles.filter(
+    (triangle) => triangle.collisionType === collisionTypes.wall,
+  )
+
+  if (wallTriangles.length === 0) {
+    return new Vector3(0, 0, 0)
   }
 
   let accumulatedWallPush = new Vector3(0, 0, 0)
-  let wallCollisionOccurred = false
 
-  trianglesInNearbyCells
-    .filter((triangle) => triangle.collisionType === collisionTypes.wall)
-    .forEach((wallTriangle) => {
+  for (let i = 0; i < 2; i++) {
+    const offset = new Vector3(0, 1.5 * (i + 1), 0)
+    const rS = (r / 2) * (i + 1)
+    let pos = startpos.add(offset)
+
+    wallTriangles.forEach((wallTriangle) => {
       const normal = wallTriangle.normal
       const originOffset = wallTriangle.originOffset
 
-      const distBottom = player.position.dot(normal) + originOffset
-      const playerTopPos = player.position.add(new Vector3(0, player.height, 0))
-      const distTop = playerTopPos.dot(normal) + originOffset
+      const distBottom = pos.dot(normal) + originOffset
+      const TopPos = pos.add(new Vector3(0, objHeight, 0))
+      const distTop = TopPos.dot(normal) + originOffset
 
       const minProjectedDistance = Math.min(distBottom, distTop)
       const maxProjectedDistance = Math.max(distBottom, distTop)
 
       const overlapsPlaneDepth =
-        minProjectedDistance <= player.radius + epsilon &&
-        maxProjectedDistance >= -player.radius - epsilon
+        minProjectedDistance <= rS + epsilon &&
+        maxProjectedDistance >= -rS - epsilon
 
       const wallMinY = Math.min(
         wallTriangle.vertices[0].y,
@@ -1754,38 +1786,88 @@ function checkWallCollisions() {
         wallTriangle.vertices[1].y,
         wallTriangle.vertices[2].y,
       )
-      const playerMinY = player.position.y + 1.9 //TT
-      const playerMaxY = player.position.y + player.height
+      const MinY = pos.y
+      const MaxY = pos.y + objHeight
 
       const yOverlap = Math.max(
         0,
-        Math.min(playerMaxY, wallMaxY) - Math.max(playerMinY, wallMinY),
+        Math.min(MaxY, wallMaxY) - Math.max(MinY, wallMinY),
       )
 
       if (overlapsPlaneDepth && yOverlap > epsilon) {
-        wallCollisionOccurred = true
-
-        const penetrationDepth = player.radius - minProjectedDistance
+        const penetrationDepth = rS - minProjectedDistance
 
         if (penetrationDepth > epsilon) {
-          const div = (-5 / 32) * Math.abs(player.forwardVel) + 8
-          const push = new Vector3(
-            (normal.x * penetrationDepth) / div,
-            (normal.y * penetrationDepth) / div,
-            (normal.z * penetrationDepth) / div,
+          const pointOnPlaneClosestToStartpos = pos.add(
+            new Vector3(
+              normal.x * -distBottom,
+              normal.y * -distBottom,
+              normal.z * -distBottom,
+            ),
           )
-          accumulatedWallPush = accumulatedWallPush.add(push)
+
+          const absNormalX = Math.abs(normal.x)
+          const absNormalY = Math.abs(normal.y)
+          const absNormalZ = Math.abs(normal.z)
+
+          let vertices2D: number[] = []
+          let point2D: number[] = []
+
+          if (absNormalZ > absNormalX && absNormalZ > absNormalY) {
+            vertices2D = [
+              wallTriangle.vertices[0].x,
+              wallTriangle.vertices[0].y,
+              wallTriangle.vertices[1].x,
+              wallTriangle.vertices[1].y,
+              wallTriangle.vertices[2].x,
+              wallTriangle.vertices[2].y,
+            ]
+            point2D = [
+              pointOnPlaneClosestToStartpos.x,
+              pointOnPlaneClosestToStartpos.y,
+            ]
+          } else if (absNormalY > absNormalX && absNormalY > absNormalZ) {
+            vertices2D = [
+              wallTriangle.vertices[0].x,
+              wallTriangle.vertices[0].z,
+              wallTriangle.vertices[1].x,
+              wallTriangle.vertices[1].z,
+              wallTriangle.vertices[2].x,
+              wallTriangle.vertices[2].z,
+            ]
+            point2D = [
+              pointOnPlaneClosestToStartpos.x,
+              pointOnPlaneClosestToStartpos.z,
+            ]
+          } else {
+            vertices2D = [
+              wallTriangle.vertices[0].y,
+              wallTriangle.vertices[0].z,
+              wallTriangle.vertices[1].y,
+              wallTriangle.vertices[1].z,
+              wallTriangle.vertices[2].y,
+              wallTriangle.vertices[2].z,
+            ]
+            point2D = [
+              pointOnPlaneClosestToStartpos.y,
+              pointOnPlaneClosestToStartpos.z,
+            ]
+          }
+
+          if (isPointInTriangle2D(point2D, vertices2D)) {
+            const push = new Vector3(
+              normal.x * penetrationDepth,
+              normal.y * penetrationDepth,
+              normal.z * penetrationDepth,
+            )
+            accumulatedWallPush = accumulatedWallPush.add(push)
+          }
         }
       }
     })
-
-  if (accumulatedWallPush.magnitude() > epsilon) {
-    player.position = player.position.add(accumulatedWallPush)
   }
 
-  if (wallCollisionOccurred) {
-    player.forwardVel /= 1.25
-  }
+  return accumulatedWallPush
 }
 
 function approach(
@@ -2088,7 +2170,7 @@ function loadCollisionMap() {
             true,
           )
           collisionMap.push(collisionTriangleThis)
-          //scene.push(renderTri)
+          scene.push(renderTri)
         }
       }
       console.log("setup")
