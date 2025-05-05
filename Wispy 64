@@ -1299,9 +1299,6 @@ function updateCamera() {
   const cameraDist = 15
   const cameraHeightOffset = 8
   const cameraPitchAngle = -10
-  /*const cameraDist = 20
-  const cameraHeightOffset = 16
-  const cameraPitchAngle = -70*/
 
   if (camera.turningYaw) {
     let diff = camera.targetYaw - camera.yaw
@@ -1490,7 +1487,71 @@ function getFloors(
           player.position.y <= heightAtPoint
         )
           heightList.push(heightAtPoint)
+      }else {
+        heightList.push(heightAtPoint)
       }
+    })
+
+  return heightList
+}
+
+function inCeiling(checkY: number, distanceY: number, ceilingHeights: number[]): boolean {
+  let inCeiling = false
+  ceilingHeights.forEach((height) => {
+    if (checkY < height && checkY + distanceY >= height) {
+      inCeiling = true
+      
+    }
+  })
+  return inCeiling
+}
+
+function getCeilings(
+  x: number,
+  z: number,
+  collisionTrianglesCell: collisionTriangle[] = []
+): number[] {
+  let heightList: number[] = []
+  let collisionTriangles = collisionTrianglesCell
+  if (collisionTriangles.length == 0) {
+    collisionTriangles = getSurfaceTrianglesAt(x, z)
+    if (collisionTriangles.length == 0) return []
+  }
+  collisionTriangles
+    .filter((triangle) => triangle.collisionType === collisionTypes.ceiling)
+    .forEach((triangle) => {
+      const v1 = triangle.vertices[0]
+      const v2 = triangle.vertices[1]
+      const v3 = triangle.vertices[2]
+
+      const cross_v1_v2 =
+        (v2.z - v1.z) * (x - v1.x) - (v2.x - v1.x) * (z - v1.z)
+      const cross_v2_v3 =
+        (v3.z - v2.z) * (x - v2.x) - (v3.x - v2.x) * (z - v2.z)
+      const cross_v3_v1 =
+        (v1.z - v3.z) * (x - v3.x) - (v1.x - v3.x) * (z - v3.z)
+
+      const isInside2D =
+        (cross_v1_v2 >= -epsilon &&
+          cross_v2_v3 >= -epsilon &&
+          cross_v3_v1 >= -epsilon) ||
+        (cross_v1_v2 <= epsilon &&
+          cross_v2_v3 <= epsilon &&
+          cross_v3_v1 <= epsilon)
+
+      if (!isInside2D) return
+      const nx = triangle.normal.x
+      const ny = triangle.normal.y
+      const nz = triangle.normal.z
+      const oo = triangle.originOffset
+
+      if (Math.abs(ny) < epsilon) {
+        return []
+      }
+
+      const heightAtPoint = -(x * nx + nz * z + oo) / ny
+
+      heightList.push(heightAtPoint)
     })
 
   return heightList
@@ -1682,18 +1743,28 @@ function movePlayer(x: number, z: number) {
       true,
     )
     player.position = player.position.add(wallPush)
-    const heightList = getFloors(
+    const heightListFloor = getFloors(
       player.position.x,
       player.position.z,
       trianglesInPlayerCell,
       true,
     )
-    if (heightList.length == 0) {
+    if (heightListFloor.length == 0) {
       playerSetAir()
     } else {
       player.state = state.ground
-      const floor = Math.max(...heightList)
+      const floor = Math.max(...heightListFloor)
       player.position.y = floor
+    }
+    const heightListCeilings = getCeilings(player.position.x, player.position.z, trianglesInPlayerCell)
+    if (heightListCeilings. length != 0) {
+      const isInCeiling = inCeiling(player.position.y, player.height, heightListCeilings)
+      if (isInCeiling) {
+        if (player.verticalVel > 0)
+        player.verticalVel = 0
+        player.position.x -= moveX
+        player.position.z -= moveZ
+      }
     }
   }
 }
@@ -2175,4 +2246,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUO FUNCTIONING 19:58 04.05
+//LATESTBACKUP 17:22 05.05
