@@ -29,6 +29,7 @@ let intendedY = 0
 let intendedX = 0
 let intendedMag = 0
 let intendedSpace = false
+let intendedShift = false
 const moveSpeed = 0.1
 const gravity = -0.1
 const enable_outlines = true
@@ -42,6 +43,9 @@ enum animations {
   running,
   fall,
   idle,
+  long_jump,
+  crouch,
+  sneaking,
 }
 enum state {
   ground,
@@ -381,24 +385,7 @@ class Vector3 {
   }
 }
 
-let player = {
-  position: new Vector3(0, 0, 0),
-  yaw: 0,
-  pitch: 0,
-  forwardVel: 0,
-  slideVelX: 0,
-  slideVelZ: 0,
-  verticalVel: 0,
-  intendedYaw: 0,
-  intendedPitch: 0,
-  animWannaState: 0,
-  state: state.ground,
-  currentAnimation: animations.idle,
-  height: 8,
-  radius: 2.5,
-  canMove: true,
-  bonked: false
-}
+
 
 class AnimatableObject {
   position: Vector3
@@ -684,6 +671,28 @@ class collisionTriangle {
     // Calculate the plane equation constant (Ax + By + Cz + D = 0, where D = -normal.dot(vertex))
     this.originOffset = -this.normal.dot(this.vertices[0])
   }
+}
+
+let player = {
+  position: new Vector3(0, 0, 0),
+  yaw: 0,
+  pitch: 0,
+  forwardVel: 0,
+  slideVelX: 0,
+  slideVelZ: 0,
+  verticalVel: 0,
+  intendedYaw: 0,
+  intendedPitch: 0,
+  animWannaState: 0,
+  state: state.ground,
+  currentAnimation: animations.idle,
+  height: 8,
+  radius: 2.5,
+  canMove: true,
+  bonked: false,
+  sneaking: false,
+  sneak_walk: false,
+  groundTriangle: new collisionTriangle(new Vector3(0,0,0), new Vector3(0,0,0), new Vector3(0,0,0), new Vector3(0,0,0)),
 }
 
 const LEVEL_BOUNDARY_MAX = 600 // Max extent of the level in world units
@@ -1232,6 +1241,7 @@ function inputs() {
   intendedX = 0
   intendedY = 0
   intendedSpace = false
+  intendedShift = false
   if (!camera.turningYaw) {
     if (Keyboard.keyDown(Key.ArrowRight)) {
       camera.targetYaw = camera.targetYaw - camera.stepAngle
@@ -1245,23 +1255,26 @@ function inputs() {
     }
   }
   if (player.canMove) {
-  if (Keyboard.keyHeld(Key.D)) {
-    intendedY += 32
-  }
-  if (Keyboard.keyHeld(Key.A)) {
-    intendedY -= 32
-  }
-  if (Keyboard.keyHeld(Key.S)) {
-    intendedX -= 32
-  }
-  if (Keyboard.keyHeld(Key.W)) {
-    intendedX += 32
-  }
-  if (Keyboard.keyDown(Key.Space)) {
-    intendedSpace = true
-  }
-  intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
-  player.intendedYaw = -camera.yaw + atan2(intendedX, intendedY)
+    if (Keyboard.keyHeld(Key.D)) {
+      intendedY += 32
+    }
+    if (Keyboard.keyHeld(Key.A)) {
+      intendedY -= 32
+    }
+    if (Keyboard.keyHeld(Key.S)) {
+      intendedX -= 32
+    }
+    if (Keyboard.keyHeld(Key.W)) {
+      intendedX += 32
+    }
+    if (Keyboard.keyDown(Key.Space) || Keyboard.keyDown(Key.B)) {
+      intendedSpace = true
+    }
+    if (Keyboard.keyHeld(Key.Shift)) {
+      intendedShift = true
+    }
+    intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
+    player.intendedYaw = -camera.yaw + atan2(intendedX, intendedY)
   }
 }
 
@@ -1430,6 +1443,7 @@ function getFloors(
   isPlayer: boolean = false,
 ): number[] {
   let heightList: number[] = []
+  let groundTriangle: collisionTriangle = new collisionTriangle(new Vector3(0,0,0),new Vector3(0,0,0),new Vector3(0,0,0),new Vector3(0,0,0))
   let collisionTriangles = collisionTrianglesCell
   if (collisionTriangles.length == 0) {
     collisionTriangles = getSurfaceTrianglesAt(x, z)
@@ -1482,11 +1496,13 @@ function getFloors(
           player.position.y <= heightAtPoint
         )
           heightList.push(heightAtPoint)
+        groundTriangle = triangle
       } else {
         heightList.push(heightAtPoint)
       }
     })
-
+  if (isPlayer)
+    player.groundTriangle = groundTriangle
   return heightList
 }
 
@@ -1682,8 +1698,10 @@ function player_actions_moving(was_standing_still: boolean) {
     const currentForwardVel = player.forwardVel
     const inputMagnitude = intendedMag // Globale Variable aus inputs()
 
-    // Aktualisiere den Gierwinkel (Yaw) des Spielers sanft in Richtung intendedYaw
-    // Nutzt deine existierende rotateTowardsAngleDegrees Funktion
+    if (intendedShift) {player.sneaking = true}
+    else {player.sneaking = false}
+
+    if (!player.sneaking) {
     const rotationSpeed = 9 // Übernommen aus deiner alten update_walking_speed Logik
     if (inputMagnitude != 0) {
       if (was_standing_still) {
@@ -1710,6 +1728,36 @@ function player_actions_moving(was_standing_still: boolean) {
     if (targetSpeed === 0 && Math.abs(player.forwardVel) < 0.5) {
       player.forwardVel = 0
     }
+    } else {
+      if (player.sneak_walk && inputMagnitude != 0) {
+        setPlayerAnimation(animations.sneaking)
+      }else {
+        setPlayerAnimation(animations.crouch)
+      }
+      player.forwardVel = approach(player.forwardVel, 0, 0.175, 0.175)
+      const dragThreshold = 12
+      if (player.forwardVel > dragThreshold) {
+      player.forwardVel = dragThreshold
+      }
+      if (player.forwardVel < -dragThreshold / 2) {
+        player.forwardVel += 2
+      }
+      const downhillSpeedConstant = 20.0;
+      const horizontalSteepness = Math.sqrt(1.0 - player.groundTriangle.normal.y * player.groundTriangle.normal.y);
+
+      if (horizontalSteepness > 0.3) {
+      player.slideVelX = player.forwardVel * Math.sin(player.yaw) + downhillSpeedConstant * horizontalSteepness * player.groundTriangle.normal.x;
+      player.slideVelZ = player.forwardVel * Math.cos(player.yaw) + downhillSpeedConstant * horizontalSteepness * player.groundTriangle.normal.z;
+      }
+      else {
+      player.slideVelX = player.forwardVel * Math.sin(player.yaw) 
+      player.slideVelZ = player.forwardVel * Math.cos(player.yaw)
+      }
+      //player.slideVelX += sidewaysSpeed * Math.sin(player.yaw + 90)
+      //player.slideVelZ += sidewaysSpeed * Math.cos(player.yaw + 90)
+
+      movePlayer(player.slideVelX, player.slideVelZ)
+    }
 
     const speed = player.forwardVel
     const yawDegrees = player.yaw
@@ -1718,9 +1766,10 @@ function player_actions_moving(was_standing_still: boolean) {
     const deltaZ = speed * Math.cos(yawDegrees)
 
     movePlayer(deltaX, deltaZ)
-
+    
     if (intendedSpace) playerJump()
   }
+
 }
 
 function movePlayer(x: number, z: number) {
@@ -1742,11 +1791,10 @@ function movePlayer(x: number, z: number) {
     )
     if (player.state == state.air && player.forwardVel > 30) {
       const pushAmt = Math.abs(wallPush.x) + Math.abs(wallPush.z)
-      console.log(pushAmt)
-      if (pushAmt >= .15 || pushAmt <= -.15) {
+      if (pushAmt >= 0.15 || pushAmt <= -0.15) {
         player.bonked = true
-        player.currentAnimation = animations.fall
-        player.forwardVel = -player.forwardVel/4
+        setPlayerAnimation(animations.fall)
+        player.forwardVel = -player.forwardVel / 4
       }
     }
     player.canMove = !player.bonked //currently only bonks NOMOVE
@@ -1991,6 +2039,15 @@ function updatePlayerAnimations() {
     case animations.running:
       playerAnimRunning(player.forwardVel / 3)
       break
+    case animations.crouch:
+      playerAnimCrouching()
+      break
+    case animations.sneaking:
+      playerAnimSneaking()
+      break
+    case animations.long_jump:
+      playerAnimLongJump()
+      break
   }
 }
 
@@ -2079,6 +2136,72 @@ function playerAnimFreeFall() {
   player.animWannaState = 0
 }
 
+function playerAnimLongJump() {
+  playerObj.rightArm.rotation = new rotation(10, 0, 200)
+  playerObj.rightArm.position = new Vector3(-1.5, 8.5, -0.5)
+  playerObj.leftArm.rotation = new rotation(-10, 0, 200)
+  playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
+
+  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
+  playerObj.leftLeg.position = new Vector3(0, 0.2, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
+  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 8)
+  playerObj.Body.position = new Vector3(0.8, 0, 0)
+
+  playerObj.Head.rotation = new rotation(0, 0, 16)
+  playerObj.Head.position = new Vector3(1.6, 0, 0)
+
+  animTime = 0
+  animTime2 = 0
+  player.animWannaState = 0
+}
+
+function playerAnimCrouching() {
+  playerObj.rightArm.rotation = new rotation(10, 0, 200)
+  playerObj.rightArm.position = new Vector3(-1.5, 8.5, -0.5)
+  playerObj.leftArm.rotation = new rotation(-10, 0, 200)
+  playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
+
+  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
+  playerObj.leftLeg.position = new Vector3(0, 0.2, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
+  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 8)
+  playerObj.Body.position = new Vector3(0.8, 0, 0)
+
+  playerObj.Head.rotation = new rotation(0, 0, 16)
+  playerObj.Head.position = new Vector3(1.6, 0, 0)
+
+  animTime = 0
+  animTime2 = 0
+  player.animWannaState = 0
+}
+
+function playerAnimSneaking() {
+  playerObj.rightArm.rotation = new rotation(10, 0, 200)
+  playerObj.rightArm.position = new Vector3(-1.5, 8.5, -0.5)
+  playerObj.leftArm.rotation = new rotation(-10, 0, 200)
+  playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
+
+  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
+  playerObj.leftLeg.position = new Vector3(0, 0.2, 0)
+  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
+  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, 8)
+  playerObj.Body.position = new Vector3(0.8, 0, 0)
+
+  playerObj.Head.rotation = new rotation(0, 0, 16)
+  playerObj.Head.position = new Vector3(1.6, 0, 0)
+
+  animTime = 0
+  animTime2 = 0
+  player.animWannaState = 0
+}
+
 function playerAnimSingleJump() {
   playerObj.rightArm.rotation = new rotation(-30, 0, -10)
   playerObj.rightArm.position = new Vector3(-1, -0.3, -0.6)
@@ -2099,31 +2222,6 @@ function playerAnimSingleJump() {
   animTime = 0
   animTime2 = 0
   player.animWannaState = 0
-}
-
-function playerAnimJumpStart() {
-  if (animationTimer == 0) {
-    animationTimer = 0
-    animationTime = 30
-  }
-  playerObj.rightArm.rotation = new rotation(0, 0, 0)
-  playerObj.rightArm.position = new Vector3(0, 0, 0)
-  playerObj.leftArm.rotation = new rotation(0, 0, 0)
-  playerObj.leftArm.position = new Vector3(0, 0, 0)
-
-  playerObj.leftLeg.rotation = new rotation(0, 0, 0)
-  playerObj.leftLeg.position = new Vector3(0, 0, 0)
-  playerObj.rightLeg.rotation = new rotation(0, 0, 0)
-  playerObj.rightLeg.position = new Vector3(0, 0, 0)
-
-  playerObj.Body.rotation = new rotation(0, 0, 0)
-  playerObj.Body.position = new Vector3(0, 0, 0)
-  playerObj.Head.rotation = new rotation(0, 0, 0)
-  playerObj.Head.position = new Vector3(0, 0 + animationTimer, 0)
-
-  if (animationTimer < animationTime) animationTimer++
-  if (animationTimer == animationTime)
-    player.currentAnimation = animations.single_jumping_fall
 }
 
 function importPlayer() {
