@@ -119,18 +119,9 @@ function worldToView(vertex: Vector3): Vector3 {
   return new Vector3(viewX, viewY, viewZ) // Gibt den Eckpunkt in Kamera-Koordinaten zurück
 }
 
-// NEU: Transformiert einen 3D Punkt von Kamera-Koordinaten (View Space) in 2D Bildschirm-Koordinaten (Screen Space).
-// Führt die Perspektiv-Division und Skalierung/Verschiebung auf Canvas-Pixel durch.
-// WICHTIG: Geht davon aus, dass der Punkt bereits GEKLIPPT ist (vertex.z > 0.1). Führt KEINEN Z-Check durch.
 function viewToScreen(vertex: Vector3): { x: number; y: number; z: number } {
-  // Überprüfe, ob der Z-Wert immer noch gültig ist (sollte nach Clipping der Fall sein)
-  // Eine Division durch Null oder negatives Z würde hier Fehler verursachen.
   if (vertex.z <= epsilon) {
-    // Nutze epsilon anstelle von 0.1 für Robustheit
-    // Dieser Pfad sollte nach korrektem Clipping nicht erreicht werden,
-    // aber es ist eine Sicherheitsmaßnahme.
     console.warn("viewToScreen: Punkt hinter/auf Projektionsebene!")
-    // Gebe einen Punkt zurück, der außerhalb des Bildschirms liegt
     return { x: -1, y: -1, z: vertex.z }
   }
 
@@ -405,6 +396,8 @@ let player = {
   currentAnimation: animations.idle,
   height: 8,
   radius: 2.5,
+  canMove: true,
+  bonked: false
 }
 
 class AnimatableObject {
@@ -1251,6 +1244,7 @@ function inputs() {
       camera.turningYaw = true
     }
   }
+  if (player.canMove) {
   if (Keyboard.keyHeld(Key.D)) {
     intendedY += 32
   }
@@ -1268,6 +1262,7 @@ function inputs() {
   }
   intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
   player.intendedYaw = -camera.yaw + atan2(intendedX, intendedY)
+  }
 }
 
 function atan2(x: number, y: number): number {
@@ -1487,7 +1482,7 @@ function getFloors(
           player.position.y <= heightAtPoint
         )
           heightList.push(heightAtPoint)
-      }else {
+      } else {
         heightList.push(heightAtPoint)
       }
     })
@@ -1495,12 +1490,15 @@ function getFloors(
   return heightList
 }
 
-function inCeiling(checkY: number, distanceY: number, ceilingHeights: number[]): boolean {
+function inCeiling(
+  checkY: number,
+  distanceY: number,
+  ceilingHeights: number[],
+): boolean {
   let inCeiling = false
   ceilingHeights.forEach((height) => {
     if (checkY < height && checkY + distanceY >= height) {
       inCeiling = true
-      
     }
   })
   return inCeiling
@@ -1509,7 +1507,7 @@ function inCeiling(checkY: number, distanceY: number, ceilingHeights: number[]):
 function getCeilings(
   x: number,
   z: number,
-  collisionTrianglesCell: collisionTriangle[] = []
+  collisionTrianglesCell: collisionTriangle[] = [],
 ): number[] {
   let heightList: number[] = []
   let collisionTriangles = collisionTrianglesCell
@@ -1742,6 +1740,16 @@ function movePlayer(x: number, z: number) {
       trianglesInPlayerCell,
       true,
     )
+    if (player.state == state.air && player.forwardVel > 30) {
+      const pushAmt = Math.abs(wallPush.x) + Math.abs(wallPush.z)
+      console.log(pushAmt)
+      if (pushAmt >= .15 || pushAmt <= -.15) {
+        player.bonked = true
+        player.currentAnimation = animations.fall
+        player.forwardVel = -player.forwardVel/4
+      }
+    }
+    player.canMove = !player.bonked //currently only bonks NOMOVE
     player.position = player.position.add(wallPush)
     const heightListFloor = getFloors(
       player.position.x,
@@ -1753,15 +1761,23 @@ function movePlayer(x: number, z: number) {
       playerSetAir()
     } else {
       player.state = state.ground
+      player.bonked = false
       const floor = Math.max(...heightListFloor)
       player.position.y = floor
     }
-    const heightListCeilings = getCeilings(player.position.x, player.position.z, trianglesInPlayerCell)
-    if (heightListCeilings. length != 0) {
-      const isInCeiling = inCeiling(player.position.y, player.height, heightListCeilings)
+    const heightListCeilings = getCeilings(
+      player.position.x,
+      player.position.z,
+      trianglesInPlayerCell,
+    )
+    if (heightListCeilings.length != 0) {
+      const isInCeiling = inCeiling(
+        player.position.y,
+        player.height,
+        heightListCeilings,
+      )
       if (isInCeiling) {
-        if (player.verticalVel > 0)
-        player.verticalVel = 0
+        if (player.verticalVel > 0) player.verticalVel = 0
         player.position.x -= moveX
         player.position.z -= moveZ
       }
@@ -2246,4 +2262,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUP 17:22 05.05
+//LATESTBACKUP 20:23 07.05
