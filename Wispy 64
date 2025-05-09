@@ -2254,25 +2254,43 @@ function playerAnimLongJump() {
 }
 
 function playerAnimCrouching() {
-  playerObj.rightArm.rotation = new rotation(10, 0, 200)
-  playerObj.rightArm.position = new Vector3(-1.5, 8.5, -0.5)
-  playerObj.leftArm.rotation = new rotation(-10, 0, 200)
-  playerObj.leftArm.position = new Vector3(-1.5, 8.5, 0.5)
+  const timeSin = Math.sin(animTime)
+  const timeSinAbs = Math.abs(timeSin)
+  const timeSinAbs4 = Math.abs(timeSin) / 8
+  const timeSin2 = Math.sin(animTime2)
+  playerObj.rightArm.rotation = new rotation(
+    -20,
+    timeSin * 7 - 25,
+    -timeSinAbs - 90,
+  )
+  playerObj.rightArm.position = new Vector3(-4, -timeSinAbs4 + 2, 1)
+  playerObj.leftArm.rotation = new rotation(
+    20,
+    timeSin * 7 + 25,
+    -timeSinAbs - 90,
+  )
+  playerObj.leftArm.position = new Vector3(-4, -timeSinAbs4 + 2, -1)
 
-  playerObj.leftLeg.rotation = new rotation(0, 5, -15)
-  playerObj.leftLeg.position = new Vector3(0, 0.2, 0)
-  playerObj.rightLeg.rotation = new rotation(0, 0, -13)
-  playerObj.rightLeg.position = new Vector3(-0.3, 0.8, 0)
+  playerObj.leftLeg.rotation = new rotation(
+    timeSin * 3,
+    -timeSin,
+    -timeSin * 3 + 90,
+  )
+  playerObj.leftLeg.position = new Vector3(2.5, timeSin / 16, 0)
+  playerObj.rightLeg.rotation = new rotation(
+    -timeSin2,
+    timeSin2,
+    timeSin * 3 + 90,
+  )
+  playerObj.rightLeg.position = new Vector3(2.5, 0, -timeSin2 / 16)
 
-  playerObj.Body.rotation = new rotation(0, 0, 8)
-  playerObj.Body.position = new Vector3(0.8, 5, 0)
-
-  playerObj.Head.rotation = new rotation(0, 0, 16)
-  playerObj.Head.position = new Vector3(1.6, 0, 0)
-
-  animTime = 0
-  animTime2 = 0
-  player.animWannaState = 0
+  playerObj.Body.rotation = new rotation(0, timeSin * 2, 60 + timeSin2)
+  playerObj.Body.position = new Vector3(3, -timeSinAbs4 - 0.5, 0)
+  playerObj.Head.rotation = new rotation(0, timeSin * 2, 30)
+  playerObj.Head.position = new Vector3(1, -timeSinAbs4 - 2.5, 0)
+  const diff = Math.random(-0.3, 0.3)
+  animTime = (animTime + 6 + diff) % 360
+  animTime2 = (animTime2 + 5 - diff) % 360
 }
 
 function playerAnimSneakingIdle() {
@@ -2479,4 +2497,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUP 23:38 09.05
+//LATESTBACKUP 23:56 09.05
