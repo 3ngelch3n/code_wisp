@@ -56,6 +56,7 @@ enum state {
 enum jumpTypes {
   single,
   long,
+  wall,
 }
 const epsilon = 1e-6
 resolutionScale = Math.max(resolutionScale, 1)
@@ -351,6 +352,10 @@ class Vector3 {
     this.x = x
     this.y = y
     this.z = z
+  }
+
+  scale(amount: number): Vector3 {
+    return new Vector3(this.x * amount, this.y * amount, this.z * amount)
   }
 
   add(other: Vector3): Vector3 {
@@ -692,11 +697,18 @@ let player = {
   height: 8,
   radius: 2.5,
   canMove: true,
+  bonkedTimer: 0,
   bonked: false,
   sneaking: false,
   sneak_walk: false,
   long_jump: false,
   groundTriangle: new collisionTriangle(
+    new Vector3(0, 0, 0),
+    new Vector3(0, 0, 0),
+    new Vector3(0, 0, 0),
+    new Vector3(0, 0, 0),
+  ),
+  wallTriangle: new collisionTriangle(
     new Vector3(0, 0, 0),
     new Vector3(0, 0, 0),
     new Vector3(0, 0, 0),
@@ -1199,8 +1211,10 @@ function drawFPS() {
   ctx.fillText(`Z: ${camera.z.toFixed(2)}`, 135, 30)
   ctx.fillText(`FV: ${player.forwardVel.toFixed(2)}`, 5, 45)
   ctx.fillText(`PY: ${player.yaw.toFixed(2)}`, 80, 45)
-  ctx.fillText(`M: ${intendedMag.toFixed(2)}`, 145, 45)
+  ctx.fillText(` WJ: ${player.bonkedTimer.toFixed(2)}`, 145, 45)
   ctx.fillText(`GR: ${player.verticalVel.toFixed(2)}`, 5, 60)
+  ctx.fillText(`CM: ${player.canMove}`, 120, 60)
+  ctx.fillText(`IY: ${player.intendedYaw.toFixed(2)}`, 5, 75)
 }
 
 function updateSkyBox() {
@@ -1276,39 +1290,51 @@ function inputs() {
     if (Keyboard.keyHeld(Key.W)) {
       intendedX += 32
     }
-    if (Keyboard.keyDown(Key.Space) || Keyboard.keyDown(Key.B)) {
-      intendedSpace = true
-    }
     if (Keyboard.keyHeld(Key.Shift)) {
       intendedShift = true
     }
     intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
     player.intendedYaw = -camera.yaw + atan2(intendedX, intendedY)
   }
+  if (Keyboard.keyDown(Key.Space) || Keyboard.keyDown(Key.B)) {
+    intendedSpace = true
+  }
 }
 
 function atan2(x: number, y: number): number {
-  // Konstante für die Umrechnung von Radiant in Grad
   const RADIANS_TO_DEGREES = 180 / Math.PI
-
+  x = Math.floor(x * 100) / 100
+  y = Math.floor(y * 100) / 100
   if (x > 0) {
-    // Winkel in Radiant * Umrechnungsfaktor
     return Math.atan(y / x) * RADIANS_TO_DEGREES
   } else if (x < 0 && y >= 0) {
-    // (Winkel in Radiant + PI) * Umrechnungsfaktor
     return (Math.atan(y / x) + Math.PI) * RADIANS_TO_DEGREES
   } else if (x < 0 && y < 0) {
-    // (Winkel in Radiant - PI) * Umrechnungsfaktor
     return (Math.atan(y / x) - Math.PI) * RADIANS_TO_DEGREES
   } else if (x === 0 && y > 0) {
-    // PI/2 Radiant sind 90 Grad
-    return 90 // Oder (Math.PI / 2) * RADIANS_TO_DEGREES, ergibt 90
+    return 90
   } else if (x === 0 && y < 0) {
-    // -PI/2 Radiant sind -90 Grad
-    return -90 // Oder (-Math.PI / 2) * RADIANS_TO_DEGREES, ergibt -90
+    return -90
   } else {
-    // 0 Radiant ist 0 Grad
-    return 0 // Oder 0 * RADIANS_TO_DEGREES, ergibt 0
+    return 0
+  }
+}
+
+function atan22(y: number, x: number): number {
+  x = Math.floor(x * 100) / 100
+  y = Math.floor(y * 100) / 100
+  if (x > 0) {
+    return Math.atan(y / x) * (Math.PI/180)
+  } else if (x < 0 && y >= 0) {
+    return (Math.atan(y / x)* (Math.PI/180) + Math.PI) 
+  } else if (x < 0 && y < 0) {
+    return (Math.atan(y / x)* (Math.PI/180) - Math.PI)
+  } else if (x === 0 && y > 0) {
+    return Math.PI/2
+  } else if (x === 0 && y < 0) {
+    return -Math.PI/2
+  } else {
+    return 0
   }
 }
 
@@ -1712,6 +1738,23 @@ function player_actions_moving(was_standing_still: boolean) {
     if (player.forwardVel < -dragThreshold / 2) {
       player.forwardVel += 2
     }
+    if (player.bonkedTimer > 0) {
+      player.bonkedTimer--
+      if (intendedSpace) {
+        playerJump(jumpTypes.wall)
+        const playerVec = new Vector3(Math.cos(player.yaw), 0, Math.sin(player.yaw))
+        const wallVec = new Vector3(player.wallTriangle.normal.x, 0, player.wallTriangle.normal.z)
+        const dot = playerVec.dot(wallVec)
+        const reflected = new Vector3(
+          playerVec.x - 2 * dot * wallVec.x,
+          0,
+          playerVec.z - 2 * dot * wallVec.z
+        ) //this took way too long to figure out with atan atan2...
+        player.yaw = 180 + atan22(reflected.z, reflected.x) / Math.PI*180
+
+      }
+    }
+
     player.slideVelX = player.forwardVel * Math.sin(player.yaw)
     player.slideVelZ = player.forwardVel * Math.cos(player.yaw)
 
@@ -1828,8 +1871,11 @@ function player_actions_moving(was_standing_still: boolean) {
           player.slideVelX = player.forwardVel * Math.sin(player.yaw)
           player.slideVelZ = player.forwardVel * Math.cos(player.yaw)
         }
-        if (Math.abs(player.forwardVel) >= 4 && intendedSpace)
+        if (Math.abs(player.forwardVel) >= 4 && intendedSpace) {
           playerJump(jumpTypes.long)
+          if (Math.abs(player.forwardVel) < 20)
+            player.forwardVel = Math.sign(player.forwardVel) * 20
+        }
       }
 
       movePlayer(player.slideVelX, player.slideVelZ)
@@ -1866,6 +1912,7 @@ function movePlayer(x: number, z: number) {
       const pushAmt = Math.abs(wallPush.x) + Math.abs(wallPush.z)
       if (pushAmt >= 0.15 || pushAmt <= -0.15) {
         player.bonked = true
+        player.bonkedTimer = 40
         setPlayerAnimation(animations.fall)
         player.forwardVel = -player.forwardVel / 4
       }
@@ -1883,6 +1930,7 @@ function movePlayer(x: number, z: number) {
     } else {
       player.state = state.ground
       player.bonked = false
+      player.bonkedTimer = 0
       const floor = Math.max(...heightListFloor)
       player.position.y = floor
     }
@@ -2062,6 +2110,7 @@ function getWallPush(
               normal.y * penetrationDepth,
               normal.z * penetrationDepth,
             )
+            if (isPlayer) player.wallTriangle = wallTriangle
             accumulatedWallPush = accumulatedWallPush.add(push)
           }
         }
@@ -2103,6 +2152,17 @@ function playerJump(jumpType: jumpTypes) {
       setPlayerAnimation(animations.long_jump)
       player.long_jump = true
       player.forwardVel *= 2.5
+      break
+    case jumpTypes.wall:
+      player.canMove = true
+      player.bonked = false
+      player.verticalVel = 2.1 / 2 + player.forwardVel / 256
+      setPlayerAnimation(animations.single_jumping_fall)
+      player.long_jump = false
+      player.bonkedTimer = 0
+      player.forwardVel *= -3
+      player.slideVelX = 0
+      player.slideVelZ = 0
       break
   }
 
@@ -2497,4 +2557,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUP 23:56 09.05
+//LATESTBACKUP 11:26 11.05
