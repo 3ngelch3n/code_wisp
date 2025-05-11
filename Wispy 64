@@ -47,6 +47,9 @@ enum animations {
   crouch,
   sneaking,
   sneakingIdle,
+  double_jumping_fall,
+  tripe_jumping_fall,
+  skidding,
 }
 enum state {
   ground,
@@ -699,6 +702,8 @@ let player = {
   canMove: true,
   bonkedTimer: 0,
   bonked: false,
+  skiddingTime: 0,
+  skiddingAngle: 0,
   sneaking: false,
   sneak_walk: false,
   long_jump: false,
@@ -1213,8 +1218,11 @@ function drawFPS() {
   ctx.fillText(`PY: ${player.yaw.toFixed(2)}`, 80, 45)
   ctx.fillText(` WJ: ${player.bonkedTimer.toFixed(2)}`, 145, 45)
   ctx.fillText(`GR: ${player.verticalVel.toFixed(2)}`, 5, 60)
-  ctx.fillText(`CM: ${player.canMove}`, 120, 60)
+  ctx.fillText(`CM: ${player.skiddingTime.toFixed(2)}`, 120, 60)
   ctx.fillText(`IY: ${player.intendedYaw.toFixed(2)}`, 5, 75)
+  ctx.fillText(`IX: ${intendedX.toFixed(2)}`, 5, 90)
+  ctx.fillText(`IY: ${intendedY.toFixed(2)}`, 75, 90)
+  ctx.fillText(`IM: ${intendedMag.toFixed(2)}`, 5, 105)
 }
 
 function updateSkyBox() {
@@ -1278,23 +1286,23 @@ function inputs() {
     }
   }
   if (player.canMove) {
-    if (Keyboard.keyHeld(Key.D)) {
+    if (Keyboard.keyHeld(Key.W)) {
       intendedY += 32
     }
-    if (Keyboard.keyHeld(Key.A)) {
+    if (Keyboard.keyHeld(Key.S)) {
       intendedY -= 32
     }
-    if (Keyboard.keyHeld(Key.S)) {
+    if (Keyboard.keyHeld(Key.A)) {
       intendedX -= 32
     }
-    if (Keyboard.keyHeld(Key.W)) {
+    if (Keyboard.keyHeld(Key.D)) {
       intendedX += 32
     }
     if (Keyboard.keyHeld(Key.Shift)) {
       intendedShift = true
     }
     intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
-    player.intendedYaw = -camera.yaw + atan2(intendedX, intendedY)
+    player.intendedYaw = -camera.yaw + atan22(intendedX, intendedY) * 180 / Math.PI
   }
   if (Keyboard.keyDown(Key.Space) || Keyboard.keyDown(Key.B)) {
     intendedSpace = true
@@ -1324,15 +1332,15 @@ function atan22(y: number, x: number): number {
   x = Math.floor(x * 100) / 100
   y = Math.floor(y * 100) / 100
   if (x > 0) {
-    return Math.atan(y / x) * (Math.PI/180)
+    return Math.atan(y / x) * (Math.PI / 180)
   } else if (x < 0 && y >= 0) {
-    return (Math.atan(y / x)* (Math.PI/180) + Math.PI) 
+    return Math.atan(y / x) * (Math.PI / 180) + Math.PI
   } else if (x < 0 && y < 0) {
-    return (Math.atan(y / x)* (Math.PI/180) - Math.PI)
+    return Math.atan(y / x) * (Math.PI / 180) - Math.PI
   } else if (x === 0 && y > 0) {
-    return Math.PI/2
+    return Math.PI / 2
   } else if (x === 0 && y < 0) {
-    return -Math.PI/2
+    return -Math.PI / 2
   } else {
     return 0
   }
@@ -1444,10 +1452,14 @@ function updatePlayer() {
   player_actions_moving(isIdle)
   if (player.state == state.ground) {
     if (!player.sneaking) {
+      if (player.skiddingTime <= 0) {
       if (player.forwardVel == 0) {
         setPlayerAnimation(animations.idle)
       } else {
         setPlayerAnimation(animations.running)
+      }
+      } else {
+        setPlayerAnimation(animations.skidding)
       }
     } else {
       if (player.sneak_walk) {
@@ -1742,16 +1754,23 @@ function player_actions_moving(was_standing_still: boolean) {
       player.bonkedTimer--
       if (intendedSpace) {
         playerJump(jumpTypes.wall)
-        const playerVec = new Vector3(Math.cos(player.yaw), 0, Math.sin(player.yaw))
-        const wallVec = new Vector3(player.wallTriangle.normal.x, 0, player.wallTriangle.normal.z)
+        const playerVec = new Vector3(
+          Math.cos(player.yaw+90),
+          0,
+          Math.sin(player.yaw+90),
+        )
+        const wallVec = new Vector3(
+          player.wallTriangle.normal.x,
+          0,
+          player.wallTriangle.normal.z,
+        )
         const dot = playerVec.dot(wallVec)
         const reflected = new Vector3(
           playerVec.x - 2 * dot * wallVec.x,
           0,
-          playerVec.z - 2 * dot * wallVec.z
+          playerVec.z - 2 * dot * wallVec.z,
         ) //this took way too long to figure out with atan atan2...
-        player.yaw = 180 + atan22(reflected.z, reflected.x) / Math.PI*180
-
+        player.yaw = atan22(wallVec.x, wallVec.z) * 180 / Math.PI
       }
     }
 
@@ -1774,6 +1793,7 @@ function player_actions_moving(was_standing_still: boolean) {
     const currentForwardVel = player.forwardVel
     const inputMagnitude = intendedMag // Globale Variable aus inputs()
 
+    //setPitch()
     if (intendedShift) {
       if (player.sneaking == false) player.sneak_walk = false
       player.sneaking = true
@@ -1783,6 +1803,15 @@ function player_actions_moving(was_standing_still: boolean) {
     player.long_jump = false
     if (!player.sneaking) {
       //__IS NOT SNEAKING__
+
+      if (player.skiddingTime <= epsilon) {
+        if (player.canMove && !player.sneaking) {
+          if (player.forwardVel > 27 && getShortestAngleDifferenceDegrees(intendedYaw, player.yaw) > 160) {
+            player.skiddingAngle = intendedYaw
+            player.skiddingTime = 20
+            player.forwardVel = -player.forwardVel
+            }
+      }
       const rotationSpeed = 9
       if (inputMagnitude != 0) {
         if (was_standing_still) {
@@ -1804,11 +1833,19 @@ function player_actions_moving(was_standing_still: boolean) {
 
       if (player.forwardVel > 48) {
         player.forwardVel = 48
-      }
-
+        }
       if (targetSpeed === 0 && Math.abs(player.forwardVel) < 0.5) {
         player.forwardVel = 0
+        }
+      } else {
+        console.log("ran")
+        player.skiddingTime--
+        setPlayerAnimation(animations.skidding)
+        player.yaw = player.skiddingAngle
+        const smoothingFactor = 0.1
+        player.forwardVel = approach(player.forwardVel, 32, 2.8, 2.8)
       }
+
       if (intendedSpace) playerJump(jumpTypes.single)
     } else {
       //__IS SNEAKING__
@@ -1889,6 +1926,24 @@ function player_actions_moving(was_standing_still: boolean) {
 
     movePlayer(deltaX, deltaZ)
   }
+
+  function setPitch() {
+    const normal = player.groundTriangle.normal.normalize()
+
+    const horizontalLength = Math.sqrt(
+      normal.x * normal.x + normal.z * normal.z,
+    )
+
+    if (horizontalLength < 0.001) {
+      player.pitch = normal.y > 0 ? 0 : Math.PI
+      player.roll = 0
+      console.log(player.pitch - 90, "  ", player.roll, "  0")
+    } else {
+      //player.pitch = atan22(normal.y, horizontalLength) / Math.PI*180 - 90;
+      //player.roll = atan22(-normal.x, normal.y) / Math.PI*180
+      //console.log(player.pitch, "  ", player.roll, "  4")
+    }
+  }
 }
 
 function movePlayer(x: number, z: number) {
@@ -1953,6 +2008,20 @@ function movePlayer(x: number, z: number) {
     }
   }
 }
+
+function getShortestAngleDifferenceDegrees(angle1: number, angle2: number): number {
+    let difference = angle1 - angle2;
+
+    if (difference > 180) {
+        difference -= 360;
+    }
+    else if (difference <= -180) {
+        difference += 360;
+    }
+
+    return Math.abs(difference);
+}
+
 
 function crossProduct2D(
   p1x: number,
@@ -2170,17 +2239,10 @@ function playerJump(jumpType: jumpTypes) {
   player.position.y += 1
 }
 
-function getfloorOrientations(
-  vec3: Vector3,
-): { roll: number; pitch: number } | null {
-  //!!??
-  return null
-}
-
 function updatePlayerAnimations() {
   switch (player.currentAnimation) {
     case animations.idle:
-      playerAnimIdle()
+      playerAnimIdle() 
       break
     case animations.fall:
       playerAnimFreeFall()
@@ -2201,6 +2263,15 @@ function updatePlayerAnimations() {
       playerAnimLongJump()
       break
     case animations.sneakingIdle:
+      playerAnimSneakingIdle()
+      break
+    case animations.skidding:
+      playerAnimSkidding()
+      break
+    case animations.double_jumping_fall:
+      playerAnimSneakingIdle()
+      break
+    case animations.tripe_jumping_fall:
       playerAnimSneakingIdle()
       break
   }
@@ -2307,6 +2378,30 @@ function playerAnimLongJump() {
 
   playerObj.Head.rotation = new rotation(0, 0, 7)
   playerObj.Head.position = new Vector3(0.8, -0.1, 0)
+
+  animTime = 0
+  animTime2 = 0
+  player.animWannaState = 0
+}
+
+function playerAnimSkidding() {
+  playerObj.rightArm.rotation = new rotation(-40, 0, 0)
+  playerObj.rightArm.position = new Vector3(.2, 0, 0)
+
+  playerObj.leftArm.rotation = new rotation(0, 40, -90)
+  playerObj.leftArm.position = new Vector3(-2.4, 4, -2)
+
+  playerObj.leftLeg.rotation = new rotation(0, 0, -10)
+  playerObj.leftLeg.position = new Vector3(-.1, .1, 0)
+
+  playerObj.rightLeg.rotation = new rotation(0, 0, -30)
+  playerObj.rightLeg.position = new Vector3(-.5, .2, 0)
+
+  playerObj.Body.rotation = new rotation(0, 0, -3)
+  playerObj.Body.position = new Vector3(0.2, 0, 0)
+
+  playerObj.Head.rotation = new rotation(0, 0, 3)
+  playerObj.Head.position = new Vector3(.7, 0, 0)
 
   animTime = 0
   animTime2 = 0
@@ -2557,4 +2652,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUP 11:26 11.05
+//LATESTBACKUP 23:56 09.05
