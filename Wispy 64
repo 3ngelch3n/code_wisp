@@ -1302,7 +1302,8 @@ function inputs() {
       intendedShift = true
     }
     intendedMag = Math.sqrt(intendedX * intendedX + intendedY * intendedY)
-    player.intendedYaw = -camera.yaw + atan22(intendedX, intendedY) * 180 / Math.PI
+    player.intendedYaw =
+      -camera.yaw + (atan22(intendedX, intendedY) * 180) / Math.PI
   }
   if (Keyboard.keyDown(Key.Space) || Keyboard.keyDown(Key.B)) {
     intendedSpace = true
@@ -1453,11 +1454,11 @@ function updatePlayer() {
   if (player.state == state.ground) {
     if (!player.sneaking) {
       if (player.skiddingTime <= 0) {
-      if (player.forwardVel == 0) {
-        setPlayerAnimation(animations.idle)
-      } else {
-        setPlayerAnimation(animations.running)
-      }
+        if (player.forwardVel == 0) {
+          setPlayerAnimation(animations.idle)
+        } else {
+          setPlayerAnimation(animations.running)
+        }
       } else {
         setPlayerAnimation(animations.skidding)
       }
@@ -1755,9 +1756,9 @@ function player_actions_moving(was_standing_still: boolean) {
       if (intendedSpace) {
         playerJump(jumpTypes.wall)
         const playerVec = new Vector3(
-          Math.cos(player.yaw+90),
+          Math.cos(player.yaw + 90),
           0,
-          Math.sin(player.yaw+90),
+          Math.sin(player.yaw + 90),
         )
         const wallVec = new Vector3(
           player.wallTriangle.normal.x,
@@ -1770,7 +1771,7 @@ function player_actions_moving(was_standing_still: boolean) {
           0,
           playerVec.z - 2 * dot * wallVec.z,
         ) //this took way too long to figure out with atan atan2...
-        player.yaw = atan22(wallVec.x, wallVec.z) * 180 / Math.PI
+        player.yaw = (atan22(wallVec.x, wallVec.z) * 180) / Math.PI
       }
     }
 
@@ -1806,36 +1807,39 @@ function player_actions_moving(was_standing_still: boolean) {
 
       if (player.skiddingTime <= epsilon) {
         if (player.canMove && !player.sneaking) {
-          if (player.forwardVel > 27 && getShortestAngleDifferenceDegrees(intendedYaw, player.yaw) > 160) {
+          if (
+            player.forwardVel > 27 &&
+            getShortestAngleDifferenceDegrees(intendedYaw, player.yaw) > 160
+          ) {
             player.skiddingAngle = intendedYaw
             player.skiddingTime = 20
             player.forwardVel = -player.forwardVel
-            }
-      }
-      const rotationSpeed = 9
-      if (inputMagnitude != 0) {
-        if (was_standing_still) {
-          player.yaw = intendedYaw
-        } else {
-          player.yaw = rotateTowardsAngleDegrees(
-            currentYaw,
-            intendedYaw,
-            rotationSpeed,
-          )
+          }
         }
-      }
-      let maxTargetSpeed = 32
-      let targetSpeed =
-        inputMagnitude < maxTargetSpeed ? inputMagnitude : maxTargetSpeed
-
-      const smoothingFactor = 0.1
-      player.forwardVel += (targetSpeed - currentForwardVel) * smoothingFactor
-
-      if (player.forwardVel > 48) {
-        player.forwardVel = 48
+        const rotationSpeed = 9
+        if (inputMagnitude != 0) {
+          if (was_standing_still) {
+            player.yaw = intendedYaw
+          } else {
+            player.yaw = rotateTowardsAngleDegrees(
+              currentYaw,
+              intendedYaw,
+              rotationSpeed,
+            )
+          }
         }
-      if (targetSpeed === 0 && Math.abs(player.forwardVel) < 0.5) {
-        player.forwardVel = 0
+        let maxTargetSpeed = 32
+        let targetSpeed =
+          inputMagnitude < maxTargetSpeed ? inputMagnitude : maxTargetSpeed
+
+        const smoothingFactor = 0.1
+        player.forwardVel += (targetSpeed - currentForwardVel) * smoothingFactor
+
+        if (player.forwardVel > 48) {
+          player.forwardVel = 48
+        }
+        if (targetSpeed === 0 && Math.abs(player.forwardVel) < 0.5) {
+          player.forwardVel = 0
         }
       } else {
         console.log("ran")
@@ -2009,19 +2013,20 @@ function movePlayer(x: number, z: number) {
   }
 }
 
-function getShortestAngleDifferenceDegrees(angle1: number, angle2: number): number {
-    let difference = angle1 - angle2;
+function getShortestAngleDifferenceDegrees(
+  angle1: number,
+  angle2: number,
+): number {
+  let difference = angle1 - angle2
 
-    if (difference > 180) {
-        difference -= 360;
-    }
-    else if (difference <= -180) {
-        difference += 360;
-    }
+  if (difference > 180) {
+    difference -= 360
+  } else if (difference <= -180) {
+    difference += 360
+  }
 
-    return Math.abs(difference);
+  return Math.abs(difference)
 }
-
 
 function crossProduct2D(
   p1x: number,
@@ -2242,7 +2247,7 @@ function playerJump(jumpType: jumpTypes) {
 function updatePlayerAnimations() {
   switch (player.currentAnimation) {
     case animations.idle:
-      playerAnimIdle() 
+      playerAnimIdle()
       break
     case animations.fall:
       playerAnimFreeFall()
@@ -2386,22 +2391,22 @@ function playerAnimLongJump() {
 
 function playerAnimSkidding() {
   playerObj.rightArm.rotation = new rotation(-40, 0, 0)
-  playerObj.rightArm.position = new Vector3(.2, 0, 0)
+  playerObj.rightArm.position = new Vector3(0.2, 0, 0)
 
   playerObj.leftArm.rotation = new rotation(0, 40, -90)
   playerObj.leftArm.position = new Vector3(-2.4, 4, -2)
 
   playerObj.leftLeg.rotation = new rotation(0, 0, -10)
-  playerObj.leftLeg.position = new Vector3(-.1, .1, 0)
+  playerObj.leftLeg.position = new Vector3(-0.1, 0.1, 0)
 
   playerObj.rightLeg.rotation = new rotation(0, 0, -30)
-  playerObj.rightLeg.position = new Vector3(-.5, .2, 0)
+  playerObj.rightLeg.position = new Vector3(-0.5, 0.2, 0)
 
   playerObj.Body.rotation = new rotation(0, 0, -3)
   playerObj.Body.position = new Vector3(0.2, 0, 0)
 
   playerObj.Head.rotation = new rotation(0, 0, 3)
-  playerObj.Head.position = new Vector3(.7, 0, 0)
+  playerObj.Head.position = new Vector3(0.7, 0, 0)
 
   animTime = 0
   animTime2 = 0
@@ -2652,4 +2657,4 @@ function loadCollisionMap() {
     })
 }
 
-//LATESTBACKUP 23:56 09.05
+//LATESTBACKUP 14:18 11.05
