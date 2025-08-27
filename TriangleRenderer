@@ -181,7 +181,7 @@ function drawTriangle(
     drawLine(x1, y1, x3, y3, outline_thickness)
   }
   sprite.tint = color
-
+  /*
   //---TRIANGLE TYPE FILTER
   const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
   const p1p2_l = triVals.length_p1p2
@@ -210,11 +210,12 @@ function drawTriangle(
     const rightPoint = getRightAngleVertex(x1, y1, x2, y2, x3, y3)
     if (rightPoint) {
       drawTrianglePartRA(hypSideP, kathl, kathl2)
-    } else {
+    } else {*/
       // Any other triangle [2 h-triangle]
+  const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
       const rightTriangles = splitTriangleIntoRightTriangles(
-        hypSideP,
-        ahypAngle,
+        triVals.hypSideP,
+        triVals.ahypAngle,
       )
       const t = rightTriangles[0]
       const triVals1 = analyzeTriangle(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
@@ -230,8 +231,8 @@ function drawTriangle(
         triVals2.kathl1,
         triVals2.kathl2,
       )
-    }
-  }
+    
+  
 
   function splitTriangleIntoRightTriangles(
     hypSidePoints: {
@@ -507,4 +508,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 100 draw calls avg 32 fps
+//FULLY WORKING with 50 draw calls avg 31 fps  NOT RIANGLE SORTING
