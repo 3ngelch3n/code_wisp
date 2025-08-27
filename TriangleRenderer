@@ -41,9 +41,9 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
-  drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000) //HIER PERFEKT
+  //drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000)
+  drawTriangle(200, 200, 100, 0, 0, 0, 0xff0000, true, 0x00ff00, 8)//HIER PERFEKT
 })
-
 
 forever(function () {
   sendMessage("deleteAllClones")
@@ -63,22 +63,16 @@ function drawTriangle(
   outline_color: number = 0x11ff55,
   outline_thickness: number = 4,
 ) {
-  
-  const orientation = (x2-x1)*(y3-y1)-(y2-y1)*(x3-x1)
-  console.log(orientation)
-  console.log(x1, y1, x2, y2, x3, y3)
-  if (orientation > 0) {
-  const tempX = x2;
-  x2 = x3;
-  x3 = tempX;
+  console.log("s", x1, y1, x2, y2, x3, y3)
+  const sortedPoints = sortTriangleForHypotenuse(x1, y1, x2, y2, x3, y3);
+  x1 = sortedPoints.x1;
+  y1 = sortedPoints.y1;
+  x2 = sortedPoints.x2;
+  y2 = sortedPoints.y2;
+  x3 = sortedPoints.x3;
+  y3 = sortedPoints.y3;
+  console.log("e", x1, y1, x2, y2, x3, y3)
 
-  const tempY = y2;
-  y2 = y3;
-  y3 = tempY;
-  }
-  console.log(x1, y1, x2, y2, x3, y3)
-    
-  
   if (outline) {
     sprite.tint = outline_color
     sprite.setCostume("square_yh")
@@ -104,19 +98,24 @@ function drawTriangle(
     hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 }
   }
 
+  const dotA = (x2 - x1)*(x3 - x1) + (y2 - y1)*(y3 - y1)
+  const dotB = (x1 - x2)*(x3 - x2) + (y1 - y2)*(y3 - y2)
+  const dotC = (x1 - x3)*(x2 - x3) + (y1 - y3)*(y2 - y3)
+  const three = (dotA < 0 || dotB < 0 || dotC < 0)
+  console.log(three)
   if (
     !(
       hypSideP.x1 === x1 &&
       hypSideP.y1 === y1 &&
       hypSideP.x2 === x2 &&
       hypSideP.y2 === y2
-    )
+    ) || three
   ) {
     trianglePiece(x1, y1, x2, y2, x3, y3, {
-      x1: hypSideP.x1,
-      y1: hypSideP.y1,
-      x2: hypSideP.x2,
-      y2: hypSideP.y2,
+      x1: x2,
+      y1: y2,
+      x2: x3,
+      y2: y3,
     })
   }
   if (
@@ -125,13 +124,13 @@ function drawTriangle(
       hypSideP.y1 === y2 &&
       hypSideP.x2 === x3 &&
       hypSideP.y2 === y3
-    )
+    ) || three
   ) {
     trianglePiece(x2, y2, x3, y3, x1, y1, {
-      x1: hypSideP.x1,
-      y1: hypSideP.y1,
-      x2: hypSideP.x2,
-      y2: hypSideP.y2,
+      x1: x1,
+      y1: y1,
+      x2: x3,
+      y2: y3,
     })
   }
   if (
@@ -140,13 +139,13 @@ function drawTriangle(
       hypSideP.y1 === y3 &&
       hypSideP.x2 === x1 &&
       hypSideP.y2 === y1
-    )
+    ) || three
   ) {
     trianglePiece(x3, y3, x1, y1, x2, y2, {
-      x1: hypSideP.x1,
-      y1: hypSideP.y1,
-      x2: hypSideP.x2,
-      y2: hypSideP.y2,
+      x1: x1,
+      y1: y1,
+      x2: x2,
+      y2: y2,
     })
   }
 
@@ -156,14 +155,14 @@ function drawTriangle(
     x2: number,
     y2: number,
     x3: number,
-    y3: number,) {
-    const Orientation = (x2-x1)*(y3-y1)-(y2-y1)*(x3-x1)
+    y3: number,
+  ) {
+    const Orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
     if (Orientation > 0)
-      return {x1: x1, y1: y1, x2: x3, y2: y3, x3: x2, y3: y2}
-    else 
-      return {x1: x1, y1: y1, x2: x2, y2: y2, x3: x3, y3: y3}
+      return { x1: x1, y1: y1, x2: x3, y2: y3, x3: x2, y3: y2 }
+    else return { x1: x1, y1: y1, x2: x2, y2: y2, x3: x3, y3: y3 }
   }
-  
+
   function trianglePiece(
     kath1x: number,
     kath1y: number,
@@ -195,6 +194,39 @@ function drawTriangle(
     createClone()
   }
 
+  function sortTriangleForHypotenuse(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  x3: number, y3: number
+) {
+  /*const orientation = (x2 - x1)*(y3 - y1) - (y2 - y1)*(x3 - x1)
+  if (orientation > 0) {
+  const tempX = x2;
+  x2 = x3;
+  x3 = tempX;
+
+  const tempY = y2;
+  y2 = y3;
+  y3 = tempY;
+  }
+*/
+
+  const l12 = distance({x:x1,y:y1},{x:x2,y:y2})
+  const l23 = distance({x:x2,y:y2},{x:x3,y:y3})
+  const l31 = distance({x:x3,y:y3},{x:x1,y:y1})
+  console.log(l12, l23, l31)
+  if (l12 >= l23 && l12 >= l31) {
+    console.log("1")
+    return {x1:x3,y1:y3, x2:x1,y2:y1, x3:x2,y3:y2}
+  } else if (l31 >= l12 && l31 >= l23) {
+    console.log("2")
+    return {x1:x2,y1:y2, x2:x3,y2:y3, x3:x1,y3:y1}
+  }
+
+  console.log("?")
+  return {x1,y1,x2,y2,x3,y3}
+}
+  
   function intersectPoint(
     p: { x: number; y: number },
     angle: number,
