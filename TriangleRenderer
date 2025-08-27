@@ -18,6 +18,7 @@ onCloneStart(function (clone) {
 onMessage("drawFrame", function () {
   // Wir benutzen drawList und cloneList
   // 1. Stelle sicher, dass genug Klone existieren
+  clonesUsedTxt.text = drawList.length + ""
   while (cloneList.length < drawList.length) {
     createClone()
   }
@@ -134,13 +135,16 @@ function measureFPS() {
 
 const fpsTxt = Game.createText("-")
 const cloneTxt = Game.createText("-")
+const clonesUsedTxt = Game.createText("-")
 fpsTxt.x = -300
 fpsTxt.y = 220
 fpsTxt.style.align = "left"
 cloneTxt.x = -300
-  cloneTxt.y = 180
+cloneTxt.y = 180
 cloneTxt.style.align = "left"
-
+clonesUsedTxt.x = -300
+clonesUsedTxt.y = 130
+clonesUsedTxt.style.align = "left"
 forever(function () {
   //sendMessage("deleteAllClones")
   sprite.visible = true
@@ -510,4 +514,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 100 draw calls avg 32-33 fps
+//FULLY WORKING with 100 draw calls avg 33-34 fps
