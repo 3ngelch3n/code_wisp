@@ -1,21 +1,20 @@
-sprite.y = 0
-sprite.x = 0
 const xPixelSize = 2650 / 8 / Game.width
 const yPixelSize = 1880 / 8 / Game.height
-sprite.visible = true
-let ft = 0.1
-
-
-drawTriangle(-120, -160, 20, 130, 220, 0) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
-//drawTriangle(0, 0, 100, 200, 250, -100) //HIER PERFEKT
+sprite.visible = false
 
 
 onCloneStart(function (clone) {
+  clone.visible = true
   onMessage("deleteAllClones", function (data) {
-    console.log("DELTE")
     clone.delete()
   })
 })
+
+drawTriangle(-120, -160, 20, 130, 220, 0, 0x00ff00) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
+wait(1)
+drawTriangle(0, 0, 100, 200, 250, -100, 0xff0000) //HIER PERFEKT
+
+
 
 onMessage("drawFrame", function (data) {
   const xOff = 0 //Math.random(-100, 100)
@@ -48,16 +47,11 @@ onMessage("drawFrame", function (data) {
     y2 + yOff,
     x3 + yOff,
     y3 + yOff,)*/
-  drawTriangle(-103, -212, -117, 180, 23, -140)
+  //drawTriangle(-103, -212, -117, 180, 23, -140)
 })
 //sendMessage("drawFrame")
 
 forever(function () {
-  if (Keyboard.keyHeld(Key.A)) {
-    ft = 0.05
-  } else {
-    ft = 0.05
-  }
   //sendMessage("deleteAllClones")
   //sendMessage("drawFrame")
   //wait(2)
@@ -70,18 +64,23 @@ function drawTriangle(
   y2: number,
   x3: number,
   y3: number,
+  color: number,
+  outline: boolean = false,
+  outline_color: number = 0x11ff55,
+  outline_thickness: number = 4
 ) {
-  sprite.layer = 1
-  sprite.tint = 0x00aaff
+  if (outline) {
+  sprite.tint = outline_color
   sprite.setCostume("square_yh")
-  /*wait(0)
-  drawLine(x1, y1, x2, y2, 2)
-  wait(ft)
-  drawLine(x2, y2, x3, y3, 2)
-  wait(ft)
-  drawLine(x1, y1, x3, y3, 2)*/
-
-  sprite.tint = 0x0044ff
+  wait(0)
+  drawLine(x1, y1, x2, y2, outline_thickness)
+  drawLine(x2, y2, x3, y3, outline_thickness)
+  drawLine(x1, y1, x3, y3, outline_thickness)
+  }
+  sprite.setCostume("triangle_yh")
+  sprite.tint = color
+  wait(0)
+  
   const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
   const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
@@ -94,11 +93,7 @@ function drawTriangle(
   } else {
     hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 }
   }
-
-  sprite.layer = 0
-  sprite.transparency = 0
-  sprite.setCostume("triangle_yh")
-  wait(ft)
+  
   if (
     !(
       hypSideP.x1 === x1 &&
@@ -114,7 +109,6 @@ function drawTriangle(
       y2: hypSideP.y2,
     })
   }
-  wait(ft)
   if (
     !(
       hypSideP.x1 === x2 &&
@@ -130,7 +124,6 @@ function drawTriangle(
       y2: hypSideP.y2,
     })
   }
-  wait(ft)
   if (
     !(
       hypSideP.x1 === x3 &&
@@ -161,23 +154,16 @@ function drawTriangle(
     const roundDown = 0.95
     const kathxm = (kath1x + kath2x) / 2
     const kathym = (kath1y + kath2y) / 2
-    sprite.x = kathxm
-    sprite.y = kathym
     const angle = angleBetween(k1, k2)
-    sprite.rotation = angle
-    sprite.tint = 0xff5500
-    sprite.layer = 2
-    sprite.rotation += 90
-    sprite.height = 200
-    sprite.layer = 0
-    sprite.rotation -= 90
-    sprite.tint = 0x0055ff
-    sprite.width = distance(k1, k2) * xPixelSize * roundDown
     const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
     const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
     const interP = intersectPoint({x: kathxm, y: kathym}, angle, hypA, hypB)
     const dis = ((distance({ x: kathxm, y: kathym }, {x: interP.x, y: interP.y}) /55) *64)
+    sprite.width = distance(k1, k2) * xPixelSize * roundDown
     sprite.height = dis * yPixelSize
+    sprite.rotation = angle
+    sprite.x = kathxm
+    sprite.y = kathym
     sprite.move(dis / 2 * 0.87)
     sprite.rotation -= 90
     createClone()
@@ -214,7 +200,7 @@ function drawTriangle(
 
 
 
-/*function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
+function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   const p1 = { x: x1, y: y1 }
   const p2 = { x: x2, y: y2 }
 
@@ -224,15 +210,15 @@ function drawTriangle(
   sprite.height = distance(p1, p2) * yPixelSize
   sprite.width = xPixelSize * t
   createClone()
-}*/
+}
 
-function angleBetween(p1: float2, p2: float2): number {
+function angleBetween(p1: any, p2: any): number {
   const dx = p2.x - p1.x
   const dy = p2.y - p1.y
   return Math.atan2(dx, dy)
 }
 
-function distance(p1: float2, p2: float2): number {
+function distance(p1: any, p2: any): number {
   const dx = p2.x - p1.x
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
