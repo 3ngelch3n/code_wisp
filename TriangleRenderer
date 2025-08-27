@@ -3,7 +3,7 @@ const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.visible = true
 globals.setCloneSprite = "square_yh"
-const drawAmount = 1000
+const drawAmount = 100
 
 onCloneStart(function (clone) {
   //clone.setCostume(globals.setCloneSprite)
