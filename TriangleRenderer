@@ -1,45 +1,4 @@
-const xPixelSize = 2650 / 8 / Game.width
-const yPixelSize = 1880 / 8 / Game.height
-const triangleM = 64 / 55
-sprite.visible = true
-globals.setCloneSprite = "square_yh"
 const drawAmount = 10
-
-onCloneStart(function (clone) {
-  cloneList.push({
-    clone: clone,
-  })
-})
-
-function randColor() {
-  return Math.random(0x000000, 0xdddddd)
-}
-
-function drawFrame() {
-  while (cloneList.length < drawList.length) {
-    createClone()
-  }
-
-  for (let i = 0; i < drawList.length; i++) {
-    const entry = drawList[i]
-    const cloneEntry = cloneList[i]
-
-    cloneEntry.clone.x = entry.x
-    cloneEntry.clone.y = entry.y
-    cloneEntry.clone.width = entry.width
-    cloneEntry.clone.height = entry.height
-    cloneEntry.clone.rotation = entry.rotation
-    cloneEntry.clone.setCostume(entry.texture)
-    cloneEntry.clone.tint = entry.color
-    cloneEntry.clone.visible = true
-  }
-
-  for (let i = drawList.length; i < cloneList.length; i++) {
-    cloneList[i].clone.visible = false
-  }
-
-  drawList = []
-}
 
 function createFrame() {
   function randomBetween(min: number, max: number) {
@@ -80,6 +39,68 @@ function createFrame() {
   for (let i = 0; i < drawAmount; i++) {
     randomTriangle()
   }
+}
+
+const fpsTxt = Game.createText("-")
+const cloneTxt = Game.createText("-")
+fpsTxt.x = -300
+fpsTxt.y = 220
+fpsTxt.style.align = "left"
+cloneTxt.x = -300
+cloneTxt.y = 180
+cloneTxt.style.align = "left"
+
+forever(function () {
+  sprite.visible = true
+  createFrame()
+  drawFrame()
+  sprite.visible = false
+  fpsTxt.text = measureFPS().avgFps + ""
+  cloneTxt.text = sprite.clones.length + ""
+  //wait(1)
+})
+
+//------------- TRIANGLE RENDERER -------------
+const xPixelSize = 2650 / 8 / Game.width
+const yPixelSize = 1880 / 8 / Game.height
+const triangleM = 64 / 55
+sprite.visible = true
+globals.setCloneSprite = "square_yh"
+
+onCloneStart(function (clone) {
+  cloneList.push({
+    clone: clone,
+  })
+})
+
+function randColor() {
+  return Math.random(0x000000, 0xdddddd)
+}
+
+function drawFrame() {
+  while (cloneList.length < drawList.length) {
+    createClone()
+  }
+
+  for (let i = 0; i < drawList.length; i++) {
+    const entry = drawList[i]
+    const cloneEntry = cloneList[i]
+
+    cloneEntry.clone.x = entry.x
+    cloneEntry.clone.y = entry.y
+    cloneEntry.clone.width = entry.width
+    cloneEntry.clone.height = entry.height
+    cloneEntry.clone.rotation = entry.rotation
+    cloneEntry.clone.setCostume(entry.texture)
+    cloneEntry.clone.tint = entry.color
+    cloneEntry.clone.visible = true
+  }
+
+  for (let i = drawList.length; i < cloneList.length; i++) {
+    cloneList[i].clone.visible = false
+  }
+
+  drawList = []
 }
 
 interface CloneEntry {
@@ -126,26 +147,6 @@ function measureFPS() {
 
   return { fps, avgFps }
 }
-
-const fpsTxt = Game.createText("-")
-const cloneTxt = Game.createText("-")
-fpsTxt.x = -300
-fpsTxt.y = 220
-fpsTxt.style.align = "left"
-cloneTxt.x = -300
-cloneTxt.y = 180
-cloneTxt.style.align = "left"
-
-forever(function () {
-  //sendMessage("deleteAllClones")
-  sprite.visible = true
-  createFrame()
-  drawFrame()
-  sprite.visible = false
-  fpsTxt.text = measureFPS().avgFps + ""
-  cloneTxt.text = sprite.clones.length + ""
-  //wait(1)
-})
 
 function drawTriangle(
   x1: number,
