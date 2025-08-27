@@ -1,11 +1,10 @@
 const xPixelSize = 2650 / 8 / Game.width
 const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
-sprite.visible = false
+sprite.visible = true
 globals.setCloneSprite = "square_yh"
 
 onCloneStart(function (clone) {
-  clone.visible = true
   clone.setCostume(globals.setCloneSprite)
   onMessage("deleteAllClones", function (data) {
     clone.delete()
