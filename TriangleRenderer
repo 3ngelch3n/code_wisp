@@ -21,8 +21,9 @@ function drawTriangle(
   y3: number,
 ) {
   const ft = 0.3
-  
-  //sprite.setCostume("square")
+  sprite.layer = 1
+  sprite.tint = 0x00aaff
+  sprite.setCostume("square")
   wait(ft)
   drawLine(x1, y1, x2, y2, 3)
   wait(ft)
@@ -30,6 +31,7 @@ function drawTriangle(
   wait(ft)
   drawLine(x1, y1, x3, y3, 3)
   wait(ft)
+  sprite.tint = 0x0044ff
   //sprite.setCostume("triangle")
   const center = centroid(x1, y1, x2, y2, x3, y3)
   sprite.x = center.x
@@ -38,21 +40,145 @@ function drawTriangle(
   sprite.height = yPixelSize * 5
   createClone()
   wait(ft)
+  sprite.width = xPixelSize * 3
+  sprite.height = yPixelSize * 800
   const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
   sprite.x = x1
   sprite.y = y1
-  sprite.height = yPixelSize * 300
   sprite.rotation = p1AngleToCenter
   createClone()
-  wait(ft * 100)
+  wait(ft)
   const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
+  sprite.x = x2
+  sprite.y = y2
+  sprite.rotation = p2AngleToCenter
+  createClone()
+  wait(ft)
   const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
+  sprite.x = x3
+  sprite.y = y3
+  sprite.rotation = p3AngleToCenter
+  createClone()
+  wait(ft)
+  sprite.tint = 0xff0000
+  sprite.x = x2
+  sprite.y = y2
+  sprite.rotation = p1AngleToCenter + 90
+  createClone()
+  wait(ft)
+  sprite.x = x3
+  sprite.y = y3
+  sprite.rotation = p1AngleToCenter + 90
+  createClone()
+  sprite.layer = -1
+  sprite.setCostume("triangle")
+  wait(ft)
+  const triangleDefp1 = calcMaxTriangleSize(
+    p1AngleToCenter,
+    x1,
+    y1,
+    x2,
+    y2,
+    x3,
+    y3,
+  )
+  sprite.x = (x1 + triangleDefp1.x) / 2
+  sprite.y = (y1 + triangleDefp1.y) / 2
+  sprite.rotation = p1AngleToCenter
+  sprite.height = triangleDefp1.l * yPixelSize
+  sprite.width = triangleDefp1.f * xPixelSize
+  createClone()
+  wait(ft)
+  const triangleDefp2 = calcMaxTriangleSize(
+    p2AngleToCenter,
+    x2,
+    y2,
+    x3,
+    y3,
+    x1,
+    y1,
+  )
+  sprite.setCostume("triangle")
+  sprite.x = (x2 + triangleDefp2.x) / 2
+  sprite.y = (y2 + triangleDefp2.y) / 2
+  sprite.rotation = p2AngleToCenter
+  sprite.height = triangleDefp2.l * yPixelSize
+  sprite.width = triangleDefp2.f * xPixelSize
+  createClone()
+  wait(ft)
+  const triangleDefp3 = calcMaxTriangleSize(
+    p3AngleToCenter,
+    x3,
+    y3,
+    x1,
+    y1,
+    x2,
+    y2,
+  )
+  sprite.setCostume("triangle")
+  sprite.x = (x3 + triangleDefp3.x) / 2
+  sprite.y = (y3 + triangleDefp3.y) / 2
+  sprite.rotation = p3AngleToCenter
+  sprite.height = triangleDefp3.l * yPixelSize
+  sprite.width = triangleDefp3.f * xPixelSize
+  createClone()
+  wait(ft)
+  //sprite.tint = 0x00ff00
+  sprite.layer = 0
+  sprite.width = distance({x: x1, y: y1}, {x: x2, y: y2}) * xPixelSize
+  sprite.rotation = angleBetween({x: x1, y: y1}, {x: x2, y: y2})
+  sprite.x = (x1 + x2) / 2
+  sprite. y = (y1 + y2) / 2
+  sprite.height = 50 * yPixelSize
+  sprite.move(25)
+  sprite.rotation -= 90
+  createClone()
+  wait(ft)
+  sprite.width = distance({x: x2, y: y2}, {x: x3, y: y3}) * xPixelSize
+  sprite.rotation = angleBetween({x: x2, y: y2}, {x: x3, y: y3})
+  sprite.x = (x2 + x3) / 2
+  sprite. y = (y2 + y3) / 2
+  sprite.height = 50 * yPixelSize
+  sprite.move(25)
+  sprite.rotation -= 90
+  createClone()
+  wait(ft)
+  sprite.width = distance({x: x3, y: y3}, {x: x1, y: y1}) * xPixelSize
+  sprite.rotation = angleBetween({x: x3, y: y3}, {x: x1, y: y1})
+  sprite.x = (x3 + x1) / 2
+  sprite. y = (y3 + y1) / 2
+  sprite.height = 50 * yPixelSize
+  sprite.move(25)
+  sprite.rotation -= 90
+  createClone()
   
+  
+  
+  //drawLine(x1, y1, triangleDef.x, triangleDef.y, 10)
+  /*wait(ft * 100)
+  const triangleDef = calcMaxTriangleSize(
+    p1AngleToCenter,
+    x1,
+    y1,
+    x2,
+    y2,
+    x3,
+    y3,
+  )
+  sprite.width = xPixelSize * 5
+  //sprite.height = triangleDef.height
+  console.log(triangleDef)
+  sprite.x = x1 + triangleDef.x
+  sprite.y = y1 - triangleDef.y
+  sprite.rotation = p1AngleToCenter
+  createClone()
+  wait(ft)
+  wait(10000)
   sprite.height = xPixelSize * 100
   sprite.width = xPixelSize * 100
 
   sprite.x = x1
-  sprite.y = y1
+  sprite.y = y1*/
 }
 
 function calcMaxTriangleSize(
@@ -65,12 +191,23 @@ function calcMaxTriangleSize(
   y3: number,
 ) {
   const footVecP2 = footOfPerpendicularAngle(x1, y1, x2, y2, thisAngle)
-  const distanceToP2Line = Math.hypot(footVecP2.x, footVecP2.y)
-  console.log("..", thisAngle, footVecP2, distanceToP2Line)
-  return {
-    height: distanceToP2Line * yPixelSize,
-    x: (footVecP2.x + x1) / 2,
-    y: (footVecP2.y + y1) / 2,
+  const footVecP3 = footOfPerpendicularAngle(x1, y1, x3, y3, thisAngle)
+  const footVecP2Hypot = Math.hypot(footVecP2.x, footVecP2.y)
+  const footVecP3Hypot = Math.hypot(footVecP3.x, footVecP3.y)
+  if (footVecP2Hypot < footVecP3Hypot) {
+    return {
+      x: footVecP2.x,
+      y: footVecP2.y,
+      f: distance({ x: x2, y: y2 }, { x: footVecP2.x, y: footVecP2.y }),
+      l: distance({ x: x1, y: y1 }, { x: footVecP2.x, y: footVecP2.y }),
+    }
+  } else {
+    return {
+      x: footVecP3.x,
+      y: footVecP3.y,
+      f: Math.hypot(footVecP3.x - x3, footVecP3.y - y3),
+      l: distance({ x: x1, y: y1 }, { x: footVecP3.x, y: footVecP3.y }),
+    }
   }
 }
 
@@ -81,8 +218,8 @@ function footOfPerpendicularAngle(
   py: number,
   angle: number,
 ): float2 {
-  const vx = Math.cos(angle)
-  const vy = Math.sin(angle)
+  const vx = Math.sin(angle)
+  const vy = Math.cos(angle)
   const dx = px - sx
   const dy = py - sy
   const s = (dx * vx + dy * vy) / (vx * vx + vy * vy)
