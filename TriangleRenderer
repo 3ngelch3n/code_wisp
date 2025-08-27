@@ -3,7 +3,7 @@ const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.visible = false
 globals.setCloneSprite = "square_yh"
-const tolerance = 0.5
+
 
 onCloneStart(function (clone) {
   clone.visible = true
@@ -96,18 +96,7 @@ onMessage("drawFrame", function (data) {
     drawTriangle(r1.x, r1.y, r2.x, r2.y, r3.x, r3.y, 0xff0000, true, 0x00aaff, 2)
   }
 
-  //randomTriangle()
-drawTriangle(
-  -102.44415048969915, -72.53800410989464, // x1, y1
-  -8.582681553053867, -67.43656813017546,  // x2, y2
-  -59.909334259219634, 10.893341367925252, // x3, y3
-  0xff0000,   // color
-  true,       // outline
-  0x00aaff,   // outline color
-  4           // outline thickness
-)
-
-
+randomTriangle()
 
 
 })
@@ -118,7 +107,7 @@ sendMessage("drawFrame")
 forever(function () {
   sendMessage("deleteAllClones")
   sendMessage("drawFrame")
-  wait(0.5)
+  //wait(5)
 })
 
 function drawTriangle(
@@ -176,15 +165,11 @@ function drawTriangle(
   
 
   console.log("p",p1p2_l, p2p3_l, p3p1_l)
+
+  const tolerance = ((p1p2_l+p2p3_l+p3p1_l) / 3)/100
   
   //  Equilateral [1 triangle]
-  if (Math.abs(p1p2_l - p2p3_l) <= tolerance && Math.abs(p2p3_l - p3p1_l) <= tolerance) {
-    //drawTrianglePart(x1, y1, x2, y2, x3, y3)
-    trianglePieceHyp(diffT)
-    console.log("gleichseitig!") 
-  } 
-  //  Isosceles [1 triangle]
-  else if (Math.abs(p1p2_l - p2p3_l) <= tolerance ||
+  if (Math.abs(p1p2_l - p2p3_l) <= tolerance && Math.abs(p2p3_l - p3p1_l) <= tolerance || Math.abs(p1p2_l - p2p3_l) <= tolerance ||
     Math.abs(p2p3_l - p3p1_l) <= tolerance ||
     Math.abs(p3p1_l - p1p2_l) <= tolerance) {
     trianglePieceHyp(diffT)
