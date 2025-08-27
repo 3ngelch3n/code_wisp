@@ -42,7 +42,8 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
-  drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 4)
+  drawTriangle(0, 0, 100, 0, 50, 86.6, 0xff0000, true, 0x00aaff, 4)
+  //drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 4)
   //drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, true, 0x0066ff, 4)
   //j += 10 //HIER PERFEKT
 })
@@ -90,9 +91,15 @@ function drawTriangle(
   sprite.tint = color
   //!wait(0)
 
-  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
-  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
-  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+  //---TRIANGLE TYPE FILTER
+  const p1p2_l = Math.round(distance({ x: x1, y: y1 }, { x: x2, y: y2 }))
+  const p2p3_l = Math.round(distance({ x: x2, y: y2 }, { x: x3, y: y3 }))
+  const p3p1_l = Math.round(distance({ x: x3, y: y3 }, { x: x1, y: y1 }))
+  console.log(p1p2_l, p2p3_l, p3p1_l)
+  //equilateral [1 triangle]
+  if (p1p2_l == p2p3_l && p2p3_l == p3p1_l)
+    drawTrianglePart(x1, y1, x2, y2, x3, y3)
+    /*
   let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0 }
 
   let ahypAngle = 90
@@ -130,7 +137,30 @@ function drawTriangle(
   globals.setCloneSprite = "square_yh"
   sprite.tint = 0x00ff00
   drawLine(hypSideP.x1, hypSideP.y1, hypSideP.x2, hypSideP.y2, 8)
+  */
+  function drawTrianglePart(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) {
+  const p1 = { x: x1, y: y1 }
+  const p2 = { x: x2, y: y2 }
+  const p3 = { x: x3, y: y3 }
 
+  const baseLength = distance(p1, p2)
+  const height = Math.abs((p2.y - p1.y) * (p3.x - p1.x) - (p2.x - p1.x) * (p3.y - p1.y)) / baseLength / 55 * 64
+  const midX = (p1.x + p2.x) / 2
+  const midY = (p1.y + p2.y) / 2
+    
+  sprite.rotation = angleBetween(p1, p2)
+  sprite.x = midX
+  sprite.y = midY
+  sprite.move(-height/2 * 0.87)
+  sprite.rotation += 90
+    
+  sprite.width = baseLength * xPixelSize * 0.95
+  sprite.height = height * yPixelSize
+  globals.setCloneSprite = "triangle_yh"
+  createClone()
+}
+
+  
   function trianglePieceKath(
     kath1x: number,
     kath1y: number,
