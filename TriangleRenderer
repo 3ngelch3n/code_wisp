@@ -93,118 +93,26 @@ function drawTriangle(
   drawLine(x1, y1, x3, y3, 3)
   wait(ft)
   sprite.tint = 0x0044ff
-  //sprite.setCostume("triangle")
-  /*
-  const center = centroid(x1, y1, x2, y2, x3, y3)
-  sprite.x = center.x
-  sprite.y = center.y
-  sprite.width = xPixelSize * 5
-  sprite.height = yPixelSize * 5
-  createClone()
   wait(ft)
-  sprite.width = xPixelSize * 3
-  sprite.height = yPixelSize * 800
-  const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
-  sprite.x = x1
-  sprite.y = y1
-  sprite.rotation = p1AngleToCenter
-  createClone()
-  wait(ft)
-  const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
-  sprite.x = x2
-  sprite.y = y2
-  sprite.rotation = p2AngleToCenter
-  createClone()
-  wait(ft)
-  const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
-  sprite.x = x3
-  sprite.y = y3
-  sprite.rotation = p3AngleToCenter
-  createClone()
-  wait(ft)
-  sprite.tint = 0xff0000
-  sprite.x = x2
-  sprite.y = y2
-  sprite.rotation = p1AngleToCenter + 90
-  createClone()
-  wait(ft)
-  sprite.x = x3
-  sprite.y = y3
-  sprite.rotation = p1AngleToCenter + 90
-  createClone()
-  sprite.layer = -1
-*/
+  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+  //const heightA = height(x1, y1, x2, y2, x3, y3)
+  
   
   sprite.tint = 0xff0000
   sprite.layer = 0
-  //const center = centroid(x1, y1, x2, y2, x3, y3)
-  //const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
-  //const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
-  //const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
   sprite.setCostume("triangle")
   wait(ft)
-  /*wait(ft)
-  const triangleDefp1 = calcMaxTriangleSize(
-    p1AngleToCenter,
-    x1,
-    y1,
-    x2,
-    y2,
-    x3,
-    y3,
-  )
-  sprite.x = triangleDefp1.xi
-  sprite.y = triangleDefp1.yi
-  sprite.rotation = p1AngleToCenter
-  sprite.height = 15 * yPixelSize
-  sprite.width = 15 * xPixelSize
-  createClone()
-
+  //fillTrianglePiece(x1, y1, x2, y2, x3, y3, length_p1p2)
   wait(ft)
-  sprite.x = (x1 + triangleDefp1.x) / 2
-  sprite.y = (y1 + triangleDefp1.y) / 2
-  sprite.rotation = p1AngleToCenter
-  sprite.height = triangleDefp1.l * yPixelSize
-  sprite.width = triangleDefp1.f * xPixelSize
-  createClone()
-  */
-  //wait(ft * 10000)
-  /*
-  const triangleDefp2 = calcMaxTriangleSize(
-    p2AngleToCenter,
-    x2,
-    y2,
-    x3,
-    y3,
-    x1,
-    y1,
-  )
-  sprite.x = (x2 + triangleDefp2.x) / 2
-  sprite.y = (y2 + triangleDefp2.y) / 2
-  sprite.rotation = p2AngleToCenter
-  sprite.height = triangleDefp2.l * yPixelSize
-  sprite.width = triangleDefp2.f * xPixelSize
-  createClone()
+  fillTrianglePiece(x2, y2, x3, y3, x1, y1, length_p2p3) //HIER FALSCH
   wait(ft)
-  const triangleDefp3 = calcMaxTriangleSize(
-    p3AngleToCenter,
-    x3,
-    y3,
-    x1,
-    y1,
-    x2,
-    y2,
-  )
-  sprite.x = (x3 + triangleDefp3.x) / 2
-  sprite.y = (y3 + triangleDefp3.y) / 2
-  sprite.rotation = p3AngleToCenter
-  sprite.height = triangleDefp3.l * yPixelSize
-  sprite.width = triangleDefp3.f * xPixelSize
-  createClone()
-  //sprite.tint = 0x00ff00
-  sprite.layer = 0
-  wait(ft)*/
-
+  //fillTrianglePiece(x3, y3, x1, y1, x2, y2, length_p3p1)
+  wait(ft)
+  
+  
+/*
   const avgHeight = averageTriangleHeight(x1, y1, x2, y2, x3, y3)
   console.log(avgHeight)
   const ySize = avgHeight / 4
@@ -233,7 +141,7 @@ function drawTriangle(
   sprite.height = ySize * yPixelSize
   sprite.move(ySize / 2)
   sprite.rotation -= 90
-  createClone()
+  createClone()*/
 
   //drawLine(x1, y1, triangleDef.x, triangleDef.y, 10)
   /*wait(ft * 100)
@@ -260,6 +168,30 @@ function drawTriangle(
 
   sprite.x = x1
   sprite.y = y1*/
+}
+
+function fillTrianglePiece(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  xLength: number) {
+  sprite.width = xLength * xPixelSize * 0.95
+  const angle = angleBetween({ x: x1, y: y1 }, { x: x2, y: y2 })
+  sprite.rotation = angle
+  const p1p2x = (x1 + x2) / 2
+  const p1p2y = (y1 + y2) / 2
+  sprite.x = p1p2x
+  sprite.y = p1p2y
+  const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, x2, y2, x3, y3)
+  const yHeight = distance({x: p1p2x, y: p1p2y}, {x: intersectPoint.x, y: intersectPoint.y}) * 0.95
+  sprite.height = yHeight * yPixelSize
+  sprite.move(yHeight / 2)
+  sprite.rotation -= 90
+
+  createClone()
 }
 
 function averageTriangleHeight(
@@ -292,7 +224,25 @@ function height(
       Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) /
       Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2)
     )
-  }
+}
+
+function intersectPointAngleLine(px: number, py: number, angle: number, ax: number, ay: number, bx: number, by: number) {
+    const m1 = Math.tan(angle); // Steigung der ersten Geraden
+    const m2 = (by - ay) / (bx - ax);           // Steigung der anderen Geraden
+
+    if (m1 === m2) {
+      console.log("intersectPointAngleLine error!", m1, m2)
+      Game.stop()
+    }; // parallele Geraden
+
+    const b1 = py - m1 * px;
+    const b2 = ay - m2 * ax;
+
+    const x = (b2 - b1) / (m1 - m2);
+    const y = m1 * x + b1;
+
+    return {x, y};
+}
 
 function calcMaxTriangleSize(
   thisAngle: number,
