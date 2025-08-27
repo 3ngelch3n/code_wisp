@@ -16,54 +16,78 @@ onCloneStart(function (clone) {
 //drawTriangle(0, 0, 100, 200, 250, -100, 0xff0000) //HIER PERFEKT
 //drawTriangle(100, 200, 0, 0, 250, -100, 0xff0000) //HIER PERFEKT
 
-let j = 0
 onMessage("drawFrame", function (data) {
-  const xOff = 0 //Math.random(-100, 100)
-  const yOff = 0 //Math.random(-100, 100)
-  /*drawTriangle(
-    0 + xOff,
-    0 + yOff,
-    100 + xOff,
-    200 + yOff,
-    250 + xOff,
-    -100 + yOff,
-  )*/
-  /*const x1 = Math.random(-360, 360)
-  const y1 = Math.random(-240, 240)
-  const x2 = Math.random(-360, 360)
-  const y2 = Math.random(-240, 240)
-  const x3 = Math.random(-360, 360)
-  const y3 = Math.random(-240, 240)
-  drawTriangle(
-    x1 + xOff,
-    y1 + yOff,
-    x2 + xOff,
-    y2 + yOff,
-    x3 + yOff,
-    y3 + yOff,
-    0x00FF00
-  )*/
-  //drawTriangle(50, 196.6, 100, 0, 0, 0, 0xff0000, true, 0x00aaff, 4) //geht nicht
-  //drawTriangle(100,0, 0, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4)//geht
-  //drawTriangle(0, 0, 100, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4) //geht
-  //drawTriangle(100, 0, 0, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4)
-  //drawTriangle(50, 196.6, 100, 0, 0, 0, 0xff0000, true, 0x00aaff, 4)
-  //drawTriangle(100, 0, 0, 0, 0, 100, 0xff0000, true, 0x00aaff, 4)
- // drawTriangle(200, 100, 0, 0, 0, 100, 0xff0000, true, 0x00aaff, 4)
-  //drawTriangle(50, 200, 0, -100, 0, 200, 0xff0000, true, 0x00aaff, 4)
-  //drawTriangle(200, 50, -100, 0, 200, 0, 0xff0000, true, 0x00aaff, 4)
-  //j += 10 //HIER PERFEKT
-  //drawTriangle(-300, 0, -200, 100, -100, 0, 0xff0000, true, 0x00aaff, 2); wait(0.5);
-//drawTriangle(0, 0, 100, 0, 50, 86.6, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichseitig
-drawTriangle(-200, 100, -150, 0, -100, 100, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichschenklig
-//drawTriangle(150, -50, 100, -150, 50, -50, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichschenklig
-//drawTriangle(-50, 200, 0, 100, 50, 200, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichschenklig
-//drawTriangle(0, -200, 50, -100, 100, -200, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichschenklig
-//drawTriangle(-100, 0, -50, 100, 0, 0, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichschenklig
-//drawTriangle(200, 0, 150, 86.6, 100, 0, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichseitig
-//drawTriangle(-150, -100, -100, -186.6, -50, -100, 0xff0000, true, 0x00aaff, 2); wait(0.5); // gleichseitig
+  function randomBetween(min: number, max: number) {
+    return Math.floor(Math.random() * (max - min + 1)) + min
+  }
 
+  function randomTriangle() {
+    const types = ["gleichseitig", "gleichschenklig", "rechtwinklig"]
+    const type = types[Math.floor(Math.random() * types.length)]
+
+    let tri: { x1: number; y1: number; x2: number; y2: number; x3: number; y3: number }
+
+    if (type === "gleichseitig") {
+      const x = randomBetween(-200, 200)
+      const y = randomBetween(-100, 100)
+      const size = randomBetween(50, 150)
+      tri = {
+        x1: x,
+        y1: y,
+        x2: x + size,
+        y2: y,
+        x3: x + size / 2,
+        y3: y + Math.sqrt(3) / 2 * size
+      }
+    } else if (type === "gleichschenklig") {
+      const x = randomBetween(-200, 200)
+      const y = randomBetween(-100, 100)
+      const base = randomBetween(60, 160)
+      const height = randomBetween(60, 160)
+      tri = {
+        x1: x,
+        y1: y,
+        x2: x + base,
+        y2: y,
+        x3: x + base / 2,
+        y3: y + height
+      }
+    } else {
+      const x = randomBetween(-200, 200)
+      const y = randomBetween(-100, 100)
+      const a = randomBetween(50, 150)
+      const b = randomBetween(50, 150)
+      tri = {
+        x1: x,
+        y1: y,
+        x2: x + a,
+        y2: y,
+        x3: x,
+        y3: y + b
+      }
+    }
+
+    console.log("=================================")
+    console.log("Type:", type)
+    console.log("Points:", tri)
+    console.log("=================================")
+
+    return tri
+  }
+
+  const tri = randomTriangle()
+  console.log(tri)
+  drawTriangle(
+    tri.x1, tri.y1,
+    tri.x2, tri.y2,
+    tri.x3, tri.y3,
+    0xff8844,            // fill color
+    true,                // outline an
+    0x000000,            // outline schwarz
+    2                    // outline thickness klein
+  )
 })
+
 sendMessage("drawFrame")
 forever(function () {
   //sendMessage("deleteAllClones")
@@ -122,20 +146,18 @@ function drawTriangle(
   const ahypAngle = triVals.ahypAngle
   const kathl = triVals.kathl1
   const kathl2 = triVals.kathl2
+  const diffT = triVals.diff
+
 
   //equilateral [1 triangle]
-  if (
-    (p1p2_l === p2p3_l && p2p3_l === p3p1_l)
-  ) {
+  if (p1p2_l === p2p3_l && p2p3_l === p3p1_l) {
     //drawTrianglePart(x1, y1, x2, y2, x3, y3)
-    trianglePieceHyp(hypSideP, kathl, kathl2, ahypAngle, true)
+    trianglePieceHyp(kathl2)
     //isosceles [1 triangle]
-  } else if (p1p2_l === p2p3_l ||
-    p2p3_l === p3p1_l ||
-    p3p1_l === p1p2_l) {
-    trianglePieceHyp(hypSideP, kathl, kathl2, ahypAngle, false)
-    }
-    //right angled [1 htriangle]
+  } else if (p1p2_l === p2p3_l || p2p3_l === p3p1_l || p3p1_l === p1p2_l) {
+    trianglePieceHyp(diffT)
+  }
+  //right angled [1 htriangle]
   else {
     const rightPoint = getRightAngleVertex(x1, y1, x2, y2, x3, y3)
     if (rightPoint) {
@@ -231,10 +253,16 @@ function drawTriangle(
     sprite.x = kk2.x
     sprite.y = kk2.y
     createClone()
-    
-    const rightPoint = { 
-    x: hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1 ? kathl2.x1 : kathl2.x2,
-    y: hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1 ? kathl2.y1 : kathl2.y2
+
+    const rightPoint = {
+      x:
+        hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1
+          ? kathl2.x1
+          : kathl2.x2,
+      y:
+        hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1
+          ? kathl2.y1
+          : kathl2.y2,
     }
     const vx = k2.x - k1.x
     const vy = k2.y - k1.y
@@ -256,9 +284,9 @@ function drawTriangle(
     console.log("r", sprite.height, sprite.width, height, baseLength)
     if (rot == 90) globals.setCloneSprite = "triangle_yh_l"
     else globals.setCloneSprite = "triangle_yh_r"
-    console.log(height, )
+    console.log(height)
     createClone()
-    
+
     //createClone()
   }
 
@@ -298,15 +326,22 @@ function drawTriangle(
   }
 
   function trianglePieceHyp(
-    hypSidePoints: { x1: number; y1: number; x2: number; y2: number, x3: number, y3: number },
-    kathl: { x1: number; y1: number; x2: number; y2: number, x3: number, y3: number },
-    kathl2: { x1: number; y1: number; x2: number; y2: number, x3: number, y3: number },
-    aHypAngle: number,
-    equilateral: boolean
+    kathl2: {
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      x3: number
+      y3: number
+    }
   ) {
     const p1 = { x: kathl2.x1, y: kathl2.y1 }
     const p2 = { x: kathl2.x2, y: kathl2.y2 }
     const p3 = { x: kathl2.x3, y: kathl2.y3 }
+    drawDot(p1.x, p1.y, 10, 0x00ff00)
+    drawDot(p2.x, p2.y, 10, 0x0000ff)
+    drawDot(p3.x, p3.y, 10, 0x005555)
+    sprite.tint = 0xff0000
     const hypAngle = angleBetween(p1, p2)
     const p1p2xM = (p1.x + p2.x) / 2
     const p1p2yM = (p1.y + p2.y) / 2
@@ -314,12 +349,12 @@ function drawTriangle(
     sprite.y = p1p2yM
     sprite.rotation = hypAngle - 180
     console.log(sprite.x, sprite.y)
-    const height = distance({x: p1p2xM, y: p1p2yM}, p3) * triangleM
+    const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
     sprite.move(-(height / 2) / triangleM)
     console.log(sprite.x, sprite.y)
     sprite.rotation += 90
     sprite.width = distance(p1, p2) * 0.95 * xPixelSize
-    sprite.height = height * yPixelSize 
+    sprite.height = height * yPixelSize
     globals.setCloneSprite = "triangle_yh"
     createClone()
   }
@@ -341,7 +376,9 @@ function analyzeTriangle(
   let kathl2   = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
   let rightPoint = { x: 0, y: 0 }
   let ahypAngle = 90
+  let diff      = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
 
+  // Hypotenuse + Katheten bestimmen
   if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
     hypSideP = { x1, y1, x2, y2, x3, y3 }
     rightPoint = { x: x3, y: y3 }
@@ -349,7 +386,6 @@ function analyzeTriangle(
     const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
     kathl1 = length_p2p3 >= length_p3p1 ? k1 : k2
     kathl2 = length_p2p3 >= length_p3p1 ? k2 : k1
-
   } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
     hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
     rightPoint = { x: x1, y: y1 }
@@ -357,7 +393,6 @@ function analyzeTriangle(
     const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
     kathl1 = length_p1p2 >= length_p3p1 ? k1 : k2
     kathl2 = length_p1p2 >= length_p3p1 ? k2 : k1
-
   } else {
     hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
     rightPoint = { x: x2, y: y2 }
@@ -367,17 +402,29 @@ function analyzeTriangle(
     kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
   }
 
-  const kathl1Length = distance({ x: kathl1.x1, y: kathl1.y1 }, { x: kathl1.x2, y: kathl1.y2 })
-  const kathl2Length = distance({ x: kathl2.x1, y: kathl2.y1 }, { x: kathl2.x2, y: kathl2.y2 })
-  const hypLength    = distance({ x: hypSideP.x1, y: hypSideP.y1 }, { x: hypSideP.x2, y: hypSideP.y2 })
+  // diff: die kürzeste Seite + anderer Punkt
+  if (length_p1p2 <= length_p2p3 && length_p1p2 <= length_p3p1) {
+    diff = { x1, y1, x2, y2, x3, y3 }
+  } else if (length_p2p3 <= length_p1p2 && length_p2p3 <= length_p3p1) {
+    diff = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+  } else {
+    diff = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+  }
 
-  console.log("Hypotenuse:", hypSideP, "Length:", hypLength)
-  console.log("Longer Kathete:", kathl1, "Length:", kathl1Length)
-  console.log("Shorter Kathete:", kathl2, "Length:", kathl2Length)
-  console.log("Right angle at:", rightPoint)
-
-  return { hypSideP, kathl1, kathl2, rightPoint, ahypAngle, length_p1p2, length_p2p3, length_p3p1 }
+  return {
+    hypSideP,
+    kathl1,
+    kathl2,
+    rightPoint,
+    ahypAngle,
+    diff,
+    length_p1p2,
+    length_p2p3,
+    length_p3p1
+  }
 }
+
+
 
 
 
@@ -531,6 +578,18 @@ function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   sprite.rotation = angleBetween(p1, p2)
   sprite.height = distance(p1, p2) * yPixelSize
   sprite.width = xPixelSize * t
+  globals.setCloneSprite = "square_yh"
+  createClone()
+}
+
+function drawDot(x1: number, y1: number, t: number, c: number) {
+  const p1 = { x: x1, y: y1 }
+  sprite.tint = c
+  sprite.x = x1
+  sprite.y = y1
+  sprite.height = t * yPixelSize
+  sprite.width = xPixelSize * t
+  globals.setCloneSprite = "square_yh"
   createClone()
 }
 
