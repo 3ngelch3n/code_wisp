@@ -58,23 +58,21 @@ let frames = 0
 let fps = 0
 let avgFps = 0
 const samples: number[] = []
-const maxSamples = 60 // ~1 Sekunde bei 60fps
+const maxSamples = 60
 
 function measureFPS() {
   frames++
   const now = performance.now()
   const diff = now - lastTime
 
-  if (diff >= 1000) { // alle 1s FPS berechnen
+  if (diff >= 1000) { 
     fps = Math.round((frames * 1000) / diff)
 
-    // in die Liste pushen
     samples.push(fps)
     if (samples.length > maxSamples) {
-      samples.shift() // ältesten Wert entfernen
+      samples.shift()
     }
 
-    // Durchschnitt berechnen
     avgFps = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length)
 
     frames = 0
