@@ -50,10 +50,8 @@ onMessage("drawFrame", function (data) {
   }
 
   randomTriangle()
-  //drawTriangle(-100, -85, 20, 40, 140, 15, 0x00ff00, true, 0x0000ff, 4)
-})
+  })
 
-//sendMessage("drawFrame")
 forever(function () {
   sendMessage("deleteAllClones")
   sendMessage("drawFrame")
@@ -72,14 +70,8 @@ function drawTriangle(
   outline_color: number = 0x11ff55,
   outline_thickness: number = 4,
 ) {
-  /*let result = normalizeTriangle(x1, y1, x2, y2, x3, y3)
-  ;(x1 = result.x1), (y1 = result.y1)
-  ;(x2 = result.x2), (y2 = result.y2)
-  ;(x3 = result.x3), (y3 = result.y3)*/
 
   const orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
-  console.log(orientation)
-  console.log(x1, y1, x2, y2, x3, y3)
   if (orientation > 0) {
     const tempX = x2
     x2 = x3
@@ -89,18 +81,17 @@ function drawTriangle(
     y2 = y3
     y3 = tempY
   }
-  console.log(x1, y1, x2, y2, x3, y3)
 
   if (outline) {
     sprite.tint = outline_color
     globals.setCloneSprite = "square_yh"
-    //!wait(0)
+
     drawLine(x1, y1, x2, y2, outline_thickness)
     drawLine(x2, y2, x3, y3, outline_thickness)
     drawLine(x1, y1, x3, y3, outline_thickness)
   }
   sprite.tint = color
-  //!wait(0)
+
 
   //---TRIANGLE TYPE FILTER
   const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
@@ -113,7 +104,6 @@ function drawTriangle(
   const kathl2 = triVals.kathl2
   const diffT = triVals.diff
 
-  console.log("p", p1p2_l, p2p3_l, p3p1_l)
 
   const tolerance = (p1p2_l + p2p3_l + p3p1_l) / 3 / 100
 
@@ -126,15 +116,14 @@ function drawTriangle(
     Math.abs(p3p1_l - p1p2_l) <= tolerance
   ) {
     trianglePieceHyp(diffT)
-    console.log("gleichschenklig!")
   }
   //  Right angled [1 h-triangle]
   else {
     const rightPoint = getRightAngleVertex(x1, y1, x2, y2, x3, y3)
     if (rightPoint) {
       drawTrianglePartRA(hypSideP, kathl, kathl2, ahypAngle)
-      console.log("Das Dreieck ist rechtwinklig!")
     } else {
+      // Any other triangle [2 h-triangle]
       const rightTriangles = splitTriangleIntoRightTriangles(
         hypSideP,
         ahypAngle,
@@ -158,28 +147,6 @@ function drawTriangle(
     }
   }
 
-  /*
-  let ignoreHypS = false
-  if (ahypAngle > 90) ignoreHypS = true
-
-  if (!isHypSide(x1, y1, x2, y2, hypSideP)) {
-    trianglePieceKath(x1, y1, x2, y2, x3, y3, hypSideP)
-  }
-  if (!isHypSide(x2, y2, x3, y3, hypSideP)) {
-    trianglePieceKath(x2, y2, x3, y3, x1, y1, hypSideP)
-  }
-  if (!isHypSide(x3, y3, x1, y1, hypSideP)) {
-    trianglePieceKath(x3, y3, x1, y1, x2, y2, hypSideP)
-  }
-  if (ignoreHypS) {
-    //!wait(0)
-    //sprite.setCostume("triangle_yh")
-    trianglePieceHyp(hypSideP, anglePos.x, anglePos.y, ahypAngle)
-  }
-  globals.setCloneSprite = "square_yh"
-  sprite.tint = 0x00ff00
-  drawLine(hypSideP.x1, hypSideP.y1, hypSideP.x2, hypSideP.y2, 8)
-  */
   function splitTriangleIntoRightTriangles(
     hypSidePoints: {
       x1: number
@@ -194,10 +161,8 @@ function drawTriangle(
     const A = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
     const B = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
     const C = { x: hypSidePoints.x3, y: hypSidePoints.y3 }
-    //console.log(A, B, C, p1angle)
     const an = angleBetween(A, B)
     const g = intersectPoint(C, an, A, B)
-    //drawDot(g.x, g.y, 10, 0xff0000)
 
     return [
       { x1: B.x, y1: B.y, x2: C.x, y2: C.y, x3: g.x, y3: g.y },
@@ -205,38 +170,7 @@ function drawTriangle(
     ]
   }
 
-  function drawTrianglePart(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-  ) {
-    const p1 = { x: x1, y: y1 }
-    const p2 = { x: x2, y: y2 }
-    const p3 = { x: x3, y: y3 }
-
-    const baseLength = distance(p1, p2)
-    const height =
-      (Math.abs((p2.y - p1.y) * (p3.x - p1.x) - (p2.x - p1.x) * (p3.y - p1.y)) /
-        baseLength /
-        55) *
-      64
-    const midX = (p1.x + p2.x) / 2
-    const midY = (p1.y + p2.y) / 2
-
-    sprite.rotation = angleBetween(p1, p2)
-    sprite.x = midX
-    sprite.y = midY
-    sprite.move((-height / 2) * 0.87)
-    sprite.rotation += 90
-
-    sprite.width = baseLength * xPixelSize * 0.9
-    sprite.height = height * yPixelSize
-    globals.setCloneSprite = "triangle_yh"
-    createClone()
-  }
+  
 
   function drawTrianglePartRA(
     hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
@@ -276,8 +210,6 @@ function drawTriangle(
     const cross = vx * wy - vy * wx
     const rot = cross < 0 ? 90 : -90
 
-    console.log("a", cross)
-
     sprite.rotation = angleBetween(k1, k2) + rot
     sprite.x = midX
     sprite.y = midY
@@ -285,48 +217,10 @@ function drawTriangle(
     sprite.rotation += 90
     sprite.width = baseLength * xPixelSize * 1.9
     sprite.height = height * yPixelSize * triangleM
-    console.log("r", sprite.height, sprite.width, height, baseLength)
     if (rot == 90) globals.setCloneSprite = "triangle_yh_l"
     else globals.setCloneSprite = "triangle_yh_r"
-    console.log(height)
     createClone()
 
-    //createClone()
-  }
-
-  function trianglePieceKath(
-    kath1x: number,
-    kath1y: number,
-    kath2x: number,
-    kath2y: number,
-    hypx: number,
-    hypy: number,
-    hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
-  ) {
-    const k1 = { x: kath1x, y: kath1y }
-    const k2 = { x: kath2x, y: kath2y }
-    const kathxm = (kath1x + kath2x) / 2
-    const kathym = (kath1y + kath2y) / 2
-    const angle = angleBetween(k1, k2)
-    const interP = intersectPoint(
-      { x: kathxm, y: kathym },
-      angle,
-      { x: hypSidePoints.x1, y: hypSidePoints.y1 },
-      { x: hypSidePoints.x2, y: hypSidePoints.y2 },
-    )
-    const dis =
-      (distance({ x: kathxm, y: kathym }, { x: interP.x, y: interP.y }) / 55) *
-      64
-    sprite.width = distance(k1, k2) * xPixelSize * 0.9
-    sprite.height = dis * yPixelSize
-    sprite.rotation = angle
-    sprite.x = kathxm
-    sprite.y = kathym
-    sprite.move((dis / 2) * 0.87)
-    sprite.rotation -= 90
-    globals.setCloneSprite = "triangle_yh"
-    //!wait(0)
-    createClone()
   }
 
   function trianglePieceHyp(kathl2: {
@@ -346,10 +240,8 @@ function drawTriangle(
     sprite.x = p1p2xM
     sprite.y = p1p2yM
     sprite.rotation = hypAngle - 180
-    console.log(sprite.x, sprite.y)
     const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
     sprite.move(-(height / 2) / triangleM)
-    console.log(sprite.x, sprite.y)
     sprite.rotation += 90
     sprite.width = distance(p1, p2) * 0.91 * xPixelSize
     sprite.height = height * yPixelSize
@@ -376,7 +268,6 @@ function drawTriangle(
     let ahypAngle = 90
     let diff = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
 
-    // Hypotenuse + Katheten bestimmen
     if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
       hypSideP = { x1, y1, x2, y2, x3, y3 }
       rightPoint = { x: x3, y: y3 }
@@ -400,7 +291,6 @@ function drawTriangle(
       kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
     }
 
-    // find the "different side" (diff)
     let sideLengths = [
       { len: length_p1p2, pts: { x1, y1, x2, y2, x3, y3 } },
       {
@@ -413,7 +303,6 @@ function drawTriangle(
       },
     ]
 
-    // find the two sides that are closest in length
     sideLengths.sort((a, b) => a.len - b.len)
 
     const diffSide = (() => {
@@ -441,35 +330,7 @@ function drawTriangle(
     }
   }
 
-  /*
-    //sprite.setCostume("triangle_yh_r")
-    sprite.setCostume("triangle_yh_r")
-    wait(0)
-    createClone()
-    
-    sprite.x = angleX
-    sprite.y = angleY
-    sprite.tint = 0x00aaff
-    //sprite.setCostume("triangle_yh_r")
-    sprite.setCostume("square_yh")
-    sprite.width = 3
-    sprite.height =80
-    sprite.rotation = aHypAngle / 2 - 90
-    wait(0)
-    createClone()
-
-    sprite.x = interP.x
-    sprite.y = interP.y
-    sprite.tint = 0xff00f0
-    //sprite.setCostume("triangle_yh_r")
-    sprite.setCostume("square_yh")
-    sprite.width = 5
-    sprite.height = 5
-    sprite.rotation = 0
-    wait(0)
-    createClone()
-    sprite.tint = 0xff0000
-    drawLine(interP.x, interP.y, angleX, angleY, 5)*/
+  
 
   function intersectPoint(
     p: { x: number; y: number },
@@ -496,65 +357,7 @@ function drawTriangle(
 
     return { x: ix, y: iy }
   }
-  function normalizeTriangle(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-  ) {
-    let orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
-    if (orientation < 0) {
-      let tx = x2
-      let ty = y2
-      x2 = x3
-      y2 = y3
-      x3 = tx
-      y3 = ty
-    }
-
-    let o1 = (x1 + y1) / 2
-    let o2 = (x2 + y2) / 2
-    let o3 = (x3 + y3) / 2
-
-    if (o1 > o2) {
-      let tx = x1
-      let ty = y1
-      let to = o1
-      x1 = x2
-      y1 = y2
-      o1 = o2
-      x2 = tx
-      y2 = ty
-      o2 = to
-    }
-
-    if (o2 > o3) {
-      let tx = x2
-      let ty = y2
-      let to = o2
-      x2 = x3
-      y2 = y3
-      o2 = o3
-      x3 = tx
-      y3 = ty
-      o3 = to
-      if (o1 > o2) {
-        let tx = x1
-        let ty = y1
-        let to = o1
-        x1 = x2
-        y1 = y2
-        o1 = o2
-        x2 = tx
-        y2 = ty
-        o2 = to
-      }
-    }
-
-    return { x1, y1, x2, y2, x3, y3 }
-  }
+  
 
   function getRightAngleVertex(
     x1: number,
@@ -565,19 +368,15 @@ function drawTriangle(
     y3: number,
     toleranceT: number = 1e-6,
   ): { x: number; y: number } | null {
-    // Winkel bei P1 prüfen
     const dot1 = (x2 - x1) * (x3 - x1) + (y2 - y1) * (y3 - y1)
     if (Math.abs(dot1) < toleranceT) return { x: x1, y: y1 }
 
-    // Winkel bei P2 prüfen
     const dot2 = (x1 - x2) * (x3 - x2) + (y1 - y2) * (y3 - y2)
     if (Math.abs(dot2) < toleranceT) return { x: x2, y: y2 }
 
-    // Winkel bei P3 prüfen
     const dot3 = (x1 - x3) * (x2 - x3) + (y1 - y3) * (y2 - y3)
     if (Math.abs(dot3) < toleranceT) return { x: x3, y: y3 }
 
-    // Kein rechter Winkel
     return null
   }
 }
@@ -606,24 +405,6 @@ function drawDot(x1: number, y1: number, t: number, c: number) {
   createClone()
 }
 
-function isHypSide(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  hypSideP: any,
-) {
-  return (
-    hypSideP.x1 === x1 &&
-    hypSideP.y1 === y1 &&
-    hypSideP.x2 === x2 &&
-    hypSideP.y2 === y2
-  )
-}
-
-function getHypAngle(side1: number, side2: number, hyp: number): number {
-  return Math.acos((side1 ** 2 + side2 ** 2 - hyp ** 2) / (2 * side1 * side2))
-}
 
 function angleBetween(p1: any, p2: any): number {
   const dx = p2.x - p1.x
@@ -636,4 +417,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING I THINK
+//FULLY WORKING & CLEANER
