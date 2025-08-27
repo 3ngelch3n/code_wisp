@@ -42,9 +42,11 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
-  drawTriangle(0, 0, 100, 0, 50, 86.6, 0xff0000, true, 0x00aaff, 4)
-  //drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 4)
-  //drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, true, 0x0066ff, 4)
+  //drawTriangle(50, 196.6, 100, 0, 0, 0, 0xff0000, true, 0x00aaff, 4) //geht nicht
+  //drawTriangle(100,0, 0, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4)//geht
+  //drawTriangle(0, 0, 100, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4) //geht
+  //drawTriangle(100, 0, 0, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4)
+  //drawTriangle(50, 196.6, 100, 0, 0, 0, 0xff0000, true, 0x00aaff, 4)
   //j += 10 //HIER PERFEKT
 })
 
@@ -66,19 +68,10 @@ function drawTriangle(
   outline_color: number = 0x11ff55,
   outline_thickness: number = 4,
 ) {
-  /*const orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
-  console.log(orientation)
-  console.log(x1, y1, x2, y2, x3, y3)
-  if (orientation > 0) {
-    const tempX = x2
-    x2 = x3
-    x3 = tempX
-
-    const tempY = y2
-    y2 = y3
-    y3 = tempY
-  }
-  console.log(x1, y1, x2, y2, x3, y3)*/
+  let result = normalizeTriangle(x1, y1, x2, y2, x3, y3)
+  ;(x1 = result.x1), (y1 = result.y1)
+  ;(x2 = result.x2), (y2 = result.y2)
+  ;(x3 = result.x3), (y3 = result.y3)
 
   if (outline) {
     sprite.tint = outline_color
@@ -96,10 +89,15 @@ function drawTriangle(
   const p2p3_l = Math.round(distance({ x: x2, y: y2 }, { x: x3, y: y3 }))
   const p3p1_l = Math.round(distance({ x: x3, y: y3 }, { x: x1, y: y1 }))
   console.log(p1p2_l, p2p3_l, p3p1_l)
-  //equilateral [1 triangle]
-  if (p1p2_l == p2p3_l && p2p3_l == p3p1_l)
+  //equilateral or isosceles [1 triangle]
+  if (
+    (p1p2_l === p2p3_l && p2p3_l === p3p1_l) ||
+    p1p2_l === p2p3_l ||
+    p2p3_l === p3p1_l ||
+    p3p1_l === p1p2_l
+  )
     drawTrianglePart(x1, y1, x2, y2, x3, y3)
-    /*
+  /*
   let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0 }
 
   let ahypAngle = 90
@@ -138,29 +136,39 @@ function drawTriangle(
   sprite.tint = 0x00ff00
   drawLine(hypSideP.x1, hypSideP.y1, hypSideP.x2, hypSideP.y2, 8)
   */
-  function drawTrianglePart(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) {
-  const p1 = { x: x1, y: y1 }
-  const p2 = { x: x2, y: y2 }
-  const p3 = { x: x3, y: y3 }
+  function drawTrianglePart(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+  ) {
+    const p1 = { x: x1, y: y1 }
+    const p2 = { x: x2, y: y2 }
+    const p3 = { x: x3, y: y3 }
 
-  const baseLength = distance(p1, p2)
-  const height = Math.abs((p2.y - p1.y) * (p3.x - p1.x) - (p2.x - p1.x) * (p3.y - p1.y)) / baseLength / 55 * 64
-  const midX = (p1.x + p2.x) / 2
-  const midY = (p1.y + p2.y) / 2
-    
-  sprite.rotation = angleBetween(p1, p2)
-  sprite.x = midX
-  sprite.y = midY
-  sprite.move(-height/2 * 0.87)
-  sprite.rotation += 90
-    
-  sprite.width = baseLength * xPixelSize * 0.95
-  sprite.height = height * yPixelSize
-  globals.setCloneSprite = "triangle_yh"
-  createClone()
-}
+    const baseLength = distance(p1, p2)
+    const height =
+      (Math.abs((p2.y - p1.y) * (p3.x - p1.x) - (p2.x - p1.x) * (p3.y - p1.y)) /
+        baseLength /
+        55) *
+      64
+    const midX = (p1.x + p2.x) / 2
+    const midY = (p1.y + p2.y) / 2
 
-  
+    sprite.rotation = angleBetween(p1, p2)
+    sprite.x = midX
+    sprite.y = midY
+    sprite.move((-height / 2) * 0.87)
+    sprite.rotation += 90
+
+    sprite.width = baseLength * xPixelSize * 0.95
+    sprite.height = height * yPixelSize
+    globals.setCloneSprite = "triangle_yh"
+    createClone()
+  }
+
   function trianglePieceKath(
     kath1x: number,
     kath1y: number,
@@ -298,6 +306,65 @@ function drawTriangle(
     const iy = p.y + s * dy2
 
     return { x: ix, y: iy }
+  }
+  function normalizeTriangle(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+  ) {
+    let orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+    if (orientation < 0) {
+      let tx = x2
+      let ty = y2
+      x2 = x3
+      y2 = y3
+      x3 = tx
+      y3 = ty
+    }
+
+    let o1 = (x1 + y1) / 2
+    let o2 = (x2 + y2) / 2
+    let o3 = (x3 + y3) / 2
+
+    if (o1 > o2) {
+      let tx = x1
+      let ty = y1
+      let to = o1
+      x1 = x2
+      y1 = y2
+      o1 = o2
+      x2 = tx
+      y2 = ty
+      o2 = to
+    }
+
+    if (o2 > o3) {
+      let tx = x2
+      let ty = y2
+      let to = o2
+      x2 = x3
+      y2 = y3
+      o2 = o3
+      x3 = tx
+      y3 = ty
+      o3 = to
+      if (o1 > o2) {
+        let tx = x1
+        let ty = y1
+        let to = o1
+        x1 = x2
+        y1 = y2
+        o1 = o2
+        x2 = tx
+        y2 = ty
+        o2 = to
+      }
+    }
+
+    return { x1, y1, x2, y2, x3, y3 }
   }
 }
 
