@@ -179,21 +179,22 @@ function drawTriangle(
     const hypAngle = angleBetween(p1, p2)
 
     // Abstand vom Corner zur Hypotenuse
-    const interP = intersectPoint(
-      { x: angleX, y: angleY },
-      hypAngle,
-      p1,
-      p2,
-    )
-    console.log(aHypAngle)
-    const distIntP1 = distance(p1, {x: interP.x, y: interP.y})
-    const distIntP2 = distance(p2, {x: interP.x, y: interP.y})
+    const interP = intersectPoint({ x: angleX, y: angleY }, hypAngle, p1, p2)
+    const distanceHitAngle = distance({ x: angleX, y: angleY }, interP) / 55 * 64
+    const distIntP1 = distance(p1, { x: interP.x, y: interP.y })
+    const distIntP2 = distance(p2, { x: interP.x, y: interP.y })
     const maxH = distIntP1 < distIntP2 ? distIntP1 : distIntP2
-    sprite.width = xPixelSize * maxH * 0.95 * 0.1
-    sprite.height = yPixelSize * maxH * 6
-    sprite.x = angleX
-    sprite.y = angleY
-    sprite.rotation = hypAngle - 90
+    sprite.width = xPixelSize * maxH * 2 * 0.95
+    sprite.height = yPixelSize * distanceHitAngle
+    sprite.x = interP.x
+    sprite.y = interP.y
+    //sprite.move(20)
+    //sprite.move(10)
+    sprite.rotation = hypAngle - 180
+    console.log(sprite.x, sprite.y)
+    sprite.move(-(distanceHitAngle / 2) * 0.87)
+    console.log(sprite.x, sprite.y)
+    sprite.rotation += 90
     /*
     const dis = distance({ x: angleX, y: angleY }, interP)
     const disk = distance(k1, k2)
