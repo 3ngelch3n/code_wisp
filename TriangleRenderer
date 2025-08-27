@@ -138,7 +138,7 @@ fpsTxt.x = -300
 fpsTxt.y = 220
 fpsTxt.style.align = "left"
 cloneTxt.x = -300
-  cloneTxt.y = 180
+cloneTxt.y = 180
 cloneTxt.style.align = "left"
 
 forever(function () {
@@ -201,7 +201,7 @@ function drawTriangle(
   //  Equilateral [1 triangle]
   if (
     (Math.abs(p1p2_l - p2p3_l) <= tolerance &&
-      Math.abs(p2p3_l - p3p1_l) <= tolerance) ||
+    Math.abs(p2p3_l - p3p1_l) <= tolerance) ||
     Math.abs(p1p2_l - p2p3_l) <= tolerance ||
     Math.abs(p2p3_l - p3p1_l) <= tolerance ||
     Math.abs(p3p1_l - p1p2_l) <= tolerance
@@ -221,18 +221,10 @@ function drawTriangle(
       )
       const t = rightTriangles[0]
       const triVals1 = analyzeTriangle(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
-      drawTrianglePartRA(
-        triVals1.hypSideP,
-        triVals1.kathl1,
-        triVals1.kathl2,
-      )
+      drawTrianglePartRA(triVals1.hypSideP, triVals1.kathl1, triVals1.kathl2)
       const d = rightTriangles[1]
       const triVals2 = analyzeTriangle(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
-      drawTrianglePartRA(
-        triVals2.hypSideP,
-        triVals2.kathl1,
-        triVals2.kathl2,
-      )
+      drawTrianglePartRA(triVals2.hypSideP, triVals2.kathl1, triVals2.kathl2)
     }
   }
 
@@ -294,19 +286,18 @@ function drawTriangle(
     const rot = cross < 0 ? 90 : -90
 
     const angle = angleBetween(k1, k2) + rot
-    const moved = move(midX, midY, angle, (-height / 13))
+    const moved = move(midX, midY, angle, -height / 13)
 
     let drawSprite = "triangle_yh_r"
-    if (rot == 90) 
-      drawSprite = "triangle_yh_l"
+    if (rot == 90) drawSprite = "triangle_yh_l"
     drawList.push({
-        width: baseLength * xPixelSize * 1.9,
-        height: height * yPixelSize * triangleM,
-        x: moved.x,
-        y: moved.y,
-        rotation: angle + 90,
-        texture: drawSprite,
-        color: sprite.tint,
+      width: baseLength * xPixelSize * 1.9,
+      height: height * yPixelSize * triangleM,
+      x: moved.x,
+      y: moved.y,
+      rotation: angle + 90,
+      texture: drawSprite,
+      color: sprite.tint,
     })
   }
 
@@ -327,7 +318,7 @@ function drawTriangle(
 
     const angle = hypAngle - 180
     const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
-    const moved = move(p1p2xM, p1p2yM, angle, (-(height / 2) / triangleM))
+    const moved = move(p1p2xM, p1p2yM, angle, -(height / 2) / triangleM)
     drawList.push({
       width: distance(p1, p2) * 0.91 * xPixelSize,
       height: height * yPixelSize,
@@ -496,7 +487,10 @@ function drawDot(x1: number, y1: number, t: number, c: number) {
 }
 
 function move(x: number, y: number, rotation: number, amount: number) {
-  return {x: x + Math.cos(rotation) * amount, y: y - Math.sin(rotation) * amount}
+  return {
+    x: x + Math.cos(rotation) * amount,
+    y: y - Math.sin(rotation) * amount,
+  }
 }
 
 function angleBetween(p1: any, p2: any): number {
