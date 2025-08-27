@@ -47,6 +47,7 @@ onMessage("drawFrame", function (data) {
   //drawTriangle(0, 0, 100, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4) //geht
   //drawTriangle(100, 0, 0, 0, 50, 196.6, 0xff0000, true, 0x00aaff, 4)
   //drawTriangle(50, 196.6, 100, 0, 0, 0, 0xff0000, true, 0x00aaff, 4)
+  drawTriangle(50, 196.6, 100, 0, 0, 0, 0xff0000, true, 0x00aaff, 4)
   //j += 10 //HIER PERFEKT
 })
 
@@ -366,6 +367,22 @@ function drawTriangle(
 
     return { x1, y1, x2, y2, x3, y3 }
   }
+
+  function isRightTriangle(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  x3: number, y3: number,
+  tolerance: number = 1e-6
+): boolean {
+  // Vektoren an jedem Punkt
+  const dot1 = (x2 - x1) * (x3 - x1) + (y2 - y1) * (y3 - y1) // Winkel bei P1
+  const dot2 = (x1 - x2) * (x3 - x2) + (y1 - y2) * (y3 - y2) // Winkel bei P2
+  const dot3 = (x1 - x3) * (x2 - x3) + (y1 - y3) * (y2 - y3) // Winkel bei P3
+
+  // Prüfen, ob einer der Winkel ~0 (rechtwinklig)
+  return Math.abs(dot1) < tolerance || Math.abs(dot2) < tolerance || Math.abs(dot3) < tolerance
+}
+
 }
 
 function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
