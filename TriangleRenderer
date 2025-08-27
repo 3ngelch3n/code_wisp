@@ -8,10 +8,70 @@ const yPixelSize = 1880 / Game.height
 //sprite.height = yPixelSize * Game.height
 sprite.visible = true
 
-drawTriangle(-120, -160, 20, 130, 220, 0)
+//drawTriangle(-120, -160, 20, 130, 220, 0)
 //drawTriangle(0, 0, 100, 200, 250, -100)
 //DrawQuadrilateral(0, 0, 300, 50, 200, 100, 0, 150)
 //drawLine(0,0,-150,120)
+
+onCloneStart(function (clone) {
+  onMessage("deleteAllClones", function (data) {
+    console.log("DELTE")
+    clone.delete()
+  })
+})
+
+onMessage("drawFrame", function (data) {
+  const xOff = 0//Math.random(-100, 100)
+  const yOff = 0//Math.random(-100, 100)
+  /*drawTriangle(
+    0 + xOff,
+    0 + yOff,
+    100 + xOff,
+    200 + yOff,
+    250 + xOff,
+    -100 + yOff,
+  )*/
+  /*const x1 = Math.random(-360, -10)
+  const y1 = Math.random(-240, -10)
+  const x2 = Math.random(-360, -10)
+  const y2 = Math.random(10, 240)
+  const x3 = Math.random(10, 360)
+  const y3 = Math.random(-240, 240)
+  drawTriangle(
+    x1 + xOff,
+    y1 + yOff,
+    x2 + xOff,
+    y2 + yOff,
+    x3 + yOff,
+    y3 + yOff,
+  )
+  console.log("l:", x1 + xOff,
+    y1 + yOff,
+    x2 + xOff,
+    y2 + yOff,
+    x3 + yOff,
+    y3 + yOff,)*/
+  drawTriangle(
+    -103,
+    -212,
+    -117,
+    180,
+    23,
+    -140,
+  )
+})
+sendMessage("drawFrame")
+let ft = 1
+forever(function () {
+  if (Keyboard.keyHeld(Key.A)) {
+    ft = 20
+  }else {
+    ft = 1
+  }
+  //sendMessage("deleteAllClones")
+  //sendMessage("drawFrame")
+  //wait(2)
+})
 
 function drawTriangle(
   x1: number,
@@ -21,10 +81,10 @@ function drawTriangle(
   x3: number,
   y3: number,
 ) {
-  const ft = 0.8
+  
   sprite.layer = 1
   //sprite.tint = 0x00aaff
-  /*sprite.setCostume("square")
+  sprite.setCostume("square")
   wait(ft)
   drawLine(x1, y1, x2, y2, 3)
   wait(ft)
@@ -62,23 +122,26 @@ function drawTriangle(
   createClone()
   wait(ft)
   sprite.tint = 0xff0000
-  sprite.x = x1
-  sprite.y = y1
-  sprite.rotation = p2AngleToCenter + 90
+  sprite.x = x2
+  sprite.y = y2
+  sprite.rotation = p1AngleToCenter + 90
   createClone()
   wait(ft)
   sprite.x = x3
   sprite.y = y3
-  sprite.rotation = p2AngleToCenter + 90
+  sprite.rotation = p1AngleToCenter + 90
   createClone()
-  sprite.layer = -1*/
+  sprite.layer = -1
+
+  
   sprite.tint = 0xff0000
   sprite.layer = 0
-  const center = centroid(x1, y1, x2, y2, x3, y3)
-  const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
-  const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
-  const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
+  //const center = centroid(x1, y1, x2, y2, x3, y3)
+  //const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
+  //const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
+  //const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
   sprite.setCostume("triangle")
+  wait(ft)
   const triangleDefp1 = calcMaxTriangleSize(
     p1AngleToCenter,
     x1,
@@ -94,6 +157,7 @@ function drawTriangle(
   sprite.height = triangleDefp1.l * yPixelSize
   sprite.width = triangleDefp1.f * xPixelSize
   createClone()
+  wait(ft)
   const triangleDefp2 = calcMaxTriangleSize(
     p2AngleToCenter,
     x2,
@@ -109,6 +173,7 @@ function drawTriangle(
   sprite.height = triangleDefp2.l * yPixelSize
   sprite.width = triangleDefp2.f * xPixelSize
   createClone()
+  wait(ft)
   const triangleDefp3 = calcMaxTriangleSize(
     p3AngleToCenter,
     x3,
@@ -124,8 +189,9 @@ function drawTriangle(
   sprite.height = triangleDefp3.l * yPixelSize
   sprite.width = triangleDefp3.f * xPixelSize
   createClone()
-  sprite.tint = 0x00ff00
+  //sprite.tint = 0x00ff00
   sprite.layer = 0
+  wait(ft)
 
   const avgHeight = averageTriangleHeight(x1, y1, x2, y2, x3, y3)
   console.log(avgHeight)
@@ -183,20 +249,33 @@ function drawTriangle(
 }
 
 function averageTriangleHeight(
-  x1: number, y1: number,
-  x2: number, y2: number,
-  x3: number, y3: number
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
 ): number {
   // Abstand eines Punktes zu einer Linie
-  function height(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-    return Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) / Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2);
+  function height(
+    px: number,
+    py: number,
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+  ): number {
+    return (
+      Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) /
+      Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2)
+    )
   }
 
-  const hA = height(x1, y1, x2, y2, x3, y3); // Höhe von A auf BC
-  const hB = height(x2, y2, x1, y1, x3, y3); // Höhe von B auf AC
-  const hC = height(x3, y3, x1, y1, x2, y2); // Höhe von C auf AB
+  const hA = height(x1, y1, x2, y2, x3, y3) // Höhe von A auf BC
+  const hB = height(x2, y2, x1, y1, x3, y3) // Höhe von B auf AC
+  const hC = height(x3, y3, x1, y1, x2, y2) // Höhe von C auf AB
 
-  return (hA + hB + hC) / 3; // Durchschnitt
+  return (hA + hB + hC) / 3 // Durchschnitt
 }
 
 function calcMaxTriangleSize(
