@@ -143,10 +143,13 @@ cloneTxt.style.align = "left"
 
 forever(function () {
   //sendMessage("deleteAllClones")
+  sprite.visible = true
   sendMessage("createFrame")
   sendMessage("drawFrame")
+  sprite.visible = false
   fpsTxt.text = measureFPS().avgFps + ""
   cloneTxt.text = sprite.clones.length + ""
+  //wait(1)
 })
 
 function drawTriangle(
@@ -181,7 +184,7 @@ function drawTriangle(
     drawLine(x1, y1, x3, y3, outline_thickness)
   }
   sprite.tint = color
-  /*
+
   //---TRIANGLE TYPE FILTER
   const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
   const p1p2_l = triVals.length_p1p2
@@ -210,12 +213,11 @@ function drawTriangle(
     const rightPoint = getRightAngleVertex(x1, y1, x2, y2, x3, y3)
     if (rightPoint) {
       drawTrianglePartRA(hypSideP, kathl, kathl2)
-    } else {*/
+    } else {
       // Any other triangle [2 h-triangle]
-  const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
       const rightTriangles = splitTriangleIntoRightTriangles(
-        triVals.hypSideP,
-        triVals.ahypAngle,
+        hypSideP,
+        ahypAngle,
       )
       const t = rightTriangles[0]
       const triVals1 = analyzeTriangle(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
@@ -231,8 +233,8 @@ function drawTriangle(
         triVals2.kathl1,
         triVals2.kathl2,
       )
-    
-  
+    }
+  }
 
   function splitTriangleIntoRightTriangles(
     hypSidePoints: {
@@ -291,20 +293,18 @@ function drawTriangle(
     const cross = vx * wy - vy * wx
     const rot = cross < 0 ? 90 : -90
 
-    sprite.rotation = angleBetween(k1, k2) + rot
-    sprite.x = midX
-    sprite.y = midY
-    sprite.move(-height / 13)
-    sprite.rotation += 90
+    const angle = angleBetween(k1, k2) + rot
+    const moved = move(midX, midY, angle, (-height / 13))
+
     let drawSprite = "triangle_yh_r"
     if (rot == 90) 
       drawSprite = "triangle_yh_l"
     drawList.push({
         width: baseLength * xPixelSize * 1.9,
         height: height * yPixelSize * triangleM,
-        x: sprite.x,
-        y: sprite.y,
-        rotation: sprite.rotation,
+        x: moved.x,
+        y: moved.y,
+        rotation: angle + 90,
         texture: drawSprite,
         color: sprite.tint,
     })
@@ -324,18 +324,16 @@ function drawTriangle(
     const hypAngle = angleBetween(p1, p2)
     const p1p2xM = (p1.x + p2.x) / 2
     const p1p2yM = (p1.y + p2.y) / 2
-    sprite.x = p1p2xM
-    sprite.y = p1p2yM
-    sprite.rotation = hypAngle - 180
+
+    const angle = hypAngle - 180
     const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
-    sprite.move(-(height / 2) / triangleM)
-    sprite.rotation += 90
+    const moved = move(p1p2xM, p1p2yM, angle, (-(height / 2) / triangleM))
     drawList.push({
       width: distance(p1, p2) * 0.91 * xPixelSize,
       height: height * yPixelSize,
-      x: sprite.x,
-      y: sprite.y,
-      rotation: sprite.rotation,
+      x: moved.x,
+      y: moved.y,
+      rotation: angle + 90,
       texture: "triangle_yh",
       color: sprite.tint,
     })
@@ -497,6 +495,10 @@ function drawDot(x1: number, y1: number, t: number, c: number) {
   })
 }
 
+function move(x: number, y: number, rotation: number, amount: number) {
+  return {x: x + Math.cos(rotation) * amount, y: y - Math.sin(rotation) * amount}
+}
+
 function angleBetween(p1: any, p2: any): number {
   const dx = p2.x - p1.x
   const dy = p2.y - p1.y
@@ -508,4 +510,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 50 draw calls avg 31 fps  NOT RIANGLE SORTING
+//FULLY WORKING with 100 draw calls avg 32-33 fps
