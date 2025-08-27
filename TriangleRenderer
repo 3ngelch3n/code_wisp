@@ -88,7 +88,7 @@ const fpsTxt = Game.createText('-')
 fpsTxt.x = -300
 fpsTxt.y = 220
 fpsTxt.style.align = "left"
-const drawAmount = 1
+const drawAmount = 50
 
 forever(function () {
   sendMessage("deleteAllClones")
