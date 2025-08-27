@@ -48,14 +48,52 @@ onMessage("drawFrame", function (data) {
       2,
     )
   }
+  for (let i = 0; i < drawAmount; i++) {
+    randomTriangle()
+  }
+})
 
-  randomTriangle()
-  })
+let lastTime = performance.now()
+let frames = 0
+let fps = 0
+let avgFps = 0
+const samples: number[] = []
+const maxSamples = 60 // ~1 Sekunde bei 60fps
+
+function measureFPS() {
+  frames++
+  const now = performance.now()
+  const diff = now - lastTime
+
+  if (diff >= 1000) { // alle 1s FPS berechnen
+    fps = Math.round((frames * 1000) / diff)
+
+    // in die Liste pushen
+    samples.push(fps)
+    if (samples.length > maxSamples) {
+      samples.shift() // ältesten Wert entfernen
+    }
+
+    // Durchschnitt berechnen
+    avgFps = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length)
+
+    frames = 0
+    lastTime = now
+  }
+
+  return { fps, avgFps }
+}
+
+const fpsTxt = Game.createText('-')
+fpsTxt.x = -300
+fpsTxt.y = 220
+fpsTxt.style.align = "left"
+const drawAmount = 1
 
 forever(function () {
   sendMessage("deleteAllClones")
   sendMessage("drawFrame")
-  wait(0.7)
+  fpsTxt.text = measureFPS().avgFps + ""
 })
 
 function drawTriangle(
@@ -92,7 +130,6 @@ function drawTriangle(
   }
   sprite.tint = color
 
-
   //---TRIANGLE TYPE FILTER
   const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
   const p1p2_l = triVals.length_p1p2
@@ -103,7 +140,6 @@ function drawTriangle(
   const kathl = triVals.kathl1
   const kathl2 = triVals.kathl2
   const diffT = triVals.diff
-
 
   const tolerance = (p1p2_l + p2p3_l + p3p1_l) / 3 / 100
 
@@ -170,8 +206,6 @@ function drawTriangle(
     ]
   }
 
-  
-
   function drawTrianglePartRA(
     hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
     kathl: { x1: number; y1: number; x2: number; y2: number },
@@ -220,7 +254,6 @@ function drawTriangle(
     if (rot == 90) globals.setCloneSprite = "triangle_yh_l"
     else globals.setCloneSprite = "triangle_yh_r"
     createClone()
-
   }
 
   function trianglePieceHyp(kathl2: {
@@ -330,8 +363,6 @@ function drawTriangle(
     }
   }
 
-  
-
   function intersectPoint(
     p: { x: number; y: number },
     angle: number,
@@ -357,7 +388,6 @@ function drawTriangle(
 
     return { x: ix, y: iy }
   }
-  
 
   function getRightAngleVertex(
     x1: number,
@@ -405,7 +435,6 @@ function drawDot(x1: number, y1: number, t: number, c: number) {
   createClone()
 }
 
-
 function angleBetween(p1: any, p2: any): number {
   const dx = p2.x - p1.x
   const dy = p2.y - p1.y
@@ -417,4 +446,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING & CLEANER
+//FULLY WORKING with 50 draw calls avg 30 fps
