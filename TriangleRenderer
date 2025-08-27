@@ -4,7 +4,6 @@ const triangleM = 64 / 55
 sprite.visible = false
 globals.setCloneSprite = "square_yh"
 
-
 onCloneStart(function (clone) {
   clone.visible = true
   clone.setCostume(globals.setCloneSprite)
@@ -18,19 +17,24 @@ onCloneStart(function (clone) {
 //drawTriangle(100, 200, 0, 0, 250, -100, 0xff0000) //HIER PERFEKT
 
 onMessage("drawFrame", function (data) {
-
   function randomBetween(min: number, max: number) {
     return Math.random(min, max)
   }
 
-  function rotatePoint(px: number, py: number, cx: number, cy: number, angle: number) {
+  function rotatePoint(
+    px: number,
+    py: number,
+    cx: number,
+    cy: number,
+    angle: number,
+  ) {
     const s = Math.sin(angle)
     const c = Math.cos(angle)
     const dx = px - cx
     const dy = py - cy
     return {
       x: cx + dx * c - dy * s,
-      y: cy + dx * s + dy * c
+      y: cy + dx * s + dy * c,
     }
   }
 
@@ -38,7 +42,7 @@ onMessage("drawFrame", function (data) {
     const typee = Math.floor(Math.random(0, 3))
     const rot = randomBetween(0, 360)
     console.log(typee)
-    let tri = { x1:0, y1:0, x2:0, y2:0, x3:0, y3:0 }
+    let tri = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
     console.log("typ", typee)
     if (typee === 0) {
       const x = randomBetween(-200, 200)
@@ -50,7 +54,7 @@ onMessage("drawFrame", function (data) {
         x2: x + size,
         y2: y,
         x3: x + size / 2,
-        y3: y + size * 0.866
+        y3: y + size * 0.866,
       }
     }
 
@@ -64,8 +68,8 @@ onMessage("drawFrame", function (data) {
         y1: y,
         x2: x + base,
         y2: y,
-        x3: x + base/2,
-        y3: y + height
+        x3: x + base / 2,
+        y3: y + height,
       }
     }
 
@@ -80,33 +84,41 @@ onMessage("drawFrame", function (data) {
         x2: x + a,
         y2: y,
         x3: x,
-        y3: y + b
+        y3: y + b,
       }
     }
     console.log("tri", tri)
 
     // Mittelpunkt für Rotation
-    const cx = (tri.x1 + tri.x2 + tri.x3)/3
-    const cy = (tri.y1 + tri.y2 + tri.y3)/3
-    
+    const cx = (tri.x1 + tri.x2 + tri.x3) / 3
+    const cy = (tri.y1 + tri.y2 + tri.y3) / 3
+
     const r1 = rotatePoint(Math.floor(tri.x1), Math.floor(tri.y1), cx, cy, rot)
     const r2 = rotatePoint(Math.floor(tri.x2), Math.floor(tri.y2), cx, cy, rot)
     const r3 = rotatePoint(Math.floor(tri.x3), Math.floor(tri.y3), cx, cy, rot)
     console.log("rrr", r1, r2, r3)
-    drawTriangle(r1.x, r1.y, r2.x, r2.y, r3.x, r3.y, 0xff0000, true, 0x00aaff, 2)
+    drawTriangle(
+      r1.x,
+      r1.y,
+      r2.x,
+      r2.y,
+      r3.x,
+      r3.y,
+      0xff0000,
+      true,
+      0x00aaff,
+      2,
+    )
   }
 
-randomTriangle()
-
-
+  //randomTriangle()
+  drawTriangle(-100, -85, 20, 40, 140, 15, 0x00ff00, true, 0x0000ff, 4)
 })
-
-
 
 sendMessage("drawFrame")
 forever(function () {
-  sendMessage("deleteAllClones")
-  sendMessage("drawFrame")
+  //sendMessage("deleteAllClones")
+  //sendMessage("drawFrame")
   //wait(5)
 })
 
@@ -162,16 +174,19 @@ function drawTriangle(
   const kathl = triVals.kathl1
   const kathl2 = triVals.kathl2
   const diffT = triVals.diff
-  
 
-  console.log("p",p1p2_l, p2p3_l, p3p1_l)
+  console.log("p", p1p2_l, p2p3_l, p3p1_l)
 
-  const tolerance = ((p1p2_l+p2p3_l+p3p1_l) / 3)/100
-  
+  const tolerance = (p1p2_l + p2p3_l + p3p1_l) / 3 / 100
+
   //  Equilateral [1 triangle]
-  if (Math.abs(p1p2_l - p2p3_l) <= tolerance && Math.abs(p2p3_l - p3p1_l) <= tolerance || Math.abs(p1p2_l - p2p3_l) <= tolerance ||
+  if (
+    (Math.abs(p1p2_l - p2p3_l) <= tolerance &&
+      Math.abs(p2p3_l - p3p1_l) <= tolerance) ||
+    Math.abs(p1p2_l - p2p3_l) <= tolerance ||
     Math.abs(p2p3_l - p3p1_l) <= tolerance ||
-    Math.abs(p3p1_l - p1p2_l) <= tolerance) {
+    Math.abs(p3p1_l - p1p2_l) <= tolerance
+  ) {
     trianglePieceHyp(diffT)
     console.log("gleichschenklig!")
   }
@@ -181,6 +196,27 @@ function drawTriangle(
     if (rightPoint) {
       drawTrianglePartRA(hypSideP, kathl, kathl2, ahypAngle)
       console.log("Das Dreieck ist rechtwinklig!")
+    } else {
+      const rightTriangles = splitTriangleIntoRightTriangles(
+        hypSideP,
+        ahypAngle,
+      )
+      const t = rightTriangles[0]
+      const triVals1 = analyzeTriangle(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
+      drawTrianglePartRA(
+        triVals1.hypSideP,
+        triVals1.kathl1,
+        triVals1.kathl2,
+        triVals1.ahypAngle,
+      )
+      const d = rightTriangles[1]
+      const triVals2 = analyzeTriangle(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
+      drawTrianglePartRA(
+        triVals2.hypSideP,
+        triVals2.kathl1,
+        triVals2.kathl2,
+        triVals2.ahypAngle,
+      )
     }
   }
 
@@ -206,6 +242,31 @@ function drawTriangle(
   sprite.tint = 0x00ff00
   drawLine(hypSideP.x1, hypSideP.y1, hypSideP.x2, hypSideP.y2, 8)
   */
+  function splitTriangleIntoRightTriangles(
+    hypSidePoints: {
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      x3: number
+      y3: number
+    },
+    p1angle: number,
+  ) {
+    const A = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+    const B = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+    const C = { x: hypSidePoints.x3, y: hypSidePoints.y3 }
+    //console.log(A, B, C, p1angle)
+    const an = angleBetween(A, B)
+    const g = intersectPoint(C, an, A, B)
+    //drawDot(g.x, g.y, 10, 0xff0000)
+
+    return [
+      { x1: B.x, y1: B.y, x2: C.x, y2: C.y, x3: g.x, y3: g.y },
+      { x1: A.x, y1: A.y, x2: g.x, y2: g.y, x3: C.x, y3: C.y },
+    ]
+  }
+
   function drawTrianglePart(
     x1: number,
     y1: number,
@@ -258,17 +319,6 @@ function drawTriangle(
     const height = distance(k1, k2)
     const midX = (k1.x + k2.x) / 2
     const midY = (k1.y + k2.y) / 2
-
-    sprite.width = 5
-    sprite.height = 5
-    sprite.tint = 0x00ff00
-    sprite.x = kk1.x
-    sprite.y = kk1.y
-    createClone()
-    sprite.tint = 0x000fff
-    sprite.x = kk2.x
-    sprite.y = kk2.y
-    createClone()
 
     const rightPoint = {
       x:
@@ -341,16 +391,14 @@ function drawTriangle(
     createClone()
   }
 
-  function trianglePieceHyp(
-    kathl2: {
-      x1: number
-      y1: number
-      x2: number
-      y2: number
-      x3: number
-      y3: number
-    }
-  ) {
+  function trianglePieceHyp(kathl2: {
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+    x3: number
+    y3: number
+  }) {
     const p1 = { x: kathl2.x1, y: kathl2.y1 }
     const p2 = { x: kathl2.x2, y: kathl2.y2 }
     const p3 = { x: kathl2.x3, y: kathl2.y3 }
@@ -375,90 +423,89 @@ function drawTriangle(
     createClone()
   }
 
-function analyzeTriangle(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number,
-) {
-  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
-  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
-  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+  function analyzeTriangle(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+  ) {
+    const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+    const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+    const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
 
+    let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+    let kathl1 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+    let kathl2 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+    let rightPoint = { x: 0, y: 0 }
+    let ahypAngle = 90
+    let diff = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
 
-  let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
-  let kathl1   = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
-  let kathl2   = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
-  let rightPoint = { x: 0, y: 0 }
-  let ahypAngle = 90
-  let diff      = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+    // Hypotenuse + Katheten bestimmen
+    if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+      hypSideP = { x1, y1, x2, y2, x3, y3 }
+      rightPoint = { x: x3, y: y3 }
+      const k1 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+      const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+      kathl1 = length_p2p3 >= length_p3p1 ? k1 : k2
+      kathl2 = length_p2p3 >= length_p3p1 ? k2 : k1
+    } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+      hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+      rightPoint = { x: x1, y: y1 }
+      const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+      const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+      kathl1 = length_p1p2 >= length_p3p1 ? k1 : k2
+      kathl2 = length_p1p2 >= length_p3p1 ? k2 : k1
+    } else {
+      hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+      rightPoint = { x: x2, y: y2 }
+      const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+      const k2 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+      kathl1 = length_p1p2 >= length_p2p3 ? k1 : k2
+      kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
+    }
 
-  // Hypotenuse + Katheten bestimmen
-  if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
-    hypSideP = { x1, y1, x2, y2, x3, y3 }
-    rightPoint = { x: x3, y: y3 }
-    const k1 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
-    const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
-    kathl1 = length_p2p3 >= length_p3p1 ? k1 : k2
-    kathl2 = length_p2p3 >= length_p3p1 ? k2 : k1
-  } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
-    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
-    rightPoint = { x: x1, y: y1 }
-    const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
-    const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
-    kathl1 = length_p1p2 >= length_p3p1 ? k1 : k2
-    kathl2 = length_p1p2 >= length_p3p1 ? k2 : k1
-  } else {
-    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
-    rightPoint = { x: x2, y: y2 }
-    const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
-    const k2 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
-    kathl1 = length_p1p2 >= length_p2p3 ? k1 : k2
-    kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
+    // find the "different side" (diff)
+    let sideLengths = [
+      { len: length_p1p2, pts: { x1, y1, x2, y2, x3, y3 } },
+      {
+        len: length_p2p3,
+        pts: { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 },
+      },
+      {
+        len: length_p3p1,
+        pts: { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 },
+      },
+    ]
+
+    // find the two sides that are closest in length
+    sideLengths.sort((a, b) => a.len - b.len)
+
+    const diffSide = (() => {
+      const d1 = Math.abs(sideLengths[1].len - sideLengths[0].len)
+      const d2 = Math.abs(sideLengths[2].len - sideLengths[1].len)
+      const d3 = Math.abs(sideLengths[2].len - sideLengths[0].len)
+
+      if (d1 < d2 && d1 < d3) return sideLengths[2].pts
+      if (d2 < d1 && d2 < d3) return sideLengths[0].pts
+      return sideLengths[1].pts
+    })()
+
+    diff = diffSide
+
+    return {
+      hypSideP,
+      kathl1,
+      kathl2,
+      rightPoint,
+      ahypAngle,
+      diff,
+      length_p1p2,
+      length_p2p3,
+      length_p3p1,
+    }
   }
-
-  // find the "different side" (diff)
-let sideLengths = [
-  { len: length_p1p2, pts: { x1, y1, x2, y2, x3, y3 } },
-  { len: length_p2p3, pts: { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 } },
-  { len: length_p3p1, pts: { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 } }
-]
-
-// find the two sides that are closest in length
-sideLengths.sort((a, b) => a.len - b.len)
-
-const diffSide = (() => {
-  const d1 = Math.abs(sideLengths[1].len - sideLengths[0].len)
-  const d2 = Math.abs(sideLengths[2].len - sideLengths[1].len)
-  const d3 = Math.abs(sideLengths[2].len - sideLengths[0].len)
-
-  if (d1 < d2 && d1 < d3) return sideLengths[2].pts
-  if (d2 < d1 && d2 < d3) return sideLengths[0].pts
-  return sideLengths[1].pts
-})()
-
-diff = diffSide
-
-
-  return {
-    hypSideP,
-    kathl1,
-    kathl2,
-    rightPoint,
-    ahypAngle,
-    diff,
-    length_p1p2,
-    length_p2p3,
-    length_p3p1
-  }
-}
-
-
-
-
-
 
   /*
     //sprite.setCostume("triangle_yh_r")
@@ -655,4 +702,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//NOT WORKINF
+//FULLY WORKING I THINK
