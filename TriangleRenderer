@@ -24,7 +24,7 @@ sprite.setCostume("triangle_yh")
 wait(100)*/
 
 drawTriangle(-120, -160, 20, 130, 220, 0) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
-drawTriangle(0, 0, 100, 200, 250, -100) //HIER PERFEKT
+//drawTriangle(0, 0, 100, 200, 250, -100) //HIER PERFEKT
 /*drawTriangle(
     -103,
     -212,
@@ -126,7 +126,7 @@ function drawTriangle(
   sprite.transparency = 0
   sprite.setCostume("triangle_yh")
   wait(ft)
-  if (
+  /*if (
     !(
       hypSideP.x1 === x1 &&
       hypSideP.y1 === y1 &&
@@ -140,7 +140,7 @@ function drawTriangle(
       x2: hypSideP.x2,
       y2: hypSideP.y2,
     })
-  }
+  }*/
   wait(ft)
   if (
     !(
@@ -192,29 +192,35 @@ function drawTriangle(
     sprite.y = kathym
     const angle = angleBetween(k1, k2)
     sprite.rotation = angle
+    sprite.tint = 0xff5500
+    sprite.layer = 2
+    sprite.rotation += 90
+    sprite.height = 200
+    createClone()
+    sprite.layer = 0
+    sprite.rotation -= 90
+    sprite.tint = 0x0055ff
     sprite.width = distance(k1, k2) * xPixelSize * roundDown
     const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
     const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
     
     const hypM = { x: (hypA.x + hypB.x) / 2, y: (hypA.y + hypB.y) / 2 }
     const dis =
-      ((distance({ x: kathxm, y: kathym }, hypM) / 52) * 64)
+      ((distance({ x: kathxm, y: kathym }, hypM) / 52) * 64) * 1.1
     sprite.height = dis * yPixelSize
     sprite.move(dis / 2 * 0.89)
     sprite.rotation -= 90
     createClone()
     ////
-    /*
+    
     sprite.tint = 0x00ff00
     sprite.width = 4
     sprite.height = 4
     sprite.x = hypM.x
     sprite.y = hypM.y
     createClone()
-    sprite.x = kathxm
-    sprite.y = kathym
-    sprite.move(dis / 2)
-    */
+    
+    
     ////
     /*wait(0)
     sprite.tint = 0x00ff00
@@ -328,72 +334,7 @@ function drawTriangle(
   sprite.y = y1*/
 }
 
-function fillTrianglePiece(
-  p1: { x: number; y: number },
-  p2: { x: number; y: number },
-  p3: { x: number; y: number },
-  a: boolean,
-  xLength: number,
-) {
-  sprite.width = xLength * xPixelSize * 0.95
-  const angle = angleBetween({ x: p1.x, y: p1.y }, { x: p2.x, y: p2.y })
-  sprite.rotation = angle
-  const p1p2x = (p1.x + p2.x) / 2
-  const p1p2y = (p1.y + p2.y) / 2
-  sprite.x = p1p2x
-  sprite.y = p1p2y
-  //const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, pC.a == 0 ? p2.x : p1.x, pC.a == 0 ? p2.y : p1.y, pC.a == 0 ? p3.x : , p3.y, , p3.x, p3.y)
-  const intersectPoint = intersectPointAngleLine(
-    p1p2x,
-    p1p2y,
-    angle,
-    a ? p2.x : p1.x,
-    a ? p2.y : p1.y,
-    p3.x,
-    p3.y,
-  )
-  const yHeight =
-    distance(
-      { x: p1p2x, y: p1p2y },
-      { x: intersectPoint.x, y: intersectPoint.y },
-    ) * 0.95
-  sprite.height = yHeight * yPixelSize
-  sprite.move(yHeight / 2)
-  sprite.rotation -= 90
 
-  createClone()
-}
-
-function averageTriangleHeight(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number,
-): number {
-  // Abstand eines Punktes zu einer Linie
-
-  const hA = height(x1, y1, x2, y2, x3, y3) // Höhe von A auf BC
-  const hB = height(x2, y2, x1, y1, x3, y3) // Höhe von B auf AC
-  const hC = height(x3, y3, x1, y1, x2, y2) // Höhe von C auf AB
-
-  return (hA + hB + hC) / 3 // Durchschnitt
-}
-
-function height(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
-  return (
-    Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) /
-    Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2)
-  )
-}
 
 function intersectPointAngleLine(
   px: number,
