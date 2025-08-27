@@ -2,12 +2,12 @@ type float2 = { x: number; y: number }
 //sprite.tint = 0x00ffff
 sprite.y = 0
 sprite.x = 0
-const xPixelSize = 2650 / Game.width
-const yPixelSize = 1880 / Game.height
+const xPixelSize = 2650 / 8 / Game.width
+const yPixelSize = 1880 / 8 / Game.height
 //sprite.width = xPixelSize * Game.width
 //sprite.height = yPixelSize * Game.height
 sprite.visible = true
-let ft = 1
+let ft = 0.1
 
 /*sprite.setCostume("triangle_y")
 sprite.layer = 1
@@ -23,8 +23,8 @@ sprite.tint = 0x00ff00
 sprite.setCostume("triangle_yh")
 wait(100)*/
 
-drawTriangle(-120, -160, 20, 130, 220, 0)
-//drawTriangle(0, 0, 100, 200, 250, -100)
+drawTriangle(-120, -160, 20, 130, 220, 0) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
+drawTriangle(0, 0, 100, 200, 250, -100) //HIER PERFEKT
 /*drawTriangle(
     -103,
     -212,
@@ -79,9 +79,9 @@ onMessage("drawFrame", function (data) {
 
 forever(function () {
   if (Keyboard.keyHeld(Key.A)) {
-    ft = 1
+    ft = 0.05
   } else {
-    ft = 0.4
+    ft = 0.05
   }
   //sendMessage("deleteAllClones")
   //sendMessage("drawFrame")
@@ -97,47 +97,83 @@ function drawTriangle(
   y3: number,
 ) {
   sprite.layer = 1
-  //sprite.tint = 0x00aaff
-  //sprite.setCostume("square")
-  /*wait(0)
-  drawLine(x1, y1, x2, y2, 6)
+  sprite.tint = 0x00aaff
+  sprite.setCostume("square_yh")
+  wait(0)
+  drawLine(x1, y1, x2, y2, 2)
   wait(ft)
-  drawLine(x2, y2, x3, y3, 6)
+  drawLine(x2, y2, x3, y3, 2)
   wait(ft)
-  drawLine(x1, y1, x3, y3, 6)*/
+  drawLine(x1, y1, x3, y3, 2)
 
   sprite.tint = 0x0044ff
   const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
   const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
-  let hypSideP = {x1: 0, y1: 0, x2: 0, y2: 0}
+  let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0 }
 
   if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
-    hypSideP = { x1: x1, y1: y1, x2: x2, y2: y2 };
+    hypSideP = { x1: x1, y1: y1, x2: x2, y2: y2 }
   } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
-    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3 };
+    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3 }
   } else {
-    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 };
+    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 }
   }
   //const heightA = height(x1, y1, x2, y2, x3, y3)
 
-  sprite.tint = 0xff0000
+  //sprite.tint = 0xff0000
   sprite.layer = 0
   sprite.transparency = 0
   sprite.setCostume("triangle_yh")
   wait(ft)
-  if (!(hypSideP.x1 === x1 && hypSideP.y1 === y1 && hypSideP.x2 === x2 && hypSideP.y2 === y2)) {
-  trianglePiece(x1, y1, x2, y2, x3, y3, {x1: hypSideP.x1, y1: hypSideP.y1, x2: hypSideP.x2, y2: hypSideP.y2})
+  if (
+    !(
+      hypSideP.x1 === x1 &&
+      hypSideP.y1 === y1 &&
+      hypSideP.x2 === x2 &&
+      hypSideP.y2 === y2
+    )
+  ) {
+    trianglePiece(x1, y1, x2, y2, x3, y3, {
+      x1: hypSideP.x1,
+      y1: hypSideP.y1,
+      x2: hypSideP.x2,
+      y2: hypSideP.y2,
+    })
   }
   wait(ft)
-  if (!(hypSideP.x1 === x2 && hypSideP.y1 === y2 && hypSideP.x2 === x3 && hypSideP.y2 === y3)) {
-    trianglePiece(x2, y2, x3, y3, x1, y1, {x1: hypSideP.x1, y1: hypSideP.y1, x2: hypSideP.x2, y2: hypSideP.y2})
+  if (
+    !(
+      hypSideP.x1 === x2 &&
+      hypSideP.y1 === y2 &&
+      hypSideP.x2 === x3 &&
+      hypSideP.y2 === y3
+    )
+  ) {
+    trianglePiece(x2, y2, x3, y3, x1, y1, {
+      x1: hypSideP.x1,
+      y1: hypSideP.y1,
+      x2: hypSideP.x2,
+      y2: hypSideP.y2,
+    })
   }
   wait(ft)
-  if (!(hypSideP.x1 === x3 && hypSideP.y1 === y3 && hypSideP.x2 === x1 && hypSideP.y2 === y1)) {
-    trianglePiece(x3, y3, x1, y1, x2, y2, {x1: hypSideP.x1, y1: hypSideP.y1, x2: hypSideP.x2, y2: hypSideP.y2})
+  if (
+    !(
+      hypSideP.x1 === x3 &&
+      hypSideP.y1 === y3 &&
+      hypSideP.x2 === x1 &&
+      hypSideP.y2 === y1
+    )
+  ) {
+    trianglePiece(x3, y3, x1, y1, x2, y2, {
+      x1: hypSideP.x1,
+      y1: hypSideP.y1,
+      x2: hypSideP.x2,
+      y2: hypSideP.y2,
+    })
   }
-  
+
   function trianglePiece(
     kath1x: number,
     kath1y: number,
@@ -145,26 +181,41 @@ function drawTriangle(
     kath2y: number,
     hypx: number,
     hypy: number,
-    hypSidePoints: {x1: number, y1: number, x2: number, y2: number}
+    hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
   ) {
     const k1 = { x: kath1x, y: kath1y }
     const k2 = { x: kath2x, y: kath2y }
-    const roundDown = 0.96
+    const roundDown = 0.95
     const kathxm = (kath1x + kath2x) / 2
     const kathym = (kath1y + kath2y) / 2
     sprite.x = kathxm
     sprite.y = kathym
     const angle = angleBetween(k1, k2)
     sprite.rotation = angle
-    sprite.width = distance(k1, k2) * xPixelSize
-    const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1}
-    const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2}
-    const hypM = {x: (hypA.x + hypB.x) / 2, y: (hypA.y + hypB.y) / 2}
-    const dis = distance({x: kathxm, y: kathym}, hypM) / 50 * 64 / roundDown
+    sprite.width = distance(k1, k2) * xPixelSize * roundDown
+    const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+    const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+    
+    const hypM = { x: (hypA.x + hypB.x) / 2, y: (hypA.y + hypB.y) / 2 }
+    const dis =
+      ((distance({ x: kathxm, y: kathym }, hypM) / 52) * 64)
     sprite.height = dis * yPixelSize
-    sprite.move(dis/2 * roundDown)
+    sprite.move(dis / 2 * 0.89)
     sprite.rotation -= 90
     createClone()
+    ////
+    /*
+    sprite.tint = 0x00ff00
+    sprite.width = 4
+    sprite.height = 4
+    sprite.x = hypM.x
+    sprite.y = hypM.y
+    createClone()
+    sprite.x = kathxm
+    sprite.y = kathym
+    sprite.move(dis / 2)
+    */
+    ////
     /*wait(0)
     sprite.tint = 0x00ff00
     sprite.width = 50
@@ -184,28 +235,32 @@ function drawTriangle(
     createClone()*/
   }
 
-  function intersectPoint(p: {x:number,y:number}, angle:number, a:{x:number,y:number}, b:{x:number,y:number}) {
-    const dx1 = b.x - a.x;
-    const dy1 = b.y - a.y;
-    const dx2 = Math.cos(angle);
-    const dy2 = Math.sin(angle);
+  function intersectPoint(
+    p: { x: number; y: number },
+    angle: number,
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+  ) {
+    const dx1 = b.x - a.x
+    const dy1 = b.y - a.y
+    const dx2 = Math.cos(angle)
+    const dy2 = Math.sin(angle)
 
-    const det = dx2 * dy1 - dy2 * dx1;
+    const det = dx2 * dy1 - dy2 * dx1
     if (Math.abs(det) < 1e-10) {
-        console.log("Geraden parallel");
-        Game.stop(); // kein Schnittpunkt
+      console.log("Geraden parallel")
+      Game.stop() // kein Schnittpunkt
     }
 
     // Parameter s entlang Gerade vom Punkt P
-    const s = ((a.x - p.x) * dy1 - (a.y - p.y) * dx1) / det;
+    const s = ((a.x - p.x) * dy1 - (a.y - p.y) * dx1) / det
 
     // Schnittpunkt
-    const ix = p.x + s * dx2;
-    const iy = p.y + s * dy2;
+    const ix = p.x + s * dx2
+    const iy = p.y + s * dy2
 
-    return { x: ix, y: iy };
-}
-
+    return { x: ix, y: iy }
+  }
 
   /*
   fillTrianglePiece({x: x1, y: y1}, {x:x2,y: y2}, {x:x3, y:y3}, true, length_p1p2)
@@ -569,3 +624,6 @@ function DrawTriangle(
   createClone()
   // Hier würdest du noch die Textur-UVs anpassen, falls nötig
 }*/
+
+
+//NEWEST
