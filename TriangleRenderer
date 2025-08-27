@@ -19,7 +19,7 @@ function drawTrianglePartRA(
     const midX = (k1.x + k2.x) / 2
     const midY = (k1.y + k2.y) / 2
 
-    sprite.rotation = angleBetween(k1, k2) - 90
+    sprite.rotation = angleBetween(k1, k2) + 90
     sprite.x = midX
     sprite.y = midY
     sprite.move(-height / 6)
@@ -27,6 +27,6 @@ function drawTrianglePartRA(
     sprite.width = baseLength * xPixelSize * 0.95
     sprite.height = height * yPixelSize * 2 * triangleM
     console.log("r",sprite.height, sprite.width, height, baseLength)
-    globals.setCloneSprite = "triangle_yh_r"
+    globals.setCloneSprite = "triangle_yh_l"
     createClone()
   }
