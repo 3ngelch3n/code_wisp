@@ -64,9 +64,9 @@ sendMessage("drawFrame")
 let ft = 1
 forever(function () {
   if (Keyboard.keyHeld(Key.A)) {
-    ft = 20
+    ft = 2
   }else {
-    ft = 1
+    ft = 0.4
   }
   //sendMessage("deleteAllClones")
   //sendMessage("drawFrame")
@@ -142,7 +142,7 @@ function drawTriangle(
   //const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
   sprite.setCostume("triangle")
   wait(ft)
-  const triangleDefp1 = calcMaxTriangleSize(
+  /*const triangleDefp1 = calcMaxTriangleSize(
     p1AngleToCenter,
     x1,
     y1,
@@ -151,13 +151,22 @@ function drawTriangle(
     x3,
     y3,
   )
-  sprite.x = (x1 + triangleDefp1.x) / 2
+  sprite.x = triangleDefp1.xi
+  sprite.y = triangleDefp1.yi
+  sprite.rotation = p1AngleToCenter
+  sprite.height = 15 * yPixelSize
+  sprite.width = 15 * xPixelSize*/
+
+
+  
+  /*sprite.x = (x1 + triangleDefp1.x) / 2
   sprite.y = (y1 + triangleDefp1.y) / 2
   sprite.rotation = p1AngleToCenter
   sprite.height = triangleDefp1.l * yPixelSize
   sprite.width = triangleDefp1.f * xPixelSize
-  createClone()
-  wait(ft)
+  createClone()*/
+  
+  /*wait(ft * 10000)
   const triangleDefp2 = calcMaxTriangleSize(
     p2AngleToCenter,
     x2,
@@ -191,7 +200,7 @@ function drawTriangle(
   createClone()
   //sprite.tint = 0x00ff00
   sprite.layer = 0
-  wait(ft)
+  wait(ft)*/
 
   const avgHeight = averageTriangleHeight(x1, y1, x2, y2, x3, y3)
   console.log(avgHeight)
@@ -204,6 +213,7 @@ function drawTriangle(
   sprite.move(ySize / 2)
   sprite.rotation -= 90
   createClone()
+  wait(ft)
   sprite.width = distance({ x: x2, y: y2 }, { x: x3, y: y3 }) * 0.9 * xPixelSize
   sprite.rotation = angleBetween({ x: x2, y: y2 }, { x: x3, y: y3 })
   sprite.x = (x2 + x3) / 2
@@ -212,6 +222,7 @@ function drawTriangle(
   sprite.move(ySize / 2)
   sprite.rotation -= 90
   createClone()
+  wait(ft)
   sprite.width = distance({ x: x3, y: y3 }, { x: x1, y: y1 }) * 0.9 * xPixelSize
   sprite.rotation = angleBetween({ x: x3, y: y3 }, { x: x1, y: y1 })
   sprite.x = (x3 + x1) / 2
@@ -297,22 +308,61 @@ function calcMaxTriangleSize(
     { x: x1, y: y1 },
     { x: footVecP3.x, y: footVecP3.y },
   )
-  console.log(x1, y1, x2, y2, x3, y3, thisAngle, footVecP2, footVecP3)
+
+  const intersection = getIntersectionPoint(thisAngle, x1, y1, x1, y1, x2, y2)
+  
+  let shortestVec = {x: 0, y: 0}
+  let shortestVecPos = {x: 0, y: 0}
   if (footVecP2Hypot < footVecP3Hypot) {
-    return {
-      x: footVecP2.x,
-      y: footVecP2.y,
-      f: distance({ x: x2, y: y2 }, { x: footVecP2.x, y: footVecP2.y }),
-      l: distance({ x: x1, y: y1 }, { x: footVecP2.x, y: footVecP2.y }),
+    shortestVec = footVecP2
+    shortestVecPos = {x: x2, y: y2}
     }
-  } else {
-    return {
-      x: footVecP3.x,
-      y: footVecP3.y,
-      f: Math.hypot(footVecP3.x - x3, footVecP3.y - y3),
-      l: distance({ x: x1, y: y1 }, { x: footVecP3.x, y: footVecP3.y }),
+  else {
+    shortestVec = footVecP3
+    shortestVecPos = {x: x3, y: y3}
     }
+
+  return {
+      x: shortestVec.x,
+      y: shortestVec.y,
+      f: distance({ x: x3, y: y3 }, { x: shortestVec.x, y: shortestVec.y }),
+      l: distance({ x: x1, y: y1 }, { x: shortestVec.x, y: shortestVec.y }),
+      xi: intersection.x,
+      yi: intersection.y
   }
+  
+}
+
+function getIntersectionPoint(
+  angle: number,
+  sx: number,
+  sy: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,): {x: number, y: number} {
+  const vx = Math.cos(angle)
+  const vy = Math.sin(angle)
+
+  // Richtungsvektor der Linie x1,y1 -> x2,y2
+  const dx = x2 - x1
+  const dy = y2 - y1
+
+  // Determinante prüfen
+  const det = vx * dy - vy * dx
+  if (Math.abs(det) < 1e-10) {
+    console.log("ERROR INTERSECTION POINT!!!!")
+    return {x: 1000, y: 1000}
+  } // parallel
+
+  // Parameter t entlang der Geraden sx,sy
+  const t = ((x1 - sx) * dy - (y1 - sy) * dx) / det
+
+  // Schnittpunkt berechnen
+  const ix = sx + t * vx
+  const iy = sy + t * vy
+
+  return { x: ix, y: iy }
 }
 
 function footOfPerpendicularAngle(
