@@ -1,32 +1,36 @@
-  function trianglePieceHyp(
-    hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
-    angleX: number,
-    angleY: number,
-    aHypAngle: number,
-  ) {
-    console.log(aHypAngle)
-    const k1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
-    const k2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
-    const hypxm = (hypSidePoints.x1 + hypSidePoints.x2) / 2
-    const hypym = (hypSidePoints.y1 + hypSidePoints.y2) / 2
-    //const angle = angleBetween(k1, k2)
-    const interP = intersectPoint(
-      { x: angleX, y: angleY },
-      aHypAngle / 2,
-      { x: hypSidePoints.x1, y: hypSidePoints.y1 },
-      { x: hypSidePoints.x2, y: hypSidePoints.y2 },
-    )
-    const dis =
-      (distance({ x: angleX, y: angleY }, { x: interP.x, y: interP.y }) / 55) *
-      64
-   // sprite.tint = 0x00ff00
-    sprite.height = -dis * yPixelSize * 1.4
-    sprite.width = dis * xPixelSize * 1.4
-    sprite.rotation = angleBetween(k1, k2) - 90
-    sprite.x = interP.x
-    sprite.y = interP.y
-    sprite.move(dis/2 * 0.859)
-    sprite.rotation += 90
-    sprite.setCostume("triangle_yh_r")
-    wait(0)
-    createClone()
+function trianglePieceHyp(
+  hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
+  angleX: number,
+  angleY: number,
+  aHypAngle: number,
+) {
+  const k1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+  const k2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+
+  // Richtung Hypotenuse
+  const hypAngle = angleBetween(k1, k2)
+
+  // Abstand vom Corner zur Hypotenuse
+  const interP = intersectPoint(
+    { x: angleX, y: angleY },
+    aHypAngle / 2,
+    k1,
+    k2,
+  )
+  const dis = distance({ x: angleX, y: angleY }, interP)
+
+  // Sprite auf Corner-Punkt setzen
+  sprite.x = angleX
+  sprite.y = angleY
+
+  // Rotation entlang Hypotenuse
+  sprite.rotation = hypAngle - 180
+  sprite.move(22 * dis / 50)
+  sprite.rotation += 90
+  sprite.height = dis * yPixelSize * 1.1
+  sprite.width = dis * xPixelSize * 1.1
+
+  sprite.setCostume("triangle_yh_r")
+  wait(0)
+  createClone()
+  }
