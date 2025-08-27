@@ -9,8 +9,8 @@ const yPixelSize = 1880 / Game.height
 sprite.visible = true
 let ft = 1
 
-/*sprite.setCostume("triangle")
-layer = 1
+/*sprite.setCostume("triangle_y")
+sprite.layer = 1
 sprite.tint = 0x0033ff
 sprite.transparency = 50
 wait(0)
@@ -18,13 +18,13 @@ sprite.width = 300
 sprite.height = 300
 createClone()
 wait(0)
-layer = 0
+sprite.layer = 0
 sprite.tint = 0x00ff00
-sprite.setCostume("triangle_h")
-wait(100)
-*/
-//drawTriangle(-120, -160, 20, 130, 220, 0)
-drawTriangle(0, 0, 100, 200, 250, -100)
+sprite.setCostume("triangle_yh")
+wait(100)*/
+
+drawTriangle(-120, -160, 20, 130, 220, 0)
+//drawTriangle(0, 0, 100, 200, 250, -100)
 /*drawTriangle(
     -103,
     -212,
@@ -43,8 +43,8 @@ onCloneStart(function (clone) {
 })
 
 onMessage("drawFrame", function (data) {
-  const xOff = 0//Math.random(-100, 100)
-  const yOff = 0//Math.random(-100, 100)
+  const xOff = 0 //Math.random(-100, 100)
+  const yOff = 0 //Math.random(-100, 100)
   /*drawTriangle(
     0 + xOff,
     0 + yOff,
@@ -73,21 +73,14 @@ onMessage("drawFrame", function (data) {
     y2 + yOff,
     x3 + yOff,
     y3 + yOff,)*/
-  drawTriangle(
-    -103,
-    -212,
-    -117,
-    180,
-    23,
-    -140,
-  )
+  drawTriangle(-103, -212, -117, 180, 23, -140)
 })
 //sendMessage("drawFrame")
 
 forever(function () {
   if (Keyboard.keyHeld(Key.A)) {
     ft = 1
-  }else {
+  } else {
     ft = 0.4
   }
   //sendMessage("deleteAllClones")
@@ -103,39 +96,126 @@ function drawTriangle(
   x3: number,
   y3: number,
 ) {
-  
   sprite.layer = 1
   //sprite.tint = 0x00aaff
-  sprite.setCostume("square")
-  wait(0)
-  drawLine(x1, y1, x2, y2, 3)
+  //sprite.setCostume("square")
+  /*wait(0)
+  drawLine(x1, y1, x2, y2, 6)
   wait(ft)
-  drawLine(x2, y2, x3, y3, 3)
+  drawLine(x2, y2, x3, y3, 6)
   wait(ft)
-  drawLine(x1, y1, x3, y3, 3)
-  wait(ft)
+  drawLine(x1, y1, x3, y3, 6)*/
+
   sprite.tint = 0x0044ff
-  wait(ft)
   const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
   const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
-  
+  let hypSideP = {x1: 0, y1: 0, x2: 0, y2: 0}
+
+  if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+    hypSideP = { x1: x1, y1: y1, x2: x2, y2: y2 };
+  } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3 };
+  } else {
+    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 };
+  }
   //const heightA = height(x1, y1, x2, y2, x3, y3)
-  
-  
+
   sprite.tint = 0xff0000
   sprite.layer = 0
-  sprite.setCostume("triangle")
-  wait(ft)/*
+  sprite.transparency = 0
+  sprite.setCostume("triangle_yh")
+  wait(ft)
+  if (!(hypSideP.x1 === x1 && hypSideP.y1 === y1 && hypSideP.x2 === x2 && hypSideP.y2 === y2)) {
+  trianglePiece(x1, y1, x2, y2, x3, y3, {x1: hypSideP.x1, y1: hypSideP.y1, x2: hypSideP.x2, y2: hypSideP.y2})
+  }
+  wait(ft)
+  if (!(hypSideP.x1 === x2 && hypSideP.y1 === y2 && hypSideP.x2 === x3 && hypSideP.y2 === y3)) {
+    trianglePiece(x2, y2, x3, y3, x1, y1, {x1: hypSideP.x1, y1: hypSideP.y1, x2: hypSideP.x2, y2: hypSideP.y2})
+  }
+  wait(ft)
+  if (!(hypSideP.x1 === x3 && hypSideP.y1 === y3 && hypSideP.x2 === x1 && hypSideP.y2 === y1)) {
+    trianglePiece(x3, y3, x1, y1, x2, y2, {x1: hypSideP.x1, y1: hypSideP.y1, x2: hypSideP.x2, y2: hypSideP.y2})
+  }
+  
+  function trianglePiece(
+    kath1x: number,
+    kath1y: number,
+    kath2x: number,
+    kath2y: number,
+    hypx: number,
+    hypy: number,
+    hypSidePoints: {x1: number, y1: number, x2: number, y2: number}
+  ) {
+    const k1 = { x: kath1x, y: kath1y }
+    const k2 = { x: kath2x, y: kath2y }
+    const roundDown = 0.96
+    const kathxm = (kath1x + kath2x) / 2
+    const kathym = (kath1y + kath2y) / 2
+    sprite.x = kathxm
+    sprite.y = kathym
+    const angle = angleBetween(k1, k2)
+    sprite.rotation = angle
+    sprite.width = distance(k1, k2) * xPixelSize
+    const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1}
+    const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2}
+    const hypM = {x: (hypA.x + hypB.x) / 2, y: (hypA.y + hypB.y) / 2}
+    const dis = distance({x: kathxm, y: kathym}, hypM) / 50 * 64 / roundDown
+    sprite.height = dis * yPixelSize
+    sprite.move(dis/2 * roundDown)
+    sprite.rotation -= 90
+    createClone()
+    /*wait(0)
+    sprite.tint = 0x00ff00
+    sprite.width = 50
+    sprite.height = 50
+    sprite.x = kathxm
+    sprite.y = kathym
+    wait(0)
+    createClone()
+    
+    const intP = intersectPoint({x: kathxm, y: kathym}, angle, {x: hypSidePoints.x1, y: hypSidePoints.y1}, {x: hypSidePoints.x2, y: hypSidePoints.y2})
+    sprite.tint = 0x0000ff
+    sprite.width = 50
+    sprite.height = 50
+    sprite.x = intP.x
+    sprite.y = intP.y
+    wait(0)
+    createClone()*/
+  }
+
+  function intersectPoint(p: {x:number,y:number}, angle:number, a:{x:number,y:number}, b:{x:number,y:number}) {
+    const dx1 = b.x - a.x;
+    const dy1 = b.y - a.y;
+    const dx2 = Math.cos(angle);
+    const dy2 = Math.sin(angle);
+
+    const det = dx2 * dy1 - dy2 * dx1;
+    if (Math.abs(det) < 1e-10) {
+        console.log("Geraden parallel");
+        Game.stop(); // kein Schnittpunkt
+    }
+
+    // Parameter s entlang Gerade vom Punkt P
+    const s = ((a.x - p.x) * dy1 - (a.y - p.y) * dx1) / det;
+
+    // Schnittpunkt
+    const ix = p.x + s * dx2;
+    const iy = p.y + s * dy2;
+
+    return { x: ix, y: iy };
+}
+
+
+  /*
   fillTrianglePiece({x: x1, y: y1}, {x:x2,y: y2}, {x:x3, y:y3}, true, length_p1p2)
   wait(ft)
   fillTrianglePiece({x: x2, y:y2}, {x: x3, y:y3}, {x: x1, y:y1}, false, length_p2p3) //HIER FALSCH
   wait(ft)
   fillTrianglePiece({x: x3, y:y3}, {x: x1, y:y1}, {x: x2,y: y2}, true, length_p3p1)
   wait(ft)*/
-  
-  
-/*
+
+  /*
   const avgHeight = averageTriangleHeight(x1, y1, x2, y2, x3, y3)
   console.log(avgHeight)
   const ySize = avgHeight / 4
@@ -194,11 +274,12 @@ function drawTriangle(
 }
 
 function fillTrianglePiece(
-  p1: {x: number, y: number},
-  p2: {x: number, y: number},
-  p3: {x: number, y: number},
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+  p3: { x: number; y: number },
   a: boolean,
-  xLength: number) {
+  xLength: number,
+) {
   sprite.width = xLength * xPixelSize * 0.95
   const angle = angleBetween({ x: p1.x, y: p1.y }, { x: p2.x, y: p2.y })
   sprite.rotation = angle
@@ -207,8 +288,20 @@ function fillTrianglePiece(
   sprite.x = p1p2x
   sprite.y = p1p2y
   //const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, pC.a == 0 ? p2.x : p1.x, pC.a == 0 ? p2.y : p1.y, pC.a == 0 ? p3.x : , p3.y, , p3.x, p3.y)
-  const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, a ? p2.x : p1.x, a ? p2.y : p1.y, p3.x, p3.y)
-  const yHeight = distance({x: p1p2x, y: p1p2y}, {x: intersectPoint.x, y: intersectPoint.y}) * 0.95
+  const intersectPoint = intersectPointAngleLine(
+    p1p2x,
+    p1p2y,
+    angle,
+    a ? p2.x : p1.x,
+    a ? p2.y : p1.y,
+    p3.x,
+    p3.y,
+  )
+  const yHeight =
+    distance(
+      { x: p1p2x, y: p1p2y },
+      { x: intersectPoint.x, y: intersectPoint.y },
+    ) * 0.95
   sprite.height = yHeight * yPixelSize
   sprite.move(yHeight / 2)
   sprite.rotation -= 90
@@ -225,7 +318,6 @@ function averageTriangleHeight(
   y3: number,
 ): number {
   // Abstand eines Punktes zu einer Linie
-  
 
   const hA = height(x1, y1, x2, y2, x3, y3) // Höhe von A auf BC
   const hB = height(x2, y2, x1, y1, x3, y3) // Höhe von B auf AC
@@ -235,35 +327,43 @@ function averageTriangleHeight(
 }
 
 function height(
-    px: number,
-    py: number,
-    ax: number,
-    ay: number,
-    bx: number,
-    by: number,
-  ): number {
-    return (
-      Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) /
-      Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2)
-    )
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  return (
+    Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) /
+    Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2)
+  )
 }
 
-function intersectPointAngleLine(px: number, py: number, angle: number, ax: number, ay: number, bx: number, by: number) {
-    const m1 = Math.tan(angle); // Steigung der ersten Geraden
-    const m2 = (by - ay) / (bx - ax);           // Steigung der anderen Geraden
+function intersectPointAngleLine(
+  px: number,
+  py: number,
+  angle: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+) {
+  const m1 = Math.tan(angle) // Steigung der ersten Geraden
+  const m2 = (by - ay) / (bx - ax) // Steigung der anderen Geraden
 
-    if (m1 === m2) {
-      console.log("intersectPointAngleLine error!", m1, m2)
-      Game.stop()
-    }; // parallele Geraden
+  if (m1 === m2) {
+    console.log("intersectPointAngleLine error!", m1, m2)
+    Game.stop()
+  } // parallele Geraden
 
-    const b1 = py - m1 * px;
-    const b2 = ay - m2 * ax;
+  const b1 = py - m1 * px
+  const b2 = ay - m2 * ax
 
-    const x = (b2 - b1) / (m1 - m2);
-    const y = m1 * x + b1;
+  const x = (b2 - b1) / (m1 - m2)
+  const y = m1 * x + b1
 
-    return {x, y};
+  return { x, y }
 }
 
 function calcMaxTriangleSize(
@@ -287,33 +387,49 @@ function calcMaxTriangleSize(
   )
 
   let intersection
-  
-  let shortestVec = {x: 0, y: 0}
-  let shortestVecPos = {x: 0, y: 0}
+
+  let shortestVec = { x: 0, y: 0 }
+  let shortestVecPos = { x: 0, y: 0 }
   if (footVecP2Hypot < footVecP3Hypot) {
     shortestVec = footVecP2
-    shortestVecPos = {x: x2, y: y2}
-    intersection = getIntersectionPoint(thisAngle, footVecP2.x, footVecP2.y, x1, y1, x3, y3)
-    }
-  else {
+    shortestVecPos = { x: x2, y: y2 }
+    intersection = getIntersectionPoint(
+      thisAngle,
+      footVecP2.x,
+      footVecP2.y,
+      x1,
+      y1,
+      x3,
+      y3,
+    )
+  } else {
     shortestVec = footVecP3
-    shortestVecPos = {x: x3, y: y3}
-    intersection = getIntersectionPoint(thisAngle, footVecP3.x, footVecP3.y, x1, y1, x2, y2)
-    
-    }
-
-  const f1 = distance({ x: shortestVecPos.x, y: shortestVecPos.y }, { x: shortestVec.x, y: shortestVec.y })
-  const f2 = Math.hypot(intersection.x, intersection.y)
-  
-  return {
-      x: shortestVec.x,
-      y: shortestVec.y,
-      f: f1 < f2 ? f1 : f2,
-      l: distance({ x: x1, y: y1 }, { x: shortestVec.x, y: shortestVec.y }),
-      xi: intersection.x,
-      yi: intersection.y
+    shortestVecPos = { x: x3, y: y3 }
+    intersection = getIntersectionPoint(
+      thisAngle,
+      footVecP3.x,
+      footVecP3.y,
+      x1,
+      y1,
+      x2,
+      y2,
+    )
   }
-  
+
+  const f1 = distance(
+    { x: shortestVecPos.x, y: shortestVecPos.y },
+    { x: shortestVec.x, y: shortestVec.y },
+  )
+  const f2 = Math.hypot(intersection.x, intersection.y)
+
+  return {
+    x: shortestVec.x,
+    y: shortestVec.y,
+    f: f1 < f2 ? f1 : f2,
+    l: distance({ x: x1, y: y1 }, { x: shortestVec.x, y: shortestVec.y }),
+    xi: intersection.x,
+    yi: intersection.y,
+  }
 }
 
 function getIntersectionPoint(
@@ -323,7 +439,8 @@ function getIntersectionPoint(
   x1: number,
   y1: number,
   x2: number,
-  y2: number,): {x: number, y: number} {
+  y2: number,
+): { x: number; y: number } {
   const vx = Math.cos(angle)
   const vy = Math.sin(angle)
 
@@ -335,7 +452,7 @@ function getIntersectionPoint(
   const det = vx * dy - vy * dx
   if (Math.abs(det) < 1e-10) {
     console.log("ERROR INTERSECTION POINT!!!!")
-    return {x: 1000, y: 1000}
+    return { x: 1000, y: 1000 }
   } // parallel
 
   // Parameter t entlang der Geraden sx,sy
