@@ -3,18 +3,19 @@ const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.visible = true
 globals.setCloneSprite = "square_yh"
+const drawAmount = 100
 
 onCloneStart(function (clone) {
   //clone.setCostume(globals.setCloneSprite)
   cloneList.push({
-    clone: clone
+    clone: clone,
   })
   /*onMessage("deleteAllClones", function (data) {
     clone.delete()
   })*/
 })
 
-onMessage("drawFrame", function() {
+onMessage("drawFrame", function () {
   // Wir benutzen drawList und cloneList
   // 1. Stelle sicher, dass genug Klone existieren
   while (cloneList.length < drawList.length) {
@@ -114,7 +115,7 @@ function measureFPS() {
   const now = performance.now()
   const diff = now - lastTime
 
-  if (diff >= 1000) { 
+  if (diff >= 1000) {
     fps = Math.round((frames * 1000) / diff)
 
     samples.push(fps)
@@ -131,17 +132,21 @@ function measureFPS() {
   return { fps, avgFps }
 }
 
-const fpsTxt = Game.createText('-')
+const fpsTxt = Game.createText("-")
+const cloneTxt = Game.createText("-")
 fpsTxt.x = -300
 fpsTxt.y = 220
 fpsTxt.style.align = "left"
-const drawAmount = 50
+cloneTxt.x = -300
+  cloneTxt.y = 180
+cloneTxt.style.align = "left"
 
 forever(function () {
   //sendMessage("deleteAllClones")
   sendMessage("createFrame")
   sendMessage("drawFrame")
   fpsTxt.text = measureFPS().avgFps + ""
+  cloneTxt.text = sprite.clones.length + ""
 })
 
 function drawTriangle(
@@ -156,7 +161,6 @@ function drawTriangle(
   outline_color: number = 0x11ff55,
   outline_thickness: number = 4,
 ) {
-
   const orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
   if (orientation > 0) {
     const tempX = x2
@@ -205,7 +209,7 @@ function drawTriangle(
   else {
     const rightPoint = getRightAngleVertex(x1, y1, x2, y2, x3, y3)
     if (rightPoint) {
-      drawTrianglePartRA(hypSideP, kathl, kathl2, ahypAngle)
+      drawTrianglePartRA(hypSideP, kathl, kathl2)
     } else {
       // Any other triangle [2 h-triangle]
       const rightTriangles = splitTriangleIntoRightTriangles(
@@ -218,7 +222,6 @@ function drawTriangle(
         triVals1.hypSideP,
         triVals1.kathl1,
         triVals1.kathl2,
-        triVals1.ahypAngle,
       )
       const d = rightTriangles[1]
       const triVals2 = analyzeTriangle(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
@@ -226,7 +229,6 @@ function drawTriangle(
         triVals2.hypSideP,
         triVals2.kathl1,
         triVals2.kathl2,
-        triVals2.ahypAngle,
       )
     }
   }
@@ -258,11 +260,7 @@ function drawTriangle(
     hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
     kathl: { x1: number; y1: number; x2: number; y2: number },
     kathl2: { x1: number; y1: number; x2: number; y2: number },
-    aHypAngle: number,
   ) {
-    const h1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
-    const h2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
-
     const k1 = { x: kathl.x1, y: kathl.y1 }
     const k2 = { x: kathl.x2, y: kathl.y2 }
 
@@ -297,28 +295,18 @@ function drawTriangle(
     sprite.y = midY
     sprite.move(-height / 13)
     sprite.rotation += 90
-    if (rot == 90) {
-      drawList.push({
-      width: baseLength * xPixelSize * 1.9,
-      height: height * yPixelSize * triangleM,
-      x: sprite.x,
-      y: sprite.y,
-      rotation: sprite.rotation,
-      texture: "triangle_yh_l",
-      color: sprite.tint
-  })
-    } 
-    else {
-      drawList.push({
-      width: baseLength * xPixelSize * 1.9,
-      height: height * yPixelSize * triangleM,
-      x: sprite.x,
-      y: sprite.y,
-      rotation: sprite.rotation,
-      texture: "triangle_yh_r",
-      color: sprite.tint
-  })
-         }
+    let drawSprite = "triangle_yh_r"
+    if (rot == 90) 
+      drawSprite = "triangle_yh_l"
+    drawList.push({
+        width: baseLength * xPixelSize * 1.9,
+        height: height * yPixelSize * triangleM,
+        x: sprite.x,
+        y: sprite.y,
+        rotation: sprite.rotation,
+        texture: drawSprite,
+        color: sprite.tint,
+    })
   }
 
   function trianglePieceHyp(kathl2: {
@@ -348,7 +336,7 @@ function drawTriangle(
       y: sprite.y,
       rotation: sprite.rotation,
       texture: "triangle_yh",
-      color: sprite.tint
+      color: sprite.tint,
     })
   }
 
@@ -486,25 +474,25 @@ function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   const p2 = { x: x2, y: y2 }
 
   drawList.push({
-      width: xPixelSize * t,
-      height: distance(p1, p2) * yPixelSize,
-      x: (p1.x + p2.x) / 2,
-      y: (p1.y + p2.y) / 2,
-      rotation: angleBetween(p1, p2),
-      texture: "square_yh",
-      color: sprite.tint
+    width: xPixelSize * t,
+    height: distance(p1, p2) * yPixelSize,
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2,
+    rotation: angleBetween(p1, p2),
+    texture: "square_yh",
+    color: sprite.tint,
   })
 }
 
 function drawDot(x1: number, y1: number, t: number, c: number) {
   drawList.push({
-      width: xPixelSize * t,
-      height: t * yPixelSize,
-      x: x1,
-      y: y1,
-      rotation: 0,
-      texture: "square_yh",
-      color: c
+    width: xPixelSize * t,
+    height: t * yPixelSize,
+    x: x1,
+    y: y1,
+    rotation: 0,
+    texture: "square_yh",
+    color: c,
   })
 }
 
@@ -519,4 +507,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 50 draw calls avg 50 fps
+//FULLY WORKING with 100 draw calls avg 32 fps
