@@ -220,10 +220,10 @@ function drawTriangle(
         ahypAngle,
       )
       const t = rightTriangles[0]
-      const triVals1 = analyzeTriangle(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
+      const triVals1 = analyzeTriangleR(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
       drawTrianglePartRA(triVals1.hypSideP, triVals1.kathl1, triVals1.kathl2)
       const d = rightTriangles[1]
-      const triVals2 = analyzeTriangle(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
+      const triVals2 = analyzeTriangleR(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
       drawTrianglePartRA(triVals2.hypSideP, triVals2.kathl1, triVals2.kathl2)
     }
   }
@@ -410,6 +410,53 @@ function drawTriangle(
       length_p3p1,
     }
   }
+
+
+  function analyzeTriangleR(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+  ) {
+    const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+    const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+    const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+
+    let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+    let kathl1 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+    let kathl2 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+
+    if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+      hypSideP = { x1, y1, x2, y2, x3, y3 }
+      const k1 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+      const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+      kathl1 = length_p2p3 >= length_p3p1 ? k1 : k2
+      kathl2 = length_p2p3 >= length_p3p1 ? k2 : k1
+    } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+      hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+      const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+      const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+      kathl1 = length_p1p2 >= length_p3p1 ? k1 : k2
+      kathl2 = length_p1p2 >= length_p3p1 ? k2 : k1
+    } else {
+      hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+      const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+      const k2 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+      kathl1 = length_p1p2 >= length_p2p3 ? k1 : k2
+      kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
+    }
+
+
+
+    return {
+      hypSideP,
+      kathl1,
+      kathl2
+    }
+  }
+  
 
   function intersectPoint(
     p: { x: number; y: number },
