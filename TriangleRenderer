@@ -15,10 +15,9 @@ onCloneStart(function (clone) {
   })*/
 })
 
-onMessage("drawFrame", function () {
+function drawFrame() {
   // Wir benutzen drawList und cloneList
   // 1. Stelle sicher, dass genug Klone existieren
-  clonesUsedTxt.text = drawList.length + ""
   while (cloneList.length < drawList.length) {
     createClone()
   }
@@ -45,9 +44,9 @@ onMessage("drawFrame", function () {
 
   // 4. drawList leeren für das nächste Frame
   drawList = []
-})
+}
 
-onMessage("createFrame", function (data) {
+function createFrame() {
   function randomBetween(min: number, max: number) {
     return Math.random(min, max)
   }
@@ -86,7 +85,7 @@ onMessage("createFrame", function (data) {
   for (let i = 0; i < drawAmount; i++) {
     randomTriangle()
   }
-})
+}
 
 interface CloneEntry {
   clone: any
@@ -135,21 +134,18 @@ function measureFPS() {
 
 const fpsTxt = Game.createText("-")
 const cloneTxt = Game.createText("-")
-const clonesUsedTxt = Game.createText("-")
 fpsTxt.x = -300
 fpsTxt.y = 220
 fpsTxt.style.align = "left"
 cloneTxt.x = -300
-cloneTxt.y = 180
+  cloneTxt.y = 180
 cloneTxt.style.align = "left"
-clonesUsedTxt.x = -300
-clonesUsedTxt.y = 130
-clonesUsedTxt.style.align = "left"
+
 forever(function () {
   //sendMessage("deleteAllClones")
   sprite.visible = true
-  sendMessage("createFrame")
-  sendMessage("drawFrame")
+  createFrame()
+  drawFrame()
   sprite.visible = false
   fpsTxt.text = measureFPS().avgFps + ""
   cloneTxt.text = sprite.clones.length + ""
@@ -514,4 +510,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 100 draw calls avg 33-34 fps
+//FULLY WORKING with 100 draw calls avg 37-38 fps
