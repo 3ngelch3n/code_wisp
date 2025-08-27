@@ -12,7 +12,6 @@ drawTriangle(-100, -200, 0, 100, 220, 0)
 //DrawQuadrilateral(0, 0, 300, 50, 200, 100, 0, 150)
 //drawLine(0,0,-150,120)
 
-
 function drawTriangle(
   x1: number,
   y1: number,
@@ -21,10 +20,9 @@ function drawTriangle(
   x3: number,
   y3: number,
 ) {
-  const ft = 0.2
-  const center = centroid(x1, y1, x2, y2, x3, y3)
-  console.log("center:", center)
-  sprite.setCostume("square")
+  const ft = 0.3
+  
+  //sprite.setCostume("square")
   wait(ft)
   drawLine(x1, y1, x2, y2, 3)
   wait(ft)
@@ -32,25 +30,27 @@ function drawTriangle(
   wait(ft)
   drawLine(x1, y1, x3, y3, 3)
   wait(ft)
-  sprite.setCostume("triangle")
+  //sprite.setCostume("triangle")
+  const center = centroid(x1, y1, x2, y2, x3, y3)
+  sprite.x = center.x
+  sprite.y = center.y
+  sprite.width = xPixelSize * 5
+  sprite.height = yPixelSize * 5
+  createClone()
+  wait(ft)
   const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
+  sprite.x = x1
+  sprite.y = y1
+  sprite.height = yPixelSize * 300
+  sprite.rotation = p1AngleToCenter
+  createClone()
+  wait(ft * 100)
   const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
   const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
-  console.log("p1AngleToCenter:", p1AngleToCenter, x1, y1, x2, y2, center.x, center.y)
-  //p1 start
-  sprite.rotation = p1AngleToCenter
-  const triangleDef = calcMaxTriangleSize(
-    p1AngleToCenter,
-    x1,
-    y1,
-    x2,
-    y2,
-    x3,
-    y3,
-  )
+  
   sprite.height = xPixelSize * 100
   sprite.width = xPixelSize * 100
-  console.log(triangleDef)
+
   sprite.x = x1
   sprite.y = y1
 }
@@ -66,7 +66,7 @@ function calcMaxTriangleSize(
 ) {
   const footVecP2 = footOfPerpendicularAngle(x1, y1, x2, y2, thisAngle)
   const distanceToP2Line = Math.hypot(footVecP2.x, footVecP2.y)
-  console.log("..",thisAngle,footVecP2,distanceToP2Line)
+  console.log("..", thisAngle, footVecP2, distanceToP2Line)
   return {
     height: distanceToP2Line * yPixelSize,
     x: (footVecP2.x + x1) / 2,
@@ -95,7 +95,7 @@ function footOfPerpendicularAngle(
 function angleToCentroid(sx: number, sy: number, ex: number, ey: number) {
   const dx = ex - sx
   const dy = ey - sy
-  return Math.atan2(dy, dx) // Winkel im Bogenmaß
+  return Math.atan2(dx, dy) // Winkel im Bogenmaß
 }
 
 function centroid(
