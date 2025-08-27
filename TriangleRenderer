@@ -10,11 +10,10 @@ onCloneStart(function (clone) {
 })
 
 //drawTriangle(-120, -160, 20, 130, 220, 0, 0x00ff00) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
-//wait(1)
 //drawTriangle(0, 0, 100, 200, 250, -100, 0xff0000) //HIER PERFEKT
-//wait(1)
 //drawTriangle(100, 200, 0, 0, 250, -100, 0xff0000) //HIER PERFEKT
 
+let j = 0
 onMessage("drawFrame", function (data) {
   const xOff = 0 //Math.random(-100, 100)
   const yOff = 0 //Math.random(-100, 100)
@@ -41,14 +40,14 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
-  //drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000)
-  drawTriangle(200, 200, 100, 0, 0, 0, 0xff0000, true, 0x00ff00, 8)//HIER PERFEKT
+  drawTriangle(0, 0, 200, 200, 100 + j, 0, 0xff0000, true, 0x0066ff, 8)
+  j += 10 //HIER PERFEKT
 })
 
 forever(function () {
   sendMessage("deleteAllClones")
   sendMessage("drawFrame")
-  wait(2)
+  wait(1)
 })
 
 function drawTriangle(
@@ -63,15 +62,19 @@ function drawTriangle(
   outline_color: number = 0x11ff55,
   outline_thickness: number = 4,
 ) {
-  console.log("s", x1, y1, x2, y2, x3, y3)
-  const sortedPoints = sortTriangleForHypotenuse(x1, y1, x2, y2, x3, y3);
-  x1 = sortedPoints.x1;
-  y1 = sortedPoints.y1;
-  x2 = sortedPoints.x2;
-  y2 = sortedPoints.y2;
-  x3 = sortedPoints.x3;
-  y3 = sortedPoints.y3;
-  console.log("e", x1, y1, x2, y2, x3, y3)
+  /*const orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+  console.log(orientation)
+  console.log(x1, y1, x2, y2, x3, y3)
+  if (orientation > 0) {
+    const tempX = x2
+    x2 = x3
+    x3 = tempX
+
+    const tempY = y2
+    y2 = y3
+    y3 = tempY
+  }
+  console.log(x1, y1, x2, y2, x3, y3)*/
 
   if (outline) {
     sprite.tint = outline_color
@@ -90,77 +93,51 @@ function drawTriangle(
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
   let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0 }
 
+  let ahypAngle = 90
+
   if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
     hypSideP = { x1: x1, y1: y1, x2: x2, y2: y2 }
+    ahypAngle = Math.acos(
+      (length_p3p1 ** 2 + length_p2p3 ** 2 - length_p1p2 ** 2) /
+        (2 * length_p3p1 * length_p2p3),
+    )
   } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
     hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3 }
+    ahypAngle = Math.acos(
+      (length_p1p2 ** 2 + length_p3p1 ** 2 - length_p2p3 ** 2) /
+        (2 * length_p1p2 * length_p3p1),
+    )
   } else {
     hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 }
+    ahypAngle = Math.acos(
+      (length_p1p2 ** 2 + length_p2p3 ** 2 - length_p3p1 ** 2) /
+        (2 * length_p1p2 * length_p2p3),
+    )
   }
+  let ignoreHypS = false
+  if (ahypAngle > 90)
+    ignoreHypS = true
 
-  const dotA = (x2 - x1)*(x3 - x1) + (y2 - y1)*(y3 - y1)
-  const dotB = (x1 - x2)*(x3 - x2) + (y1 - y2)*(y3 - y2)
-  const dotC = (x1 - x3)*(x2 - x3) + (y1 - y3)*(y2 - y3)
-  const three = (dotA < 0 || dotB < 0 || dotC < 0)
-  console.log(three)
   if (
     !(
-      hypSideP.x1 === x1 &&
-      hypSideP.y1 === y1 &&
-      hypSideP.x2 === x2 &&
-      hypSideP.y2 === y2
-    ) || three
+      isHypSide(x1, y1, x2, y2, hypSideP)
+    )
   ) {
-    trianglePiece(x1, y1, x2, y2, x3, y3, {
-      x1: x2,
-      y1: y2,
-      x2: x3,
-      y2: y3,
-    })
+    trianglePiece(x1, y1, x2, y2, x3, y3, hypSideP)
   }
   if (
     !(
-      hypSideP.x1 === x2 &&
-      hypSideP.y1 === y2 &&
-      hypSideP.x2 === x3 &&
-      hypSideP.y2 === y3
-    ) || three
+      isHypSide(x2, y2, x3, y3, hypSideP)
+    )
   ) {
-    trianglePiece(x2, y2, x3, y3, x1, y1, {
-      x1: x1,
-      y1: y1,
-      x2: x3,
-      y2: y3,
-    })
+    trianglePiece(x2, y2, x3, y3, x1, y1, hypSideP)
   }
   if (
     !(
-      hypSideP.x1 === x3 &&
-      hypSideP.y1 === y3 &&
-      hypSideP.x2 === x1 &&
-      hypSideP.y2 === y1
-    ) || three
+      isHypSide(x3, y3, x1, y1, hypSideP)
+    )
   ) {
-    trianglePiece(x3, y3, x1, y1, x2, y2, {
-      x1: x1,
-      y1: y1,
-      x2: x2,
-      y2: y2,
-    })
-  }
-
-  function sortPointsClockwise(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-  ) {
-    const Orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
-    if (Orientation > 0)
-      return { x1: x1, y1: y1, x2: x3, y2: y3, x3: x2, y3: y2 }
-    else return { x1: x1, y1: y1, x2: x2, y2: y2, x3: x3, y3: y3 }
+    trianglePiece(x3, y3, x1, y1, x2, y2, hypSideP)
   }
 
   function trianglePiece(
@@ -174,17 +151,14 @@ function drawTriangle(
   ) {
     const k1 = { x: kath1x, y: kath1y }
     const k2 = { x: kath2x, y: kath2y }
-    const roundDown = 0.95
     const kathxm = (kath1x + kath2x) / 2
     const kathym = (kath1y + kath2y) / 2
     const angle = angleBetween(k1, k2)
-    const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
-    const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
-    const interP = intersectPoint({ x: kathxm, y: kathym }, angle, hypA, hypB)
+    const interP = intersectPoint({ x: kathxm, y: kathym }, angle, { x: hypSidePoints.x1, y: hypSidePoints.y1 }, { x: hypSidePoints.x2, y: hypSidePoints.y2 })
     const dis =
       (distance({ x: kathxm, y: kathym }, { x: interP.x, y: interP.y }) / 55) *
       64
-    sprite.width = distance(k1, k2) * xPixelSize * roundDown
+    sprite.width = distance(k1, k2) * xPixelSize * 0.95
     sprite.height = dis * yPixelSize
     sprite.rotation = angle
     sprite.x = kathxm
@@ -194,39 +168,6 @@ function drawTriangle(
     createClone()
   }
 
-  function sortTriangleForHypotenuse(
-  x1: number, y1: number,
-  x2: number, y2: number,
-  x3: number, y3: number
-) {
-  /*const orientation = (x2 - x1)*(y3 - y1) - (y2 - y1)*(x3 - x1)
-  if (orientation > 0) {
-  const tempX = x2;
-  x2 = x3;
-  x3 = tempX;
-
-  const tempY = y2;
-  y2 = y3;
-  y3 = tempY;
-  }
-*/
-
-  const l12 = distance({x:x1,y:y1},{x:x2,y:y2})
-  const l23 = distance({x:x2,y:y2},{x:x3,y:y3})
-  const l31 = distance({x:x3,y:y3},{x:x1,y:y1})
-  console.log(l12, l23, l31)
-  if (l12 >= l23 && l12 >= l31) {
-    console.log("1")
-    return {x1:x3,y1:y3, x2:x1,y2:y1, x3:x2,y3:y2}
-  } else if (l31 >= l12 && l31 >= l23) {
-    console.log("2")
-    return {x1:x2,y1:y2, x2:x3,y2:y3, x3:x1,y3:y1}
-  }
-
-  console.log("?")
-  return {x1,y1,x2,y2,x3,y3}
-}
-  
   function intersectPoint(
     p: { x: number; y: number },
     angle: number,
@@ -264,6 +205,13 @@ function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   sprite.height = distance(p1, p2) * yPixelSize
   sprite.width = xPixelSize * t
   createClone()
+}
+
+function isHypSide(x1: number, y1: number, x2: number, y2: number, hypSideP: any) {
+  return hypSideP.x1 === x1 &&
+  hypSideP.y1 === y1 &&
+  hypSideP.x2 === x2 &&
+  hypSideP.y2 === y2
 }
 
 function angleBetween(p1: any, p2: any): number {
