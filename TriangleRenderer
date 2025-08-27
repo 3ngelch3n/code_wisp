@@ -42,8 +42,8 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
-  drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 2)
-  drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, false, 0x0066ff, 2)
+  //drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 4)
+  drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, true, 0x0066ff, 4)
   //j += 10 //HIER PERFEKT
 })
 
@@ -114,18 +114,18 @@ function drawTriangle(
   if (ahypAngle > 90) ignoreHypS = true
 
   if (!isHypSide(x1, y1, x2, y2, hypSideP)) {
-    trianglePieceKath(x1, y1, x2, y2, x3, y3, hypSideP)
+    //trianglePieceKath(x1, y1, x2, y2, x3, y3, hypSideP)
   }
   if (!isHypSide(x2, y2, x3, y3, hypSideP)) {
-    trianglePieceKath(x2, y2, x3, y3, x1, y1, hypSideP)
+    //trianglePieceKath(x2, y2, x3, y3, x1, y1, hypSideP)
   }
   if (!isHypSide(x3, y3, x1, y1, hypSideP)) {
-    trianglePieceKath(x3, y3, x1, y1, x2, y2, hypSideP)
+    //trianglePieceKath(x3, y3, x1, y1, x2, y2, hypSideP)
   }
   if (ignoreHypS) {
     //!wait(0)
     //sprite.setCostume("triangle_yh")
-    //trianglePieceHyp(hypSideP, anglePos.x, anglePos.y, ahypAngle)
+    trianglePieceHyp(hypSideP, anglePos.x, anglePos.y, ahypAngle)
   }
   globals.setCloneSprite = "square_yh"
   sprite.tint = 0x00ff00
@@ -172,19 +172,29 @@ function drawTriangle(
     angleY: number,
     aHypAngle: number,
   ) {
-    const k1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
-    const k2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+    const p1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+    const p2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
 
     // Richtung Hypotenuse
-    const hypAngle = angleBetween(k1, k2)
+    const hypAngle = angleBetween(p1, p2)
 
     // Abstand vom Corner zur Hypotenuse
     const interP = intersectPoint(
       { x: angleX, y: angleY },
-      aHypAngle / 2,
-      k1,
-      k2,
+      hypAngle,
+      p1,
+      p2,
     )
+    console.log(aHypAngle)
+    const distIntP1 = distance(p1, {x: interP.x, y: interP.y})
+    const distIntP2 = distance(p2, {x: interP.x, y: interP.y})
+    const maxH = distIntP1 < distIntP2 ? distIntP1 : distIntP2
+    sprite.width = xPixelSize * maxH * 0.95 * 0.1
+    sprite.height = yPixelSize * maxH * 6
+    sprite.x = angleX
+    sprite.y = angleY
+    sprite.rotation = hypAngle - 90
+    /*
     const dis = distance({ x: angleX, y: angleY }, interP)
     const disk = distance(k1, k2)
     sprite.x = angleX
@@ -195,9 +205,9 @@ function drawTriangle(
     sprite.move((18 * dis) / 44)
     sprite.rotation += 90
     sprite.height = dis * yPixelSize * 1.15
-    sprite.width = /*dis * */ xPixelSize * disk
-
-    globals.setCloneSprite = "triangle_yh_r"
+    sprite.width = xPixelSize * disk
+    globals.setCloneSprite = "triangle_yh_r" */
+    globals.setCloneSprite = "triangle_yh"
     //!wait(0)
     createClone()
   }
@@ -301,3 +311,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
+//NOT WORKINF
