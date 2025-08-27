@@ -8,7 +8,8 @@ const yPixelSize = 1880 / Game.height
 //sprite.height = yPixelSize * Game.height
 sprite.visible = true
 
-drawTriangle(-100, -200, 0, 100, 220, 0)
+//drawTriangle(-120, -160, 20, 130, 220, 0)
+drawTriangle(0, 0, 100, 100, 100, 0)
 //DrawQuadrilateral(0, 0, 300, 50, 200, 100, 0, 150)
 //drawLine(0,0,-150,120)
 
@@ -20,7 +21,7 @@ function drawTriangle(
   x3: number,
   y3: number,
 ) {
-  const ft = 0.3
+  const ft = 0.8
   sprite.layer = 1
   sprite.tint = 0x00aaff
   sprite.setCostume("square")
@@ -61,14 +62,14 @@ function drawTriangle(
   createClone()
   wait(ft)
   sprite.tint = 0xff0000
-  sprite.x = x2
-  sprite.y = y2
-  sprite.rotation = p1AngleToCenter + 90
+  sprite.x = x1
+  sprite.y = y1
+  sprite.rotation = p2AngleToCenter + 90
   createClone()
   wait(ft)
   sprite.x = x3
   sprite.y = y3
-  sprite.rotation = p1AngleToCenter + 90
+  sprite.rotation = p2AngleToCenter + 90
   createClone()
   sprite.layer = -1
   sprite.setCostume("triangle")
@@ -125,35 +126,33 @@ function drawTriangle(
   wait(ft)
   //sprite.tint = 0x00ff00
   sprite.layer = 0
-  sprite.width = distance({x: x1, y: y1}, {x: x2, y: y2}) * xPixelSize
-  sprite.rotation = angleBetween({x: x1, y: y1}, {x: x2, y: y2})
+  sprite.width = distance({ x: x1, y: y1 }, { x: x2, y: y2 }) * xPixelSize
+  sprite.rotation = angleBetween({ x: x1, y: y1 }, { x: x2, y: y2 })
   sprite.x = (x1 + x2) / 2
-  sprite. y = (y1 + y2) / 2
+  sprite.y = (y1 + y2) / 2
   sprite.height = 50 * yPixelSize
   sprite.move(25)
   sprite.rotation -= 90
   createClone()
   wait(ft)
-  sprite.width = distance({x: x2, y: y2}, {x: x3, y: y3}) * xPixelSize
-  sprite.rotation = angleBetween({x: x2, y: y2}, {x: x3, y: y3})
+  sprite.width = distance({ x: x2, y: y2 }, { x: x3, y: y3 }) * xPixelSize
+  sprite.rotation = angleBetween({ x: x2, y: y2 }, { x: x3, y: y3 })
   sprite.x = (x2 + x3) / 2
-  sprite. y = (y2 + y3) / 2
+  sprite.y = (y2 + y3) / 2
   sprite.height = 50 * yPixelSize
   sprite.move(25)
   sprite.rotation -= 90
   createClone()
   wait(ft)
-  sprite.width = distance({x: x3, y: y3}, {x: x1, y: y1}) * xPixelSize
-  sprite.rotation = angleBetween({x: x3, y: y3}, {x: x1, y: y1})
+  sprite.width = distance({ x: x3, y: y3 }, { x: x1, y: y1 }) * xPixelSize
+  sprite.rotation = angleBetween({ x: x3, y: y3 }, { x: x1, y: y1 })
   sprite.x = (x3 + x1) / 2
-  sprite. y = (y3 + y1) / 2
+  sprite.y = (y3 + y1) / 2
   sprite.height = 50 * yPixelSize
   sprite.move(25)
   sprite.rotation -= 90
   createClone()
-  
-  
-  
+
   //drawLine(x1, y1, triangleDef.x, triangleDef.y, 10)
   /*wait(ft * 100)
   const triangleDef = calcMaxTriangleSize(
@@ -192,8 +191,9 @@ function calcMaxTriangleSize(
 ) {
   const footVecP2 = footOfPerpendicularAngle(x1, y1, x2, y2, thisAngle)
   const footVecP3 = footOfPerpendicularAngle(x1, y1, x3, y3, thisAngle)
-  const footVecP2Hypot = Math.hypot(footVecP2.x, footVecP2.y)
-  const footVecP3Hypot = Math.hypot(footVecP3.x, footVecP3.y)
+  const footVecP2Hypot = distance({x: x1, y: y1}, {x:footVecP2.x, y:footVecP2.y})
+  const footVecP3Hypot = distance({x: x1, y: y1}, {x:footVecP3.x, y:footVecP3.y})
+  console.log(x1, y1, x2, y2, x3, y3, thisAngle, footVecP2, footVecP3)
   if (footVecP2Hypot < footVecP3Hypot) {
     return {
       x: footVecP2.x,
