@@ -99,12 +99,12 @@ function drawTriangle(
   sprite.layer = 1
   sprite.tint = 0x00aaff
   sprite.setCostume("square_yh")
-  wait(0)
+  /*wait(0)
   drawLine(x1, y1, x2, y2, 2)
   wait(ft)
   drawLine(x2, y2, x3, y3, 2)
   wait(ft)
-  drawLine(x1, y1, x3, y3, 2)
+  drawLine(x1, y1, x3, y3, 2)*/
 
   sprite.tint = 0x0044ff
   const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
@@ -126,7 +126,7 @@ function drawTriangle(
   sprite.transparency = 0
   sprite.setCostume("triangle_yh")
   wait(ft)
-  /*if (
+  if (
     !(
       hypSideP.x1 === x1 &&
       hypSideP.y1 === y1 &&
@@ -140,7 +140,7 @@ function drawTriangle(
       x2: hypSideP.x2,
       y2: hypSideP.y2,
     })
-  }*/
+  }
   wait(ft)
   if (
     !(
@@ -196,29 +196,28 @@ function drawTriangle(
     sprite.layer = 2
     sprite.rotation += 90
     sprite.height = 200
-    createClone()
+    //createClone()
     sprite.layer = 0
     sprite.rotation -= 90
     sprite.tint = 0x0055ff
     sprite.width = distance(k1, k2) * xPixelSize * roundDown
     const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
     const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
-    
-    const hypM = { x: (hypA.x + hypB.x) / 2, y: (hypA.y + hypB.y) / 2 }
+    const interP = intersectPoint({x: kathxm, y: kathym}, angle, hypA, hypB)
+    //const hypM = { x: (hypA.x + hypB.x) / 2, y: (hypA.y + hypB.y) / 2 }
     const dis =
-      ((distance({ x: kathxm, y: kathym }, hypM) / 52) * 64) * 1.1
+      ((distance({ x: kathxm, y: kathym }, {x: interP.x, y: interP.y}) /55) *64)
     sprite.height = dis * yPixelSize
-    sprite.move(dis / 2 * 0.89)
+    sprite.move(dis / 2 * 0.87)
     sprite.rotation -= 90
     createClone()
     ////
-    
     sprite.tint = 0x00ff00
     sprite.width = 4
     sprite.height = 4
-    sprite.x = hypM.x
-    sprite.y = hypM.y
-    createClone()
+    sprite.x = interP.x
+    sprite.y = interP.y
+    //createClone()
     
     
     ////
@@ -247,10 +246,11 @@ function drawTriangle(
     a: { x: number; y: number },
     b: { x: number; y: number },
   ) {
+    angle += 90
     const dx1 = b.x - a.x
     const dy1 = b.y - a.y
-    const dx2 = Math.cos(angle)
-    const dy2 = Math.sin(angle)
+    const dx2 = Math.sin(angle)
+    const dy2 = Math.cos(angle)
 
     const det = dx2 * dy1 - dy2 * dx1
     if (Math.abs(det) < 1e-10) {
