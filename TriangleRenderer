@@ -3,6 +3,7 @@ const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.visible = false
 globals.setCloneSprite = "square_yh"
+const tolerance = 0.5
 
 onCloneStart(function (clone) {
   clone.visible = true
@@ -34,7 +35,7 @@ onMessage("drawFrame", function (data) {
   }
 
   function randomTriangle() {
-    const typee = 1//Math.floor(Math.random(0, 3))
+    const typee = Math.floor(Math.random(0, 3))
     const rot = randomBetween(0, 360)
     console.log(typee)
     let tri = { x1:0, y1:0, x2:0, y2:0, x3:0, y3:0 }
@@ -96,15 +97,16 @@ onMessage("drawFrame", function (data) {
   }
 
   //randomTriangle()
-  drawTriangle(
-  162.44234703093866, 66.01238311698854, // P1
-  95.14269887949236, 88.63443781349062,  // P2
-  108.24549098401334, 17.766131504776688, // P3
-  0xffaa00,   // Farbe
-  true,       // Outline
-  0x000000,   // Outline-Farbe
-  2           // Outline-Dicke
+drawTriangle(
+  -102.44415048969915, -72.53800410989464, // x1, y1
+  -8.582681553053867, -67.43656813017546,  // x2, y2
+  -59.909334259219634, 10.893341367925252, // x3, y3
+  0xff0000,   // color
+  true,       // outline
+  0x00aaff,   // outline color
+  4           // outline thickness
 )
+
 
 
 
@@ -116,7 +118,7 @@ sendMessage("drawFrame")
 forever(function () {
   sendMessage("deleteAllClones")
   sendMessage("drawFrame")
-  wait(3)
+  wait(0.5)
 })
 
 function drawTriangle(
@@ -163,26 +165,28 @@ function drawTriangle(
 
   //---TRIANGLE TYPE FILTER
   const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
-  const p1p2_l = Math.round(triVals.length_p1p2)
-  const p2p3_l = Math.round(triVals.length_p2p3)
-  const p3p1_l = Math.round(triVals.length_p3p1)
+  const p1p2_l = triVals.length_p1p2
+  const p2p3_l = triVals.length_p2p3
+  const p3p1_l = triVals.length_p3p1
   const hypSideP = triVals.hypSideP
   const ahypAngle = triVals.ahypAngle
   const kathl = triVals.kathl1
   const kathl2 = triVals.kathl2
   const diffT = triVals.diff
-  const tolerance = 1
+  
 
   console.log("p",p1p2_l, p2p3_l, p3p1_l)
   
   //  Equilateral [1 triangle]
-  if (p1p2_l === p2p3_l && p2p3_l === p3p1_l) {
+  if (Math.abs(p1p2_l - p2p3_l) <= tolerance && Math.abs(p2p3_l - p3p1_l) <= tolerance) {
     //drawTrianglePart(x1, y1, x2, y2, x3, y3)
-    trianglePieceHyp(kathl2)
+    trianglePieceHyp(diffT)
     console.log("gleichseitig!") 
   } 
   //  Isosceles [1 triangle]
-  else if (p1p2_l === p2p3_l || p2p3_l === p3p1_l || p3p1_l === p1p2_l) {
+  else if (Math.abs(p1p2_l - p2p3_l) <= tolerance ||
+    Math.abs(p2p3_l - p3p1_l) <= tolerance ||
+    Math.abs(p3p1_l - p1p2_l) <= tolerance) {
     trianglePieceHyp(diffT)
     console.log("gleichschenklig!")
   }
@@ -398,6 +402,7 @@ function analyzeTriangle(
   const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
 
+
   let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
   let kathl1   = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
   let kathl2   = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
@@ -429,14 +434,28 @@ function analyzeTriangle(
     kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
   }
 
-  // diff: die kürzeste Seite + anderer Punkt
-  if (length_p1p2 <= length_p2p3 && length_p1p2 <= length_p3p1) {
-    diff = { x1, y1, x2, y2, x3, y3 }
-  } else if (length_p2p3 <= length_p1p2 && length_p2p3 <= length_p3p1) {
-    diff = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
-  } else {
-    diff = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
-  }
+  // find the "different side" (diff)
+let sideLengths = [
+  { len: length_p1p2, pts: { x1, y1, x2, y2, x3, y3 } },
+  { len: length_p2p3, pts: { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 } },
+  { len: length_p3p1, pts: { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 } }
+]
+
+// find the two sides that are closest in length
+sideLengths.sort((a, b) => a.len - b.len)
+
+const diffSide = (() => {
+  const d1 = Math.abs(sideLengths[1].len - sideLengths[0].len)
+  const d2 = Math.abs(sideLengths[2].len - sideLengths[1].len)
+  const d3 = Math.abs(sideLengths[2].len - sideLengths[0].len)
+
+  if (d1 < d2 && d1 < d3) return sideLengths[2].pts
+  if (d2 < d1 && d2 < d3) return sideLengths[0].pts
+  return sideLengths[1].pts
+})()
+
+diff = diffSide
+
 
   return {
     hypSideP,
@@ -450,6 +469,7 @@ function analyzeTriangle(
     length_p3p1
   }
 }
+
 
 
 
@@ -577,19 +597,19 @@ function analyzeTriangle(
     y2: number,
     x3: number,
     y3: number,
-    tolerance: number = 1e-6,
+    toleranceT: number = 1e-6,
   ): { x: number; y: number } | null {
     // Winkel bei P1 prüfen
     const dot1 = (x2 - x1) * (x3 - x1) + (y2 - y1) * (y3 - y1)
-    if (Math.abs(dot1) < tolerance) return { x: x1, y: y1 }
+    if (Math.abs(dot1) < toleranceT) return { x: x1, y: y1 }
 
     // Winkel bei P2 prüfen
     const dot2 = (x1 - x2) * (x3 - x2) + (y1 - y2) * (y3 - y2)
-    if (Math.abs(dot2) < tolerance) return { x: x2, y: y2 }
+    if (Math.abs(dot2) < toleranceT) return { x: x2, y: y2 }
 
     // Winkel bei P3 prüfen
     const dot3 = (x1 - x3) * (x2 - x3) + (y1 - y3) * (y2 - y3)
-    if (Math.abs(dot3) < tolerance) return { x: x3, y: y3 }
+    if (Math.abs(dot3) < toleranceT) return { x: x3, y: y3 }
 
     // Kein rechter Winkel
     return null
