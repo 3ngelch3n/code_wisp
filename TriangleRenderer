@@ -17,17 +17,29 @@ onCloneStart(function (clone) {
 //drawTriangle(100, 200, 0, 0, 250, -100, 0xff0000) //HIER PERFEKT
 
 onMessage("drawFrame", function (data) {
+
   function randomBetween(min: number, max: number) {
-    return Math.floor(Math.random() * (max - min + 1)) + min
+    return Math.random(min, max)
+  }
+
+  function rotatePoint(px: number, py: number, cx: number, cy: number, angle: number) {
+    const s = Math.sin(angle)
+    const c = Math.cos(angle)
+    const dx = px - cx
+    const dy = py - cy
+    return {
+      x: cx + dx * c - dy * s,
+      y: cy + dx * s + dy * c
+    }
   }
 
   function randomTriangle() {
-    const types = ["gleichseitig", "gleichschenklig", "rechtwinklig"]
-    const type = types[Math.floor(Math.random() * types.length)]
-
-    let tri: { x1: number; y1: number; x2: number; y2: number; x3: number; y3: number }
-
-    if (type === "gleichseitig") {
+    const typee = 1//Math.floor(Math.random(0, 3))
+    const rot = randomBetween(0, 360)
+    console.log(typee)
+    let tri = { x1:0, y1:0, x2:0, y2:0, x3:0, y3:0 }
+    console.log("typ", typee)
+    if (typee === 0) {
       const x = randomBetween(-200, 200)
       const y = randomBetween(-100, 100)
       const size = randomBetween(50, 150)
@@ -37,9 +49,11 @@ onMessage("drawFrame", function (data) {
         x2: x + size,
         y2: y,
         x3: x + size / 2,
-        y3: y + Math.sqrt(3) / 2 * size
+        y3: y + size * 0.866
       }
-    } else if (type === "gleichschenklig") {
+    }
+
+    if (typee === 1) {
       const x = randomBetween(-200, 200)
       const y = randomBetween(-100, 100)
       const base = randomBetween(60, 160)
@@ -49,10 +63,12 @@ onMessage("drawFrame", function (data) {
         y1: y,
         x2: x + base,
         y2: y,
-        x3: x + base / 2,
+        x3: x + base/2,
         y3: y + height
       }
-    } else {
+    }
+
+    if (typee === 2) {
       const x = randomBetween(-200, 200)
       const y = randomBetween(-100, 100)
       const a = randomBetween(50, 150)
@@ -66,33 +82,41 @@ onMessage("drawFrame", function (data) {
         y3: y + b
       }
     }
+    console.log("tri", tri)
 
-    console.log("=================================")
-    console.log("Type:", type)
-    console.log("Points:", tri)
-    console.log("=================================")
-
-    return tri
+    // Mittelpunkt für Rotation
+    const cx = (tri.x1 + tri.x2 + tri.x3)/3
+    const cy = (tri.y1 + tri.y2 + tri.y3)/3
+    
+    const r1 = rotatePoint(Math.floor(tri.x1), Math.floor(tri.y1), cx, cy, rot)
+    const r2 = rotatePoint(Math.floor(tri.x2), Math.floor(tri.y2), cx, cy, rot)
+    const r3 = rotatePoint(Math.floor(tri.x3), Math.floor(tri.y3), cx, cy, rot)
+    console.log("rrr", r1, r2, r3)
+    drawTriangle(r1.x, r1.y, r2.x, r2.y, r3.x, r3.y, 0xff0000, true, 0x00aaff, 2)
   }
 
-  const tri = randomTriangle()
-  console.log(tri)
+  //randomTriangle()
   drawTriangle(
-    tri.x1, tri.y1,
-    tri.x2, tri.y2,
-    tri.x3, tri.y3,
-    0xff8844,            // fill color
-    true,                // outline an
-    0x000000,            // outline schwarz
-    2                    // outline thickness klein
-  )
+  162.44234703093866, 66.01238311698854, // P1
+  95.14269887949236, 88.63443781349062,  // P2
+  108.24549098401334, 17.766131504776688, // P3
+  0xffaa00,   // Farbe
+  true,       // Outline
+  0x000000,   // Outline-Farbe
+  2           // Outline-Dicke
+)
+
+
+
 })
+
+
 
 sendMessage("drawFrame")
 forever(function () {
-  //sendMessage("deleteAllClones")
-  //sendMessage("drawFrame")
-  //wait(5)
+  sendMessage("deleteAllClones")
+  sendMessage("drawFrame")
+  wait(3)
 })
 
 function drawTriangle(
@@ -139,32 +163,35 @@ function drawTriangle(
 
   //---TRIANGLE TYPE FILTER
   const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
-  const p1p2_l = triVals.length_p1p2
-  const p2p3_l = triVals.length_p2p3
-  const p3p1_l = triVals.length_p3p1
+  const p1p2_l = Math.round(triVals.length_p1p2)
+  const p2p3_l = Math.round(triVals.length_p2p3)
+  const p3p1_l = Math.round(triVals.length_p3p1)
   const hypSideP = triVals.hypSideP
   const ahypAngle = triVals.ahypAngle
   const kathl = triVals.kathl1
   const kathl2 = triVals.kathl2
   const diffT = triVals.diff
+  const tolerance = 1
 
-
-  //equilateral [1 triangle]
+  console.log("p",p1p2_l, p2p3_l, p3p1_l)
+  
+  //  Equilateral [1 triangle]
   if (p1p2_l === p2p3_l && p2p3_l === p3p1_l) {
     //drawTrianglePart(x1, y1, x2, y2, x3, y3)
     trianglePieceHyp(kathl2)
-    //isosceles [1 triangle]
-  } else if (p1p2_l === p2p3_l || p2p3_l === p3p1_l || p3p1_l === p1p2_l) {
+    console.log("gleichseitig!") 
+  } 
+  //  Isosceles [1 triangle]
+  else if (p1p2_l === p2p3_l || p2p3_l === p3p1_l || p3p1_l === p1p2_l) {
     trianglePieceHyp(diffT)
+    console.log("gleichschenklig!")
   }
-  //right angled [1 htriangle]
+  //  Right angled [1 h-triangle]
   else {
     const rightPoint = getRightAngleVertex(x1, y1, x2, y2, x3, y3)
     if (rightPoint) {
       drawTrianglePartRA(hypSideP, kathl, kathl2, ahypAngle)
-      console.log("Das Dreieck ist rechtwinklig!", rightPoint)
-    } else {
-      console.log("Nicht rechtwinklig.")
+      console.log("Das Dreieck ist rechtwinklig!")
     }
   }
 
