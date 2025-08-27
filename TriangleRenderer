@@ -42,8 +42,8 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
-  //drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 4)
-  drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, true, 0x0066ff, 4)
+  drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 4)
+  //drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, true, 0x0066ff, 4)
   //j += 10 //HIER PERFEKT
 })
 
@@ -114,13 +114,13 @@ function drawTriangle(
   if (ahypAngle > 90) ignoreHypS = true
 
   if (!isHypSide(x1, y1, x2, y2, hypSideP)) {
-    //trianglePieceKath(x1, y1, x2, y2, x3, y3, hypSideP)
+    trianglePieceKath(x1, y1, x2, y2, x3, y3, hypSideP)
   }
   if (!isHypSide(x2, y2, x3, y3, hypSideP)) {
-    //trianglePieceKath(x2, y2, x3, y3, x1, y1, hypSideP)
+    trianglePieceKath(x2, y2, x3, y3, x1, y1, hypSideP)
   }
   if (!isHypSide(x3, y3, x1, y1, hypSideP)) {
-    //trianglePieceKath(x3, y3, x1, y1, x2, y2, hypSideP)
+    trianglePieceKath(x3, y3, x1, y1, x2, y2, hypSideP)
   }
   if (ignoreHypS) {
     //!wait(0)
@@ -180,7 +180,8 @@ function drawTriangle(
 
     // Abstand vom Corner zur Hypotenuse
     const interP = intersectPoint({ x: angleX, y: angleY }, hypAngle, p1, p2)
-    const distanceHitAngle = distance({ x: angleX, y: angleY }, interP) / 55 * 64
+    const distanceHitAngle =
+      (distance({ x: angleX, y: angleY }, interP) / 55) * 64
     const distIntP1 = distance(p1, { x: interP.x, y: interP.y })
     const distIntP2 = distance(p2, { x: interP.x, y: interP.y })
     const maxH = distIntP1 < distIntP2 ? distIntP1 : distIntP2
