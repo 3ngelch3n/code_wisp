@@ -12,10 +12,6 @@ onCloneStart(function (clone) {
   })
 })
 
-//drawTriangle(-120, -160, 20, 130, 220, 0, 0x00ff00) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
-//drawTriangle(0, 0, 100, 200, 250, -100, 0xff0000) //HIER PERFEKT
-//drawTriangle(100, 200, 0, 0, 250, -100, 0xff0000) //HIER PERFEKT
-
 onMessage("drawFrame", function (data) {
   function randomBetween(min: number, max: number) {
     return Math.random(min, max)
@@ -39,87 +35,29 @@ onMessage("drawFrame", function (data) {
   }
 
   function randomTriangle() {
-    const typee = Math.floor(Math.random(0, 3))
-    const rot = randomBetween(0, 360)
-    console.log(typee)
-    let tri = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
-    console.log("typ", typee)
-    if (typee === 0) {
-      const x = randomBetween(-200, 200)
-      const y = randomBetween(-100, 100)
-      const size = randomBetween(50, 150)
-      tri = {
-        x1: x,
-        y1: y,
-        x2: x + size,
-        y2: y,
-        x3: x + size / 2,
-        y3: y + size * 0.866,
-      }
-    }
-
-    if (typee === 1) {
-      const x = randomBetween(-200, 200)
-      const y = randomBetween(-100, 100)
-      const base = randomBetween(60, 160)
-      const height = randomBetween(60, 160)
-      tri = {
-        x1: x,
-        y1: y,
-        x2: x + base,
-        y2: y,
-        x3: x + base / 2,
-        y3: y + height,
-      }
-    }
-
-    if (typee === 2) {
-      const x = randomBetween(-200, 200)
-      const y = randomBetween(-100, 100)
-      const a = randomBetween(50, 150)
-      const b = randomBetween(50, 150)
-      tri = {
-        x1: x,
-        y1: y,
-        x2: x + a,
-        y2: y,
-        x3: x,
-        y3: y + b,
-      }
-    }
-    console.log("tri", tri)
-
-    // Mittelpunkt für Rotation
-    const cx = (tri.x1 + tri.x2 + tri.x3) / 3
-    const cy = (tri.y1 + tri.y2 + tri.y3) / 3
-
-    const r1 = rotatePoint(Math.floor(tri.x1), Math.floor(tri.y1), cx, cy, rot)
-    const r2 = rotatePoint(Math.floor(tri.x2), Math.floor(tri.y2), cx, cy, rot)
-    const r3 = rotatePoint(Math.floor(tri.x3), Math.floor(tri.y3), cx, cy, rot)
-    console.log("rrr", r1, r2, r3)
     drawTriangle(
-      r1.x,
-      r1.y,
-      r2.x,
-      r2.y,
-      r3.x,
-      r3.y,
-      0xff0000,
-      true,
+      Math.random(-320, 320),
+      Math.random(-240, 240),
+      Math.random(-320, 320),
+      Math.random(-240, 240),
+      Math.random(-320, 320),
+      Math.random(-240, 240),
+      0x00ff00,
+      false,
       0x00aaff,
       2,
     )
   }
 
-  //randomTriangle()
-  drawTriangle(-100, -85, 20, 40, 140, 15, 0x00ff00, true, 0x0000ff, 4)
+  randomTriangle()
+  //drawTriangle(-100, -85, 20, 40, 140, 15, 0x00ff00, true, 0x0000ff, 4)
 })
 
-sendMessage("drawFrame")
+//sendMessage("drawFrame")
 forever(function () {
-  //sendMessage("deleteAllClones")
-  //sendMessage("drawFrame")
-  //wait(5)
+  sendMessage("deleteAllClones")
+  sendMessage("drawFrame")
+  wait(0.7)
 })
 
 function drawTriangle(
@@ -294,7 +232,7 @@ function drawTriangle(
     sprite.move((-height / 2) * 0.87)
     sprite.rotation += 90
 
-    sprite.width = baseLength * xPixelSize * 0.95
+    sprite.width = baseLength * xPixelSize * 0.9
     sprite.height = height * yPixelSize
     globals.setCloneSprite = "triangle_yh"
     createClone()
@@ -345,7 +283,7 @@ function drawTriangle(
     sprite.y = midY
     sprite.move(-height / 13)
     sprite.rotation += 90
-    sprite.width = baseLength * xPixelSize * 1.95
+    sprite.width = baseLength * xPixelSize * 1.9
     sprite.height = height * yPixelSize * triangleM
     console.log("r", sprite.height, sprite.width, height, baseLength)
     if (rot == 90) globals.setCloneSprite = "triangle_yh_l"
@@ -379,7 +317,7 @@ function drawTriangle(
     const dis =
       (distance({ x: kathxm, y: kathym }, { x: interP.x, y: interP.y }) / 55) *
       64
-    sprite.width = distance(k1, k2) * xPixelSize * 0.95
+    sprite.width = distance(k1, k2) * xPixelSize * 0.9
     sprite.height = dis * yPixelSize
     sprite.rotation = angle
     sprite.x = kathxm
@@ -402,10 +340,6 @@ function drawTriangle(
     const p1 = { x: kathl2.x1, y: kathl2.y1 }
     const p2 = { x: kathl2.x2, y: kathl2.y2 }
     const p3 = { x: kathl2.x3, y: kathl2.y3 }
-    drawDot(p1.x, p1.y, 10, 0x00ff00)
-    drawDot(p2.x, p2.y, 10, 0x0000ff)
-    drawDot(p3.x, p3.y, 10, 0x005555)
-    sprite.tint = 0xff0000
     const hypAngle = angleBetween(p1, p2)
     const p1p2xM = (p1.x + p2.x) / 2
     const p1p2yM = (p1.y + p2.y) / 2
@@ -417,7 +351,7 @@ function drawTriangle(
     sprite.move(-(height / 2) / triangleM)
     console.log(sprite.x, sprite.y)
     sprite.rotation += 90
-    sprite.width = distance(p1, p2) * 0.95 * xPixelSize
+    sprite.width = distance(p1, p2) * 0.91 * xPixelSize
     sprite.height = height * yPixelSize
     globals.setCloneSprite = "triangle_yh"
     createClone()
