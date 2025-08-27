@@ -3,6 +3,7 @@ const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.visible = true
 globals.setCloneSprite = "square_yh"
+const drawAmount = 10
 
 onCloneStart(function (clone) {
   cloneList.push({
@@ -15,12 +16,12 @@ function randColor() {
 }
 
 function drawFrame() {
-  while (cloneList.length < globals.drawList.length) {
+  while (cloneList.length < drawList.length) {
     createClone()
   }
 
-  for (let i = 0; i < globals.drawList.length; i++) {
-    const entry = globals.drawList[i]
+  for (let i = 0; i < drawList.length; i++) {
+    const entry = drawList[i]
     const cloneEntry = cloneList[i]
 
     cloneEntry.clone.x = entry.x
@@ -33,11 +34,52 @@ function drawFrame() {
     cloneEntry.clone.visible = true
   }
 
-  for (let i = globals.drawList.length; i < cloneList.length; i++) {
+  for (let i = drawList.length; i < cloneList.length; i++) {
     cloneList[i].clone.visible = false
   }
 
-  globals.drawList = []
+  drawList = []
+}
+
+function createFrame() {
+  function randomBetween(min: number, max: number) {
+    return Math.random(min, max)
+  }
+
+  function rotatePoint(
+    px: number,
+    py: number,
+    cx: number,
+    cy: number,
+    angle: number,
+  ) {
+    const s = Math.sin(angle)
+    const c = Math.cos(angle)
+    const dx = px - cx
+    const dy = py - cy
+    return {
+      x: cx + dx * c - dy * s,
+      y: cy + dx * s + dy * c,
+    }
+  }
+
+  function randomTriangle() {
+    drawTriangle(
+      Math.random(-320, 320),
+      Math.random(-240, 240),
+      Math.random(-320, 320),
+      Math.random(-240, 240),
+      Math.random(-320, 320),
+      Math.random(-240, 240),
+      randColor(),
+      false,
+      0x00aaff,
+      2,
+    )
+  }
+  for (let i = 0; i < drawAmount; i++) {
+    randomTriangle()
+  }
 }
 
 interface CloneEntry {
@@ -54,7 +96,7 @@ interface DrawEntry {
 }
 
 let cloneList: CloneEntry[] = []
-globals.drawList = []
+let drawList: DrawEntry[] = []
 
 let lastTime = performance.now()
 let frames = 0
@@ -97,7 +139,7 @@ cloneTxt.style.align = "left"
 forever(function () {
   //sendMessage("deleteAllClones")
   sprite.visible = true
-  //createFrame()
+  createFrame()
   drawFrame()
   sprite.visible = false
   fpsTxt.text = measureFPS().avgFps + ""
@@ -243,7 +285,7 @@ function drawTriangle(
 
     let drawSprite = "triangle_yh_r"
     if (rot == 90) drawSprite = "triangle_yh_l"
-    globals.drawList.push({
+    drawList.push({
       width: baseLength * xPixelSize * 1.9,
       height: height * yPixelSize * triangleM,
       x: moved.x,
@@ -272,7 +314,7 @@ function drawTriangle(
     const angle = hypAngle - 180
     const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
     const moved = move(p1p2xM, p1p2yM, angle, -(height / 2) / triangleM)
-    globals.drawList.push({
+    drawList.push({
       width: distance(p1, p2) * 0.91 * xPixelSize,
       height: height * yPixelSize,
       x: moved.x,
@@ -459,7 +501,7 @@ function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   const p1 = { x: x1, y: y1 }
   const p2 = { x: x2, y: y2 }
 
-  globals.drawList.push({
+  drawList.push({
     width: xPixelSize * t,
     height: distance(p1, p2) * yPixelSize,
     x: (p1.x + p2.x) / 2,
@@ -471,7 +513,7 @@ function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
 }
 
 function drawDot(x1: number, y1: number, t: number, c: number) {
-  globals.drawList.push({
+  drawList.push({
     width: xPixelSize * t,
     height: t * yPixelSize,
     x: x1,
@@ -500,4 +542,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//Cleared For Game
+//Working
