@@ -7,9 +7,31 @@ const yPixelSize = 1880 / Game.height
 //sprite.width = xPixelSize * Game.width
 //sprite.height = yPixelSize * Game.height
 sprite.visible = true
+let ft = 1
 
+/*sprite.setCostume("triangle")
+layer = 1
+sprite.tint = 0x0033ff
+sprite.transparency = 50
+wait(0)
+sprite.width = 300
+sprite.height = 300
+createClone()
+wait(0)
+layer = 0
+sprite.tint = 0x00ff00
+sprite.setCostume("triangle_h")
+wait(100)
+*/
 //drawTriangle(-120, -160, 20, 130, 220, 0)
-//drawTriangle(0, 0, 100, 200, 250, -100)
+drawTriangle(0, 0, 100, 200, 250, -100)
+/*drawTriangle(
+    -103,
+    -212,
+    -117,
+    180,
+    23,
+    -140)*/
 //DrawQuadrilateral(0, 0, 300, 50, 200, 100, 0, 150)
 //drawLine(0,0,-150,120)
 
@@ -60,11 +82,11 @@ onMessage("drawFrame", function (data) {
     -140,
   )
 })
-sendMessage("drawFrame")
-let ft = 1
+//sendMessage("drawFrame")
+
 forever(function () {
   if (Keyboard.keyHeld(Key.A)) {
-    ft = 2
+    ft = 1
   }else {
     ft = 0.4
   }
@@ -85,7 +107,7 @@ function drawTriangle(
   sprite.layer = 1
   //sprite.tint = 0x00aaff
   sprite.setCostume("square")
-  wait(ft)
+  wait(0)
   drawLine(x1, y1, x2, y2, 3)
   wait(ft)
   drawLine(x2, y2, x3, y3, 3)
@@ -97,19 +119,20 @@ function drawTriangle(
   const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
   const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+  
   //const heightA = height(x1, y1, x2, y2, x3, y3)
   
   
   sprite.tint = 0xff0000
   sprite.layer = 0
   sprite.setCostume("triangle")
+  wait(ft)/*
+  fillTrianglePiece({x: x1, y: y1}, {x:x2,y: y2}, {x:x3, y:y3}, true, length_p1p2)
   wait(ft)
-  //fillTrianglePiece(x1, y1, x2, y2, x3, y3, length_p1p2)
+  fillTrianglePiece({x: x2, y:y2}, {x: x3, y:y3}, {x: x1, y:y1}, false, length_p2p3) //HIER FALSCH
   wait(ft)
-  fillTrianglePiece(x2, y2, x3, y3, x1, y1, length_p2p3) //HIER FALSCH
-  wait(ft)
-  //fillTrianglePiece(x3, y3, x1, y1, x2, y2, length_p3p1)
-  wait(ft)
+  fillTrianglePiece({x: x3, y:y3}, {x: x1, y:y1}, {x: x2,y: y2}, true, length_p3p1)
+  wait(ft)*/
   
   
 /*
@@ -171,21 +194,20 @@ function drawTriangle(
 }
 
 function fillTrianglePiece(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number,
+  p1: {x: number, y: number},
+  p2: {x: number, y: number},
+  p3: {x: number, y: number},
+  a: boolean,
   xLength: number) {
   sprite.width = xLength * xPixelSize * 0.95
-  const angle = angleBetween({ x: x1, y: y1 }, { x: x2, y: y2 })
+  const angle = angleBetween({ x: p1.x, y: p1.y }, { x: p2.x, y: p2.y })
   sprite.rotation = angle
-  const p1p2x = (x1 + x2) / 2
-  const p1p2y = (y1 + y2) / 2
+  const p1p2x = (p1.x + p2.x) / 2
+  const p1p2y = (p1.y + p2.y) / 2
   sprite.x = p1p2x
   sprite.y = p1p2y
-  const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, x2, y2, x3, y3)
+  //const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, pC.a == 0 ? p2.x : p1.x, pC.a == 0 ? p2.y : p1.y, pC.a == 0 ? p3.x : , p3.y, , p3.x, p3.y)
+  const intersectPoint = intersectPointAngleLine(p1p2x, p1p2y, angle, a ? p2.x : p1.x, a ? p2.y : p1.y, p3.x, p3.y)
   const yHeight = distance({x: p1p2x, y: p1p2y}, {x: intersectPoint.x, y: intersectPoint.y}) * 0.95
   sprite.height = yHeight * yPixelSize
   sprite.move(yHeight / 2)
