@@ -2,7 +2,6 @@ const xPixelSize = 2650 / 8 / Game.width
 const yPixelSize = 1880 / 8 / Game.height
 sprite.visible = false
 
-
 onCloneStart(function (clone) {
   clone.visible = true
   onMessage("deleteAllClones", function (data) {
@@ -10,11 +9,11 @@ onCloneStart(function (clone) {
   })
 })
 
-drawTriangle(-120, -160, 20, 130, 220, 0, 0x00ff00) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
-wait(1)
-drawTriangle(0, 0, 100, 200, 250, -100, 0xff0000) //HIER PERFEKT
-
-
+//drawTriangle(-120, -160, 20, 130, 220, 0, 0x00ff00) ///HIER FEHLT UNTEN EIN GROßeS STÜCK
+//wait(1)
+//drawTriangle(0, 0, 100, 200, 250, -100, 0xff0000) //HIER PERFEKT
+//wait(1)
+//drawTriangle(100, 200, 0, 0, 250, -100, 0xff0000) //HIER PERFEKT
 
 onMessage("drawFrame", function (data) {
   const xOff = 0 //Math.random(-100, 100)
@@ -27,11 +26,11 @@ onMessage("drawFrame", function (data) {
     250 + xOff,
     -100 + yOff,
   )*/
-  /*const x1 = Math.random(-360, -10)
-  const y1 = Math.random(-240, -10)
-  const x2 = Math.random(-360, -10)
-  const y2 = Math.random(10, 240)
-  const x3 = Math.random(10, 360)
+  /*const x1 = Math.random(-360, 360)
+  const y1 = Math.random(-240, 240)
+  const x2 = Math.random(-360, 360)
+  const y2 = Math.random(-240, 240)
+  const x3 = Math.random(-360, 360)
   const y3 = Math.random(-240, 240)
   drawTriangle(
     x1 + xOff,
@@ -40,21 +39,16 @@ onMessage("drawFrame", function (data) {
     y2 + yOff,
     x3 + yOff,
     y3 + yOff,
-  )
-  console.log("l:", x1 + xOff,
-    y1 + yOff,
-    x2 + xOff,
-    y2 + yOff,
-    x3 + yOff,
-    y3 + yOff,)*/
-  //drawTriangle(-103, -212, -117, 180, 23, -140)
+    0x00FF00
+  )*/
+  drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000) //HIER PERFEKT
 })
-//sendMessage("drawFrame")
+
 
 forever(function () {
-  //sendMessage("deleteAllClones")
-  //sendMessage("drawFrame")
-  //wait(2)
+  sendMessage("deleteAllClones")
+  sendMessage("drawFrame")
+  wait(2)
 })
 
 function drawTriangle(
@@ -67,20 +61,36 @@ function drawTriangle(
   color: number,
   outline: boolean = false,
   outline_color: number = 0x11ff55,
-  outline_thickness: number = 4
+  outline_thickness: number = 4,
 ) {
+  
+  const orientation = (x2-x1)*(y3-y1)-(y2-y1)*(x3-x1)
+  console.log(orientation)
+  console.log(x1, y1, x2, y2, x3, y3)
+  if (orientation > 0) {
+  const tempX = x2;
+  x2 = x3;
+  x3 = tempX;
+
+  const tempY = y2;
+  y2 = y3;
+  y3 = tempY;
+  }
+  console.log(x1, y1, x2, y2, x3, y3)
+    
+  
   if (outline) {
-  sprite.tint = outline_color
-  sprite.setCostume("square_yh")
-  wait(0)
-  drawLine(x1, y1, x2, y2, outline_thickness)
-  drawLine(x2, y2, x3, y3, outline_thickness)
-  drawLine(x1, y1, x3, y3, outline_thickness)
+    sprite.tint = outline_color
+    sprite.setCostume("square_yh")
+    wait(0)
+    drawLine(x1, y1, x2, y2, outline_thickness)
+    drawLine(x2, y2, x3, y3, outline_thickness)
+    drawLine(x1, y1, x3, y3, outline_thickness)
   }
   sprite.setCostume("triangle_yh")
   sprite.tint = color
   wait(0)
-  
+
   const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
   const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
   const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
@@ -93,7 +103,7 @@ function drawTriangle(
   } else {
     hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1 }
   }
-  
+
   if (
     !(
       hypSideP.x1 === x1 &&
@@ -140,6 +150,20 @@ function drawTriangle(
     })
   }
 
+  function sortPointsClockwise(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,) {
+    const Orientation = (x2-x1)*(y3-y1)-(y2-y1)*(x3-x1)
+    if (Orientation > 0)
+      return {x1: x1, y1: y1, x2: x3, y2: y3, x3: x2, y3: y2}
+    else 
+      return {x1: x1, y1: y1, x2: x2, y2: y2, x3: x3, y3: y3}
+  }
+  
   function trianglePiece(
     kath1x: number,
     kath1y: number,
@@ -157,14 +181,16 @@ function drawTriangle(
     const angle = angleBetween(k1, k2)
     const hypA = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
     const hypB = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
-    const interP = intersectPoint({x: kathxm, y: kathym}, angle, hypA, hypB)
-    const dis = ((distance({ x: kathxm, y: kathym }, {x: interP.x, y: interP.y}) /55) *64)
+    const interP = intersectPoint({ x: kathxm, y: kathym }, angle, hypA, hypB)
+    const dis =
+      (distance({ x: kathxm, y: kathym }, { x: interP.x, y: interP.y }) / 55) *
+      64
     sprite.width = distance(k1, k2) * xPixelSize * roundDown
     sprite.height = dis * yPixelSize
     sprite.rotation = angle
     sprite.x = kathxm
     sprite.y = kathym
-    sprite.move(dis / 2 * 0.87)
+    sprite.move((dis / 2) * 0.87)
     sprite.rotation -= 90
     createClone()
   }
@@ -195,10 +221,6 @@ function drawTriangle(
     return { x: ix, y: iy }
   }
 }
-
-
-
-
 
 function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   const p1 = { x: x1, y: y1 }
