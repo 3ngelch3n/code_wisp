@@ -5,13 +5,47 @@ sprite.visible = true
 globals.setCloneSprite = "square_yh"
 
 onCloneStart(function (clone) {
-  clone.setCostume(globals.setCloneSprite)
-  onMessage("deleteAllClones", function (data) {
-    clone.delete()
+  //clone.setCostume(globals.setCloneSprite)
+  cloneList.push({
+    clone: clone
   })
+  /*onMessage("deleteAllClones", function (data) {
+    clone.delete()
+  })*/
 })
 
-onMessage("drawFrame", function (data) {
+onMessage("drawFrame", function() {
+  // Wir benutzen drawList und cloneList
+  // 1. Stelle sicher, dass genug Klone existieren
+  while (cloneList.length < drawList.length) {
+    createClone()
+  }
+
+  // 2. Jedem drawList-Eintrag einen Klon zuordnen
+  for (let i = 0; i < drawList.length; i++) {
+    const entry = drawList[i]
+    const cloneEntry = cloneList[i]
+
+    cloneEntry.clone.x = entry.x
+    cloneEntry.clone.y = entry.y
+    cloneEntry.clone.width = entry.width
+    cloneEntry.clone.height = entry.height
+    cloneEntry.clone.rotation = entry.rotation
+    cloneEntry.clone.setCostume(entry.texture)
+    cloneEntry.clone.tint = entry.color
+    cloneEntry.clone.visible = true
+  }
+
+  // 3. Alle überschüssigen Klone ausblenden
+  for (let i = drawList.length; i < cloneList.length; i++) {
+    cloneList[i].clone.visible = false
+  }
+
+  // 4. drawList leeren für das nächste Frame
+  drawList = []
+})
+
+onMessage("createFrame", function (data) {
   function randomBetween(min: number, max: number) {
     return Math.random(min, max)
   }
@@ -52,6 +86,22 @@ onMessage("drawFrame", function (data) {
   }
 })
 
+interface CloneEntry {
+  clone: any
+}
+interface DrawEntry {
+  width: number
+  height: number
+  x: number
+  y: number
+  rotation: number
+  texture: string
+  color: number
+}
+
+let cloneList: CloneEntry[] = []
+let drawList: DrawEntry[] = []
+
 let lastTime = performance.now()
 let frames = 0
 let fps = 0
@@ -88,7 +138,8 @@ fpsTxt.style.align = "left"
 const drawAmount = 50
 
 forever(function () {
-  sendMessage("deleteAllClones")
+  //sendMessage("deleteAllClones")
+  sendMessage("createFrame")
   sendMessage("drawFrame")
   fpsTxt.text = measureFPS().avgFps + ""
 })
@@ -246,11 +297,28 @@ function drawTriangle(
     sprite.y = midY
     sprite.move(-height / 13)
     sprite.rotation += 90
-    sprite.width = baseLength * xPixelSize * 1.9
-    sprite.height = height * yPixelSize * triangleM
-    if (rot == 90) globals.setCloneSprite = "triangle_yh_l"
-    else globals.setCloneSprite = "triangle_yh_r"
-    createClone()
+    if (rot == 90) {
+      drawList.push({
+      width: baseLength * xPixelSize * 1.9,
+      height: height * yPixelSize * triangleM,
+      x: sprite.x,
+      y: sprite.y,
+      rotation: sprite.rotation,
+      texture: "triangle_yh_l",
+      color: sprite.tint
+  })
+    } 
+    else {
+      drawList.push({
+      width: baseLength * xPixelSize * 1.9,
+      height: height * yPixelSize * triangleM,
+      x: sprite.x,
+      y: sprite.y,
+      rotation: sprite.rotation,
+      texture: "triangle_yh_r",
+      color: sprite.tint
+  })
+         }
   }
 
   function trianglePieceHyp(kathl2: {
@@ -273,10 +341,15 @@ function drawTriangle(
     const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
     sprite.move(-(height / 2) / triangleM)
     sprite.rotation += 90
-    sprite.width = distance(p1, p2) * 0.91 * xPixelSize
-    sprite.height = height * yPixelSize
-    globals.setCloneSprite = "triangle_yh"
-    createClone()
+    drawList.push({
+      width: distance(p1, p2) * 0.91 * xPixelSize,
+      height: height * yPixelSize,
+      x: sprite.x,
+      y: sprite.y,
+      rotation: sprite.rotation,
+      texture: "triangle_yh",
+      color: sprite.tint
+    })
   }
 
   function analyzeTriangle(
@@ -412,24 +485,27 @@ function drawLine(x1: number, y1: number, x2: number, y2: number, t: number) {
   const p1 = { x: x1, y: y1 }
   const p2 = { x: x2, y: y2 }
 
-  sprite.x = (p1.x + p2.x) / 2
-  sprite.y = (p1.y + p2.y) / 2
-  sprite.rotation = angleBetween(p1, p2)
-  sprite.height = distance(p1, p2) * yPixelSize
-  sprite.width = xPixelSize * t
-  globals.setCloneSprite = "square_yh"
-  createClone()
+  drawList.push({
+      width: xPixelSize * t,
+      height: distance(p1, p2) * yPixelSize,
+      x: (p1.x + p2.x) / 2,
+      y: (p1.y + p2.y) / 2,
+      rotation: angleBetween(p1, p2),
+      texture: "square_yh",
+      color: sprite.tint
+  })
 }
 
 function drawDot(x1: number, y1: number, t: number, c: number) {
-  const p1 = { x: x1, y: y1 }
-  sprite.tint = c
-  sprite.x = x1
-  sprite.y = y1
-  sprite.height = t * yPixelSize
-  sprite.width = xPixelSize * t
-  globals.setCloneSprite = "square_yh"
-  createClone()
+  drawList.push({
+      width: xPixelSize * t,
+      height: t * yPixelSize,
+      x: x1,
+      y: y1,
+      rotation: 0,
+      texture: "square_yh",
+      color: c
+  })
 }
 
 function angleBetween(p1: any, p2: any): number {
@@ -443,4 +519,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 50 draw calls avg 30 fps
+//FULLY WORKING with 50 draw calls avg 50 fps
