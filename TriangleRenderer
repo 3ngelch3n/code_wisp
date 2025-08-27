@@ -94,6 +94,7 @@ function drawTriangle(
   wait(ft)
   sprite.tint = 0x0044ff
   //sprite.setCostume("triangle")
+  /*
   const center = centroid(x1, y1, x2, y2, x3, y3)
   sprite.x = center.x
   sprite.y = center.y
@@ -132,7 +133,7 @@ function drawTriangle(
   sprite.rotation = p1AngleToCenter + 90
   createClone()
   sprite.layer = -1
-
+*/
   
   sprite.tint = 0xff0000
   sprite.layer = 0
@@ -142,7 +143,8 @@ function drawTriangle(
   //const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
   sprite.setCostume("triangle")
   wait(ft)
-  /*const triangleDefp1 = calcMaxTriangleSize(
+  /*wait(ft)
+  const triangleDefp1 = calcMaxTriangleSize(
     p1AngleToCenter,
     x1,
     y1,
@@ -155,18 +157,19 @@ function drawTriangle(
   sprite.y = triangleDefp1.yi
   sprite.rotation = p1AngleToCenter
   sprite.height = 15 * yPixelSize
-  sprite.width = 15 * xPixelSize*/
+  sprite.width = 15 * xPixelSize
+  createClone()
 
-
-  
-  /*sprite.x = (x1 + triangleDefp1.x) / 2
+  wait(ft)
+  sprite.x = (x1 + triangleDefp1.x) / 2
   sprite.y = (y1 + triangleDefp1.y) / 2
   sprite.rotation = p1AngleToCenter
   sprite.height = triangleDefp1.l * yPixelSize
   sprite.width = triangleDefp1.f * xPixelSize
-  createClone()*/
-  
-  /*wait(ft * 10000)
+  createClone()
+  */
+  //wait(ft * 10000)
+  /*
   const triangleDefp2 = calcMaxTriangleSize(
     p2AngleToCenter,
     x2,
@@ -268,7 +271,16 @@ function averageTriangleHeight(
   y3: number,
 ): number {
   // Abstand eines Punktes zu einer Linie
-  function height(
+  
+
+  const hA = height(x1, y1, x2, y2, x3, y3) // Höhe von A auf BC
+  const hB = height(x2, y2, x1, y1, x3, y3) // Höhe von B auf AC
+  const hC = height(x3, y3, x1, y1, x2, y2) // Höhe von C auf AB
+
+  return (hA + hB + hC) / 3 // Durchschnitt
+}
+
+function height(
     px: number,
     py: number,
     ax: number,
@@ -281,13 +293,6 @@ function averageTriangleHeight(
       Math.sqrt((by - ay) ** 2 + (bx - ax) ** 2)
     )
   }
-
-  const hA = height(x1, y1, x2, y2, x3, y3) // Höhe von A auf BC
-  const hB = height(x2, y2, x1, y1, x3, y3) // Höhe von B auf AC
-  const hC = height(x3, y3, x1, y1, x2, y2) // Höhe von C auf AB
-
-  return (hA + hB + hC) / 3 // Durchschnitt
-}
 
 function calcMaxTriangleSize(
   thisAngle: number,
@@ -309,23 +314,29 @@ function calcMaxTriangleSize(
     { x: footVecP3.x, y: footVecP3.y },
   )
 
-  const intersection = getIntersectionPoint(thisAngle, x1, y1, x1, y1, x2, y2)
+  let intersection
   
   let shortestVec = {x: 0, y: 0}
   let shortestVecPos = {x: 0, y: 0}
   if (footVecP2Hypot < footVecP3Hypot) {
     shortestVec = footVecP2
     shortestVecPos = {x: x2, y: y2}
+    intersection = getIntersectionPoint(thisAngle, footVecP2.x, footVecP2.y, x1, y1, x3, y3)
     }
   else {
     shortestVec = footVecP3
     shortestVecPos = {x: x3, y: y3}
+    intersection = getIntersectionPoint(thisAngle, footVecP3.x, footVecP3.y, x1, y1, x2, y2)
+    
     }
 
+  const f1 = distance({ x: shortestVecPos.x, y: shortestVecPos.y }, { x: shortestVec.x, y: shortestVec.y })
+  const f2 = Math.hypot(intersection.x, intersection.y)
+  
   return {
       x: shortestVec.x,
       y: shortestVec.y,
-      f: distance({ x: x3, y: y3 }, { x: shortestVec.x, y: shortestVec.y }),
+      f: f1 < f2 ? f1 : f2,
       l: distance({ x: x1, y: y1 }, { x: shortestVec.x, y: shortestVec.y }),
       xi: intersection.x,
       yi: intersection.y
