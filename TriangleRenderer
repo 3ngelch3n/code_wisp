@@ -24,7 +24,7 @@ function drawTriangle(
   const ft = 0.8
   sprite.layer = 1
   sprite.tint = 0x00aaff
-  sprite.setCostume("square")
+  /*sprite.setCostume("square")
   wait(ft)
   drawLine(x1, y1, x2, y2, 3)
   wait(ft)
@@ -71,9 +71,13 @@ function drawTriangle(
   sprite.y = y3
   sprite.rotation = p2AngleToCenter + 90
   createClone()
-  sprite.layer = -1
+  sprite.layer = -1*/
+  sprite.layer = 0
+  const center = centroid(x1, y1, x2, y2, x3, y3)
+  const p1AngleToCenter = angleToCentroid(x1, y1, center.x, center.y)
+  const p2AngleToCenter = angleToCentroid(x2, y2, center.x, center.y)
+  const p3AngleToCenter = angleToCentroid(x3, y3, center.x, center.y)
   sprite.setCostume("triangle")
-  wait(ft)
   const triangleDefp1 = calcMaxTriangleSize(
     p1AngleToCenter,
     x1,
@@ -89,7 +93,6 @@ function drawTriangle(
   sprite.height = triangleDefp1.l * yPixelSize
   sprite.width = triangleDefp1.f * xPixelSize
   createClone()
-  wait(ft)
   const triangleDefp2 = calcMaxTriangleSize(
     p2AngleToCenter,
     x2,
@@ -99,14 +102,12 @@ function drawTriangle(
     x1,
     y1,
   )
-  sprite.setCostume("triangle")
   sprite.x = (x2 + triangleDefp2.x) / 2
   sprite.y = (y2 + triangleDefp2.y) / 2
   sprite.rotation = p2AngleToCenter
   sprite.height = triangleDefp2.l * yPixelSize
   sprite.width = triangleDefp2.f * xPixelSize
   createClone()
-  wait(ft)
   const triangleDefp3 = calcMaxTriangleSize(
     p3AngleToCenter,
     x3,
@@ -116,40 +117,42 @@ function drawTriangle(
     x2,
     y2,
   )
-  sprite.setCostume("triangle")
   sprite.x = (x3 + triangleDefp3.x) / 2
   sprite.y = (y3 + triangleDefp3.y) / 2
   sprite.rotation = p3AngleToCenter
   sprite.height = triangleDefp3.l * yPixelSize
   sprite.width = triangleDefp3.f * xPixelSize
   createClone()
-  wait(ft)
   //sprite.tint = 0x00ff00
   sprite.layer = 0
-  sprite.width = distance({ x: x1, y: y1 }, { x: x2, y: y2 }) * xPixelSize
+
+
+
+  const ySize = (distance({x: x1, y: y1}, {x: center.x, y: center.y}) +
+               distance({x: x2, y: y2}, {x: center.x, y: center.y}) +
+               distance({x: x3, y: y3}, {x: center.x, y: center.y})) / 6
+  sprite.width = distance({ x: x1, y: y1 }, { x: x2, y: y2 }) * 0.9 * xPixelSize
   sprite.rotation = angleBetween({ x: x1, y: y1 }, { x: x2, y: y2 })
   sprite.x = (x1 + x2) / 2
   sprite.y = (y1 + y2) / 2
-  sprite.height = 50 * yPixelSize
-  sprite.move(25)
+  sprite.height = ySize * yPixelSize
+  sprite.move(ySize/2)
   sprite.rotation -= 90
   createClone()
-  wait(ft)
-  sprite.width = distance({ x: x2, y: y2 }, { x: x3, y: y3 }) * xPixelSize
+  sprite.width = distance({ x: x2, y: y2 }, { x: x3, y: y3 }) * 0.9 * xPixelSize
   sprite.rotation = angleBetween({ x: x2, y: y2 }, { x: x3, y: y3 })
   sprite.x = (x2 + x3) / 2
   sprite.y = (y2 + y3) / 2
-  sprite.height = 50 * yPixelSize
-  sprite.move(25)
+  sprite.height = ySize * yPixelSize
+  sprite.move(ySize/2)
   sprite.rotation -= 90
   createClone()
-  wait(ft)
-  sprite.width = distance({ x: x3, y: y3 }, { x: x1, y: y1 }) * xPixelSize
+  sprite.width = distance({ x: x3, y: y3 }, { x: x1, y: y1 }) * 0.9 * xPixelSize
   sprite.rotation = angleBetween({ x: x3, y: y3 }, { x: x1, y: y1 })
   sprite.x = (x3 + x1) / 2
   sprite.y = (y3 + y1) / 2
-  sprite.height = 50 * yPixelSize
-  sprite.move(25)
+  sprite.height = ySize * yPixelSize
+  sprite.move(ySize/2)
   sprite.rotation -= 90
   createClone()
 
@@ -191,8 +194,14 @@ function calcMaxTriangleSize(
 ) {
   const footVecP2 = footOfPerpendicularAngle(x1, y1, x2, y2, thisAngle)
   const footVecP3 = footOfPerpendicularAngle(x1, y1, x3, y3, thisAngle)
-  const footVecP2Hypot = distance({x: x1, y: y1}, {x:footVecP2.x, y:footVecP2.y})
-  const footVecP3Hypot = distance({x: x1, y: y1}, {x:footVecP3.x, y:footVecP3.y})
+  const footVecP2Hypot = distance(
+    { x: x1, y: y1 },
+    { x: footVecP2.x, y: footVecP2.y },
+  )
+  const footVecP3Hypot = distance(
+    { x: x1, y: y1 },
+    { x: footVecP3.x, y: footVecP3.y },
+  )
   console.log(x1, y1, x2, y2, x3, y3, thisAngle, footVecP2, footVecP3)
   if (footVecP2Hypot < footVecP3Hypot) {
     return {
