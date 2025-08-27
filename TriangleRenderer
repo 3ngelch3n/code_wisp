@@ -42,14 +42,15 @@ onMessage("drawFrame", function (data) {
     y3 + yOff,
     0x00FF00
   )*/
+  drawTriangle(0, 0, 200, 200, 100, 0, 0xff0000, true, 0x0066ff, 2)
   drawTriangle(-150, 0, 0, 100, 150, 0, 0xff0000, false, 0x0066ff, 2)
-  j += 10 //HIER PERFEKT
+  //j += 10 //HIER PERFEKT
 })
 
 forever(function () {
   sendMessage("deleteAllClones")
   sendMessage("drawFrame")
-  wait(1)
+  wait(5)
 })
 
 function drawTriangle(
@@ -111,8 +112,7 @@ function drawTriangle(
   }
   let ignoreHypS = false
   if (ahypAngle > 90) ignoreHypS = true
-  
-  
+
   if (!isHypSide(x1, y1, x2, y2, hypSideP)) {
     trianglePieceKath(x1, y1, x2, y2, x3, y3, hypSideP)
   }
@@ -125,12 +125,12 @@ function drawTriangle(
   if (ignoreHypS) {
     //!wait(0)
     //sprite.setCostume("triangle_yh")
-    trianglePieceHyp(hypSideP, anglePos.x, anglePos.y, ahypAngle)
+    //trianglePieceHyp(hypSideP, anglePos.x, anglePos.y, ahypAngle)
   }
   globals.setCloneSprite = "square_yh"
   sprite.tint = 0x00ff00
   drawLine(hypSideP.x1, hypSideP.y1, hypSideP.x2, hypSideP.y2, 8)
-  
+
   function trianglePieceKath(
     kath1x: number,
     kath1y: number,
@@ -166,43 +166,43 @@ function drawTriangle(
     createClone()
   }
 
-function trianglePieceHyp(
-  hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
-  angleX: number,
-  angleY: number,
-  aHypAngle: number,
-) {
-  const k1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
-  const k2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+  function trianglePieceHyp(
+    hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
+    angleX: number,
+    angleY: number,
+    aHypAngle: number,
+  ) {
+    const k1 = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+    const k2 = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
 
-  // Richtung Hypotenuse
-  const hypAngle = angleBetween(k1, k2)
+    // Richtung Hypotenuse
+    const hypAngle = angleBetween(k1, k2)
 
-  // Abstand vom Corner zur Hypotenuse
-  const interP = intersectPoint(
-    { x: angleX, y: angleY },
-    aHypAngle / 2,
-    k1,
-    k2,
-  )
-  const dis = distance({ x: angleX, y: angleY }, interP)
-  const disk = distance(k1, k2)
-  sprite.x = angleX
-  sprite.y = angleY
+    // Abstand vom Corner zur Hypotenuse
+    const interP = intersectPoint(
+      { x: angleX, y: angleY },
+      aHypAngle / 2,
+      k1,
+      k2,
+    )
+    const dis = distance({ x: angleX, y: angleY }, interP)
+    const disk = distance(k1, k2)
+    sprite.x = angleX
+    sprite.y = angleY
 
-  // Rotation entlang Hypotenuse
-  sprite.rotation = hypAngle - 180
-  sprite.move(18 * dis / 44)
-  sprite.rotation += 90
-  sprite.height = dis * yPixelSize * 1.15
-  sprite.width = /*dis * */ xPixelSize * (disk)
+    // Rotation entlang Hypotenuse
+    sprite.rotation = hypAngle - 180
+    sprite.move((18 * dis) / 44)
+    sprite.rotation += 90
+    sprite.height = dis * yPixelSize * 1.15
+    sprite.width = /*dis * */ xPixelSize * disk
 
-  globals.setCloneSprite = "triangle_yh_r"
-  //!wait(0)
-  createClone()
+    globals.setCloneSprite = "triangle_yh_r"
+    //!wait(0)
+    createClone()
   }
 
-    /*
+  /*
     //sprite.setCostume("triangle_yh_r")
     sprite.setCostume("triangle_yh_r")
     wait(0)
@@ -231,7 +231,6 @@ function trianglePieceHyp(
     createClone()
     sprite.tint = 0xff0000
     drawLine(interP.x, interP.y, angleX, angleY, 5)*/
-  
 
   function intersectPoint(
     p: { x: number; y: number },
