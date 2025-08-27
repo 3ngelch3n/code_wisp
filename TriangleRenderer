@@ -15,6 +15,10 @@ onCloneStart(function (clone) {
   })*/
 })
 
+function randColor() {
+  return Math.random(0x000000, 0xdddddd)
+}
+
 function drawFrame() {
   // Wir benutzen drawList und cloneList
   // 1. Stelle sicher, dass genug Klone existieren
@@ -76,7 +80,7 @@ function createFrame() {
       Math.random(-240, 240),
       Math.random(-320, 320),
       Math.random(-240, 240),
-      0x00ff00,
+      randColor(),
       false,
       0x00aaff,
       2,
@@ -201,7 +205,7 @@ function drawTriangle(
   //  Equilateral [1 triangle]
   if (
     (Math.abs(p1p2_l - p2p3_l) <= tolerance &&
-    Math.abs(p2p3_l - p3p1_l) <= tolerance) ||
+      Math.abs(p2p3_l - p3p1_l) <= tolerance) ||
     Math.abs(p1p2_l - p2p3_l) <= tolerance ||
     Math.abs(p2p3_l - p3p1_l) <= tolerance ||
     Math.abs(p3p1_l - p1p2_l) <= tolerance
@@ -411,7 +415,6 @@ function drawTriangle(
     }
   }
 
-
   function analyzeTriangleR(
     x1: number,
     y1: number,
@@ -448,15 +451,12 @@ function drawTriangle(
       kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
     }
 
-
-
     return {
       hypSideP,
       kathl1,
-      kathl2
+      kathl2,
     }
   }
-  
 
   function intersectPoint(
     p: { x: number; y: number },
