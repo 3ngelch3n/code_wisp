@@ -3,7 +3,7 @@ const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.visible = true
 globals.setCloneSprite = "square_yh"
-const drawAmount = 100
+const drawAmount = 1000
 
 onCloneStart(function (clone) {
   //clone.setCostume(globals.setCloneSprite)
@@ -510,4 +510,4 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//FULLY WORKING with 100 draw calls avg 37-38 fps
+//FULLY WORKING with 100 draw calls avg 32-33 fps
