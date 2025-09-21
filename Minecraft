@@ -27,34 +27,112 @@ enum blockTypes {
   grass,
 }
 
-function createChunk(x: number, z: number): chunk {
-  const subChunks: subChunk[] = []
+// Perlin Noise helper
+class PerlinNoise {
+  permutation: number[] = []
 
-  for (let y = 0; y < sChunkYA; y++) {
-    const blocks: blockTypes[] = new Array(sChunkX * sChunkY * sChunkZ).fill(
-      blockTypes.air,
-    )
+  constructor(seed: number = 0) {
+    this.permutation = Array.from({ length: 256 }, (_, i) => i)
 
-    let fullAir = true
-    for (let i = 0; i < blocks.length; i++) {
-      if (Math.random(0, 10) == 0) {
-        blocks[i] = blockTypes.stone
-        fullAir = false
+    // Simple seeded shuffle
+    let random = (x: number) => {
+      const t = Math.sin(x + seed) * 10000
+      return t - Math.floor(t)
+    }
+
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(random(i) * (i + 1))
+      ;[this.permutation[i], this.permutation[j]] = [this.permutation[j], this.permutation[i]]
+    }
+
+    // duplicate for overflow
+    this.permutation = this.permutation.concat(this.permutation)
+  }
+
+  fade(t: number) {
+    // 6t^5 - 15t^4 + 10t^3 smoothstep
+    return t * t * t * (t * (t * 6 - 15) + 10)
+  }
+
+  lerp(a: number, b: number, t: number) {
+    return a + t * (b - a)
+  }
+
+  grad(hash: number, x: number, y: number = 0) {
+    const h = hash & 3
+    const u = h < 2 ? x : y
+    const v = h < 2 ? y : x
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v)
+  }
+
+  noise(x: number, y: number = 0) {
+    const xi = Math.floor(x) & 255
+    const yi = Math.floor(y) & 255
+    const xf = x - Math.floor(x)
+    const yf = y - Math.floor(y)
+
+    const u = this.fade(xf)
+    const v = this.fade(yf)
+
+    const p = this.permutation
+    const aa = p[p[xi] + yi]
+    const ab = p[p[xi] + yi + 1]
+    const ba = p[p[xi + 1] + yi]
+    const bb = p[p[xi + 1] + yi + 1]
+
+    const x1 = this.lerp(this.grad(aa, xf, yf), this.grad(ba, xf - 1, yf), u)
+    const x2 = this.lerp(this.grad(ab, xf, yf - 1), this.grad(bb, xf - 1, yf - 1), u)
+    return (this.lerp(x1, x2, v) + 1) / 2 // normalize 0..1
+  }
+}
+
+const perlin = new PerlinNoise(42); // seed
+
+function createChunk(cx: number, cz: number): chunk {
+  const subChunks: subChunk[] = [];
+  const noiseScale = 0.05;       // smoothness
+  const baseHeight = 40;         // base height
+  const heightVariation = 10;    // variation from noise
+
+  // Precompute heightmap for chunk
+  const heightMap: number[][] = [];
+  for (let lx = 0; lx < sChunkX; lx++) {
+    heightMap[lx] = [];
+    for (let lz = 0; lz < sChunkZ; lz++) {
+      const wx = cx * sChunkX + lx;
+      const wz = cz * sChunkZ + lz;
+      const h = Math.floor(perlin.noise(wx * noiseScale, wz * noiseScale) * heightVariation + baseHeight);
+      heightMap[lx][lz] = h;
+    }
+  }
+
+  // Generate subChunks
+  for (let sy = 0; sy < sChunkYA; sy++) {
+    const blocks: blockTypes[] = new Array(sChunkX * sChunkY * sChunkZ).fill(blockTypes.air);
+    let fullAir = true;
+
+    for (let lx = 0; lx < sChunkX; lx++) {
+      for (let lz = 0; lz < sChunkZ; lz++) {
+        const columnHeight = heightMap[lx][lz];
+
+        for (let ly = 0; ly < sChunkY; ly++) {
+          const globalY = sy * sChunkY + ly;
+          if (globalY <= columnHeight) {
+            let blockType = blockTypes.stone;
+            if (globalY === columnHeight) blockType = blockTypes.grass;
+            else if (globalY > columnHeight - 3) blockType = blockTypes.dirt;
+
+            blocks[index(lx, ly, lz)] = blockType;
+            fullAir = false;
+          }
+        }
       }
     }
 
-    subChunks.push({
-      y,
-      fullAir: fullAir,
-      blocks,
-    })
+    subChunks.push({ y: sy, fullAir, blocks });
   }
 
-  return {
-    x,
-    z,
-    subChunks,
-  }
+  return { x: cx, z: cz, subChunks };
 }
 
 function index(x: number, y: number, z: number): number {
@@ -119,16 +197,16 @@ function getBlock(c: chunk, x: number, y: number, z: number): blockTypes {
 
 const world: world = { chunks: [] }
 
-for (let cx = 0; cx <= 1; cx++) {
-  for (let cz = 0; cz <= 1; cz++) {
+for (let cx = -1; cx <= 1; cx++) {
+  for (let cz = -1; cz <= 1; cz++) {
     const c = createChunk(cx, cz)
 
     for (let x = 0; x < sChunkX; x++) {
       for (let z = 0; z < sChunkZ; z++) {
         for (let y = 2; y < sChunkY; y++) {
-          if (y < sChunkY - 2) {
+          if (y < sChunkY - 3) {
             setBlock(c, x, y, z, blockTypes.stone) // unten Stein
-          } else if (y === sChunkY - 2) {
+          } else if (y === sChunkY - 2 || y === sChunkY - 3) {
             setBlock(c, x, y, z, blockTypes.dirt) // dann Dirt
           } else if (y === sChunkY - 1) {
             setBlock(c, x, y, z, blockTypes.grass) // oben Gras
