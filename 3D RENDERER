@@ -1,0 +1,898 @@
+//GAME
+const sChunkX = 16
+const sChunkY = 16
+const sChunkYA = 4
+const sChunkZ = 16
+
+interface subChunk {
+  y: number
+  fullAir: boolean
+  blocks: blockTypes[]
+}
+
+interface chunk {
+  x: number
+  z: number
+  subChunks: subChunk[]
+}
+
+interface world {
+  chunks: chunk[]
+}
+
+enum blockTypes {
+  air,
+  stone,
+  dirt,
+  grass,
+}
+
+function createChunk(x: number, z: number): chunk {
+  const subChunks: subChunk[] = []
+
+  for (let y = 0; y < sChunkYA; y++) {
+    const blocks: blockTypes[] = new Array(sChunkX * sChunkY * sChunkZ).fill(
+      blockTypes.air,
+    )
+
+    let fullAir = true
+    for (let i = 0; i < blocks.length; i++) {
+      if (Math.random(0, 10) == 0) {
+        blocks[i] = blockTypes.stone
+        fullAir = false
+      }
+    }
+
+    subChunks.push({
+      y,
+      fullAir: fullAir,
+      blocks,
+    })
+  }
+
+  return {
+    x,
+    z,
+    subChunks,
+  }
+}
+
+function index(x: number, y: number, z: number): number {
+  return y * sChunkX * sChunkZ + z * sChunkX + x
+}
+
+function setBlock(c: chunk, x: number, y: number, z: number, type: blockTypes) {
+  const subChunk = c.subChunks[Math.floor(y / sChunkY)]
+  const localY = y % sChunkY
+  subChunk.blocks[index(x, localY, z)] = type
+}
+
+function getBlock(c: chunk, x: number, y: number, z: number): blockTypes {
+  const subChunk = c.subChunks[Math.floor(y / sChunkY)]
+  const localY = y % sChunkY
+  return subChunk.blocks[index(x, localY, z)]
+}
+
+const world: world = { chunks: [] }
+
+for (let cx = -1; cx <= 1; cx++) {
+  for (let cz = -1; cz <= 1; cz++) {
+    const c = createChunk(cx, cz)
+
+    for (let x = 0; x < sChunkX; x++) {
+      for (let z = 0; z < sChunkZ; z++) {
+        setBlock(c, x, 0, z, blockTypes.grass)
+        setBlock(c, x, 1, z, blockTypes.dirt)
+        for (let y = 2; y < sChunkY; y++) {
+          setBlock(c, x, y, z, blockTypes.stone)
+        }
+      }
+    }
+
+    world.chunks.push(c)
+  }
+}
+
+function isTransparent(type: blockTypes): boolean {
+  return type === blockTypes.air
+}
+
+// ==================== 3D Renderer + Camera ====================
+
+type Vec3 = [number, number, number]
+type Triangle = [Vec3, Vec3, Vec3, number]
+
+const camera = { x: 0, y: 0, z: -10, yaw: 0, pitch: 0, fov: 90, nearZ: 0.1, focalLength: 300, yawCos: 0, yawSin: 0, pitchCos: 0, pitchSin: 0, scale: 30 }
+let scene: Triangle[] = []
+
+function addCube(center: Vec3, size: number = 1, colors?: any) {
+  const c = size / 2
+  const cx = center[0]
+  const cy = center[1]
+  const cz = center[2]
+
+  const v: Vec3[] = [
+    [-c,-c,-c], [ c,-c,-c], [-c, c,-c], [ c, c,-c],
+    [-c,-c, c], [ c,-c, c], [-c, c, c], [ c, c, c]
+  ]
+
+  for (let i = 0; i < v.length; i++) {
+    v[i][0] += cx
+    v[i][1] += cy
+    v[i][2] += cz
+  }
+
+  const col = colors || { front:0xff0000, back:0x00ff00, top:0x0000ff,
+                          bottom:0xffff00, left:0xff00ff, right:0x00ffff }
+
+  const push = (i1:number,i2:number,i3:number,color:number) => scene.push([v[i1],v[i2],v[i3],color])
+
+  // Front
+  push(4,5,7,col.front); push(4,7,6,col.front)
+  // Back
+  push(1,0,2,col.back); push(1,2,3,col.back)
+  // Top
+  push(2,6,7,col.top); push(2,7,3,col.top)
+  // Bottom
+  push(0,1,5,col.bottom); push(0,5,4,col.bottom)
+  // Left
+  push(0,4,6,col.left); push(0,6,2,col.left)
+  // Right
+  push(5,1,3,col.right); push(5,3,7,col.right)
+}
+
+function isFrontface(tri: Triangle): boolean {
+  const p1 = tri[0]
+  const p2 = tri[1]
+  const p3 = tri[2]
+  
+  const ux = p2[0] - p1[0]
+  const uy = p2[1] - p1[1]
+  const uz = p2[2] - p1[2]
+
+  const vx = p3[0] - p1[0]
+  const vy = p3[1] - p1[1]
+  const vz = p3[2] - p1[2]
+
+  const dx = p1[0] - camera.x
+  const dy = p1[1] - camera.y
+  const dz = p1[2] - camera.z
+
+  const dot = (uy * vz - uz * vy) * dx
+            + (uz * vx - ux * vz) * dy
+            + (ux * vy - uy * vx) * dz
+
+  return dot < 0
+}
+
+function vertexShader(p: Vec3): Vec3 | null {
+  const dx = p[0] - camera.x
+  const dy = p[1] - camera.y
+  const dz = p[2] - camera.z
+
+  /*const x1 = dx * camera.yawCos - dz * camera.yawSin
+  const z1 = dx * camera.yawSin + dz * camera.yawCos
+
+  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
+  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos*/
+  const x1 = dx * camera.yawCos - dz * camera.yawSin
+  const z1 = dx * camera.yawSin + dz * camera.yawCos
+
+  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
+  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos
+
+  if (z2 <= camera.nearZ) return null
+  return [x1, y2, z2]
+}
+
+function projectToScreen(p: Vec3) {
+  const s = camera.scale
+  const f = camera.focalLength
+  const x = (p[0] / p[2]) / s * f
+  const y = (p[1] / p[2]) / s * f
+  return [x, y, p[2]]
+}
+
+function fragmentShader(a: Vec3, b: Vec3, c: Vec3, color: number) {
+  const p0 = projectToScreen(a)
+  const p1 = projectToScreen(b)
+  const p2 = projectToScreen(c)
+
+  drawTriangle(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], color, -Math.min(p0[2], p1[2], p2[2]))
+}
+
+function renderScene() {
+  for (let tri of scene as any) {
+    if (!isFrontface(tri)) continue 
+    const a = vertexShader(tri[0])
+    const b = vertexShader(tri[1])
+    const c = vertexShader(tri[2])
+    if (!a || !b || !c) continue
+    fragmentShader(a, b, c, randColor())
+    
+  }
+}
+
+function inputs() {
+  const speed    = 0.2,
+        rotSpeed = 2
+  let rotatedY = false
+  let rotatedP = false
+  if (Keyboard.keyHeld(Key.ArrowLeft)) { camera.yaw -= rotSpeed; rotatedY = true }
+  if (Keyboard.keyHeld(Key.ArrowRight)) { camera.yaw += rotSpeed; rotatedY = true }
+  if (Keyboard.keyHeld(Key.ArrowUp)) { camera.pitch += rotSpeed; rotatedP = true }
+  if (Keyboard.keyHeld(Key.ArrowDown)) { camera.pitch -= rotSpeed; rotatedP = true }
+
+  if (rotatedY) {
+    camera.yawCos = Math.cos(camera.yaw)
+    camera.yawSin = Math.sin(camera.yaw)
+  }
+  if (rotatedP) {
+    camera.pitchCos = Math.cos(camera.pitch)
+    camera.pitchSin = Math.sin(camera.pitch)
+  }
+  
+  
+  if (Keyboard.keyHeld(Key.W)) {
+    camera.x += camera.yawSin * speed
+    camera.z += camera.yawCos * speed
+  }
+  if (Keyboard.keyHeld(Key.S)) {
+    camera.x -= camera.yawSin * speed
+    camera.z -= camera.yawCos * speed
+  }
+  if (Keyboard.keyHeld(Key.A)) {
+    camera.x -= camera.yawCos * speed
+    camera.z += camera.yawSin * speed
+  }
+  if (Keyboard.keyHeld(Key.D)) {
+    camera.x += camera.yawCos * speed
+    camera.z -= camera.yawSin * speed
+  }
+  if (Keyboard.keyHeld(Key.Space)) camera.y += speed
+  if (Keyboard.keyHeld(Key.Shift)) camera.y -= speed
+}
+
+
+/* DEPRICATED::
+
+function rotate3D(p: Vec3, yawCos: number, yawSin: number, pitchCos: number, pitchSin: number): Vec3 {
+  const x1 = p[0] * yawCos - p[2] * yawSin
+  const z1 = p[0] * yawSin + p[2] * yawCos
+
+  const y2 = p[1] * pitchCos - z1 * pitchSin
+  const z2 = p[1] * pitchSin + z1 * pitchCos
+
+  return [x1, y2, z2]
+}
+
+*/
+
+// ====================== INIT =======================
+function init() {
+  camera.scale = Math.tan(camera.fov/2)
+  camera.yawCos = Math.cos(camera.yaw)
+  camera.yawSin = Math.sin(camera.yaw)
+  camera.pitchCos = Math.cos(camera.pitch)
+  camera.pitchSin = Math.sin(camera.pitch)
+}
+
+// ==================== Main Loop ====================
+let t = 0
+init()
+forever(function () {
+  t++
+  scene = []
+  inputs()
+  // Beispielwürfel
+  addCube([0, 0, 5], 2)
+  addCube([3, 0, 8], 1, {
+    front: 0xffff00,
+    back: 0xff00ff,
+    top: 0x00ffff,
+    bottom: 0xff0000,
+    left: 0x00ff00,
+    right: 0x0000ff,
+  })
+  renderScene()
+  drawFrame()
+  fpsTxt.text = measureFPS().avgFps + ""
+})
+
+const fpsTxt = Game.createText("")
+const cloneTxt = Game.createText("")
+fpsTxt.x = -300
+fpsTxt.y = 220
+fpsTxt.style.align = "left"
+cloneTxt.x = -300
+cloneTxt.y = 180
+cloneTxt.style.align = "left"
+globals.gameRunning = true
+
+const triAmt = 400
+
+const SW2 = Game.width / 2
+const SH2 = Game.height / 2
+
+function createFrame() {
+  for (let i = 0; i < triAmt; i++) {
+    drawTriangle(
+      Math.random(-SW2, SW2),
+      Math.random(-SH2, SH2),
+      Math.random(-SW2, SW2),
+      Math.random(-SH2, SH2),
+      Math.random(-SW2, SW2),
+      Math.random(-SH2, SH2),
+      randColor(),
+      Math.random(-100, -1),
+    )
+  }
+}
+
+//------------- TRIANGLE RENDERER -------------
+const xPixelSize = 2650 / 8 / Game.width
+const yPixelSize = 1880 / 8 / Game.height
+const triangleM = 64 / 55
+sprite.x = 1000
+sprite.y = 1000
+sprite.size = 1
+const t1 = "triangle_yh"
+const t1_l = "triangle_yh_l"
+const t1_r = "triangle_yh_r"
+
+const allSprites = [
+  "triangle_yh",
+  "triangle_yh_r",
+  "triangle_yh_l",
+  "square_yh",
+]
+
+function randColor() {
+  return Math.random(0x000000, 0xdddddd)
+}
+
+interface CloneEntry {
+  clone: any
+}
+interface DrawEntry {
+  width: number
+  height: number
+  x: number
+  y: number
+  rotation: number
+  texture: string
+  color: number
+  dist: number
+}
+
+let cloneList: CloneEntry[] = []
+let drawList: DrawEntry[] = []
+let lastUsedClones = 0
+
+let cloneGroups: { [key: string]: { clones: CloneEntry[]; lastUsed: number } } =
+  {}
+let drawGroups: { [key: string]: DrawEntry[] } = {}
+function addToDrawList(entry: DrawEntry) {
+  if (!drawGroups[entry.texture]) {
+    drawGroups[entry.texture] = []
+  }
+  drawGroups[entry.texture].push(entry)
+}
+
+onCloneStart(function (clone) {
+  cloneList.push({
+    clone: clone,
+  })
+})
+
+function drawFrame() {
+  // Ein temporäres Objekt, um zu verfolgen, welche Klone in diesem Frame verwendet werden
+  const usedClonesInThisFrame: { [key: string]: boolean } = {}
+
+  // 1. Verarbeite die aktuelle Zeichnungsliste
+  for (const texture in drawGroups) {
+    const drawListSprite = drawGroups[texture]
+
+    // Markiere die Textur als verwendet
+    usedClonesInThisFrame[texture] = true
+
+    let group = cloneGroups[texture]
+    if (!group) {
+      group = { clones: [], lastUsed: 0 }
+      cloneGroups[texture] = group
+    }
+
+    // Erstelle neue Klone, falls nötig
+    for (let j = group.clones.length; j < drawListSprite.length; j++) {
+      const newClone = createClone()
+      newClone.setCostume(texture)
+      group.clones.push({ clone: newClone })
+    }
+
+    // Aktualisiere die Eigenschaften der verwendeten Klone
+    for (let j = 0; j < drawListSprite.length; j++) {
+      const entry = drawListSprite[j]
+      const clone = group.clones[j].clone
+
+      clone.layer = entry.dist
+      clone.x = entry.x
+      clone.y = entry.y
+      clone.width = entry.width
+      clone.height = entry.height
+      clone.rotation = entry.rotation
+      clone.tint = entry.color
+      clone.visible = true
+    }
+
+    // Setze den Zähler für die nächste Runde
+    group.lastUsed = drawListSprite.length
+    drawGroups[texture] = []
+  }
+
+  // 2. Gehe durch alle Klon-Gruppen und blende unbenutzte Klone aus
+  for (const texture in cloneGroups) {
+    if (!usedClonesInThisFrame[texture]) {
+      // Wenn diese Gruppe in diesem Frame nicht verwendet wurde, blende alle Klone aus
+      const group = cloneGroups[texture]
+      for (let j = 0; j < group.clones.length; j++) {
+        group.clones[j].clone.visible = false
+      }
+      group.lastUsed = 0 // Setze den Zähler zurück
+    } else {
+      // Wenn die Gruppe verwendet wurde, aber weniger Klone als im letzten Frame,
+      // blende die überschüssigen Klone aus
+      const group = cloneGroups[texture]
+      for (let j = group.lastUsed; j < group.clones.length; j++) {
+        group.clones[j].clone.visible = false
+      }
+    }
+  }
+}
+
+///*#
+let lastTime = performance.now()
+let frames = 0
+let fps = 0
+let avgFps = 0
+const samples: number[] = []
+const maxSamples = 100
+
+function measureFPS() {
+  frames++
+  const now = performance.now()
+  const diff = now - lastTime
+
+  if (diff >= 1000) {
+    fps = (frames * 1000) / diff
+
+    samples.push(fps)
+    if (samples.length > maxSamples) {
+      samples.shift()
+    }
+
+    avgFps = samples.reduce((a, b) => a + b, 0) / samples.length
+
+    frames = 0
+    lastTime = now
+  }
+
+  return { fps, avgFps }
+} //#
+
+function drawTriangle(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  color: number,
+  dist: number,
+) {
+  const orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+  if (orientation > 0) {
+    const tempX = x2
+    x2 = x3
+    x3 = tempX
+
+    const tempY = y2
+    y2 = y3
+    y3 = tempY
+  }
+
+  //---TRIANGLE TYPE FILTER
+  const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
+  const hypSideP = triVals.hypSideP
+  const rightTriangles = splitTriangleIntoRightTriangles(hypSideP)
+  const t = rightTriangles[0]
+  const triVals1 = analyzeTriangleR(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
+  drawTrianglePartRA(
+    triVals1.hypSideP,
+    triVals1.kathl1,
+    triVals1.kathl2,
+    true,
+    color,
+    dist,
+  )
+  const d = rightTriangles[1]
+  const triVals2 = analyzeTriangleR(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
+  drawTrianglePartRA(
+    triVals2.hypSideP,
+    triVals2.kathl1,
+    triVals2.kathl2,
+    true,
+    color,
+    dist,
+  )
+}
+
+function splitTriangleIntoRightTriangles(hypSidePoints: {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  x3: number
+  y3: number
+}) {
+  const A = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+  const B = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+  const C = { x: hypSidePoints.x3, y: hypSidePoints.y3 }
+  const an = angleBetween(A, B)
+  const g = intersectPoint(C, an, A, B)
+
+  return [
+    { x1: B.x, y1: B.y, x2: C.x, y2: C.y, x3: g.x, y3: g.y },
+    { x1: A.x, y1: A.y, x2: g.x, y2: g.y, x3: C.x, y3: C.y },
+  ]
+}
+
+function drawTrianglePartRA(
+  hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
+  kathl: { x1: number; y1: number; x2: number; y2: number },
+  kathl2: { x1: number; y1: number; x2: number; y2: number },
+  c: boolean,
+  co: number,
+  dist: number,
+) {
+  const k1 = { x: kathl.x1, y: kathl.y1 }
+  const k2 = { x: kathl.x2, y: kathl.y2 }
+
+  const kk1 = { x: kathl2.x1, y: kathl2.y1 }
+  const kk2 = { x: kathl2.x2, y: kathl2.y2 }
+
+  const baseLength = distance(kk1, kk2)
+  const height = distance(k1, k2)
+  const midX = (k1.x + k2.x) / 2
+  const midY = (k1.y + k2.y) / 2
+
+  const rightPoint = {
+    x:
+      hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1
+        ? kathl2.x1
+        : kathl2.x2,
+    y:
+      hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1
+        ? kathl2.y1
+        : kathl2.y2,
+  }
+  const vx = k2.x - k1.x
+  const vy = k2.y - k1.y
+  const wx = rightPoint.x - k1.x
+  const wy = rightPoint.y - k1.y
+
+  const cross = vx * wy - vy * wx
+  const rot = cross < 0 ? 90 : -90
+
+  const angle = angleBetween(k1, k2) + rot
+  const moved = move(midX, midY, angle, -height / 12.6)
+
+  let drawSprite = t1_r
+  if (rot == 90) drawSprite = t1_l
+  addToDrawList({
+    width: baseLength * xPixelSize * 1.91,
+    height: height * yPixelSize * triangleM,
+    x: moved.x,
+    y: moved.y,
+    rotation: angle + 90,
+    texture: drawSprite,
+    color: co,
+    dist: dist,
+  })
+}
+
+function trianglePieceHyp(
+  kathl2: {
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+    x3: number
+    y3: number
+  },
+  c: number,
+  dist: number,
+) {
+  const p1 = { x: kathl2.x1, y: kathl2.y1 }
+  const p2 = { x: kathl2.x2, y: kathl2.y2 }
+  const p3 = { x: kathl2.x3, y: kathl2.y3 }
+  const hypAngle = angleBetween(p1, p2)
+  const p1p2xM = (p1.x + p2.x) / 2
+  const p1p2yM = (p1.y + p2.y) / 2
+
+  const angle = hypAngle - 180
+  const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
+  const moved = move(p1p2xM, p1p2yM, angle, -(height / 2) / triangleM)
+  addToDrawList({
+    width: distance(p1, p2) * xPixelSize,
+    height: height * yPixelSize,
+    x: moved.x,
+    y: moved.y,
+    rotation: angle + 90,
+    texture: t1,
+    color: c,
+    dist: dist,
+  })
+}
+
+function analyzeTriangle(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+) {
+  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+
+  let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+
+  if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+    hypSideP = { x1, y1, x2, y2, x3, y3 }
+  } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+  } else {
+    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+  }
+
+  return {
+    hypSideP,
+  }
+}
+
+function analyzeTriangleR(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+) {
+  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+
+  let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+  let kathl1 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+  let kathl2 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+
+  if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+    hypSideP = { x1, y1, x2, y2, x3, y3 }
+    const k1 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+    const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+    kathl1 = length_p2p3 >= length_p3p1 ? k1 : k2
+    kathl2 = length_p2p3 >= length_p3p1 ? k2 : k1
+  } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+    const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+    const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+    kathl1 = length_p1p2 >= length_p3p1 ? k1 : k2
+    kathl2 = length_p1p2 >= length_p3p1 ? k2 : k1
+  } else {
+    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+    const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+    const k2 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+    kathl1 = length_p1p2 >= length_p2p3 ? k1 : k2
+    kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
+  }
+
+  return {
+    hypSideP,
+    kathl1,
+    kathl2,
+  }
+}
+
+function getRightAngleVertex(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  toleranceT: number = 1e-6,
+): { x: number; y: number } | null {
+  const dot1 = (x2 - x1) * (x3 - x1) + (y2 - y1) * (y3 - y1)
+  if (Math.abs(dot1) < toleranceT) return { x: x1, y: y1 }
+
+  const dot2 = (x1 - x2) * (x3 - x2) + (y1 - y2) * (y3 - y2)
+  if (Math.abs(dot2) < toleranceT) return { x: x2, y: y2 }
+
+  const dot3 = (x1 - x3) * (x2 - x3) + (y1 - y3) * (y2 - y3)
+  if (Math.abs(dot3) < toleranceT) return { x: x3, y: y3 }
+
+  return null
+}
+
+function drawLine(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  t: number,
+  c: number,
+  d: number = 100,
+) {
+  const p1 = { x: x1, y: y1 }
+  const p2 = { x: x2, y: y2 }
+
+  addToDrawList({
+    width: xPixelSize * t,
+    height: distance(p1, p2) * yPixelSize,
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2,
+    rotation: angleBetween(p1, p2),
+    texture: "square_yh",
+    color: c,
+    dist: d,
+  })
+}
+
+function drawDot(x1: number, y1: number, t: number, c: number, dist: number) {
+  addToDrawList({
+    width: xPixelSize * t,
+    height: t * yPixelSize,
+    x: x1,
+    y: y1,
+    rotation: 0,
+    texture: "square_yh",
+    color: c,
+    dist: dist,
+  })
+}
+
+function move(x: number, y: number, rotation: number, amount: number) {
+  return {
+    x: x + Math.cos(rotation) * amount,
+    y: y - Math.sin(rotation) * amount,
+  }
+}
+
+function intersectPoint(
+  p: { x: number; y: number },
+  angle: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+) {
+  angle += 90
+  const dx1 = b.x - a.x
+  const dy1 = b.y - a.y
+  const dx2 = Math.sin(angle)
+  const dy2 = Math.cos(angle)
+
+  const det = dx2 * dy1 - dy2 * dx1
+  if (Math.abs(det) < 1e-10) {
+    //console.log("PARALLEL")
+    Game.stop()
+  }
+
+  const s = ((a.x - p.x) * dy1 - (a.y - p.y) * dx1) / det
+
+  const ix = p.x + s * dx2
+  const iy = p.y + s * dy2
+
+  return { x: ix, y: iy }
+}
+
+function angleBetween(p1: any, p2: any): number {
+  const dx = p2.x - p1.x
+  const dy = p2.y - p1.y
+  return Math.atan2(dx, dy)
+}
+
+function distance(p1: any, p2: any): number {
+  const dx = p2.x - p1.x
+  const dy = p2.y - p1.y
+  return Math.sqrt(dx * dx + dy * dy)
+}
+//*/
+
+/*
+const textSize = 20
+const textScX = 0.55
+const textWidth = Math.ceil(Game.width / (textSize * textScX) / 1.86)
+const textHeight = Math.ceil(Game.height / textSize)
+
+// 1. Pro Tile ein Text-Objekt
+
+const textObjects: Text[][] = []
+let Camt = 0
+for (let y = 0; y < textHeight; y++) {
+  const row: Text[] = []
+  for (let x = 0; x < textWidth; x++) {
+    const t = Game.createText("██", {
+      fontSize: textSize,
+      fontFamily: "Cascadia Mono",
+      lineHeight: textSize * 1.15,
+      letterSpacing: -0.05,
+      align: "center",
+    })
+    Camt++
+    t.x = -Game.width / 2 + textSize / 2 + x * textSize
+    t.y = -Game.height / 2 + textSize / 2 + y * textSize
+    row.push(t)
+  }
+  textObjects.push(row)
+}
+
+// 2. Vorheriges Frame speichern (optional, für minimale Updates)
+let prevFrame: number[][] = Array.from({ length: textHeight }, () =>
+  Array(textWidth).fill(""),
+)
+
+// 3. FPS- und Clones-Text
+const fpsTxt = Game.createText("")
+fpsTxt.x = -300
+fpsTxt.y = 220
+fpsTxt.style.align = "left"
+
+const cloneTxt = Game.createText("")
+cloneTxt.x = -300
+cloneTxt.y = 180
+cloneTxt.style.align = "left"
+
+cloneTxt.text = "" + Camt
+// 4. Haupt-Loop, nur 1 Zeichen pro Tile setzen
+forever(function () {
+  for (let y = 0; y < textHeight; y++) {
+    for (let x = 0; x < textWidth; x++) {
+      //const color = palette[Math.floor(Math.random(0, palette.length))];
+      const color = Math.random(0x000000, 0xffffff)
+      if (prevFrame[y][x] !== color) {
+        const r = textObjects[y][x]
+        r.style.fill = color
+        prevFrame[y][x] = color
+      }
+    }
+  }
+
+  fpsTxt.text = measureFPS().avgFps + ""
+})
+
+let lastTime = performance.now()
+let frames = 0
+let fps = 0
+let avgFps = 0
+const samples: number[] = []
+const maxSamples = 100
+
+function measureFPS() {
+  frames++
+  const now = performance.now()
+  const diff = now - lastTime
+
+  if (diff >= 1000) {
+    fps = (frames * 1000) / diff
+    samples.push(fps)
+    if (samples.length > maxSamples) samples.shift()
+    avgFps = samples.reduce((a, b) => a + b, 0) / samples.length
+    frames = 0
+    lastTime = now
+  }
+
+  return { fps, avgFps }
+}
+//EVERY PIXEL ONE TEXT DISPLAY
+*/
+//OPTIMIZED
