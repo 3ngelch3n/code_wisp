@@ -63,59 +63,75 @@ function index(x: number, y: number, z: number): number {
 
 function setBlock(c: chunk, x: number, y: number, z: number, type: blockTypes) {
   // Check if coordinates are within chunk bounds
-  if (x < 0 || x >= sChunkX || y < 0 || y >= sChunkYA * sChunkY || z < 0 || z >= sChunkZ) {
+  if (
+    x < 0 ||
+    x >= sChunkX ||
+    y < 0 ||
+    y >= sChunkYA * sChunkY ||
+    z < 0 ||
+    z >= sChunkZ
+  ) {
     // Log an error or simply do nothing if the block is outside the chunk
-    console.error(`Attempted to set a block outside of chunk bounds: (${x}, ${y}, ${z})`);
-    return;
+    console.error(
+      `Attempted to set a block outside of chunk bounds: (${x}, ${y}, ${z})`,
+    )
+    return
   }
 
-  const subChunkIndex = Math.floor(y / sChunkY);
-  const localY = y % sChunkY;
-  const subChunk = c.subChunks[subChunkIndex];
+  const subChunkIndex = Math.floor(y / sChunkY)
+  const localY = y % sChunkY
+  const subChunk = c.subChunks[subChunkIndex]
 
   // This check is a safeguard, though the bounds check above should prevent it
   if (!subChunk) {
-    console.error(`SubChunk at index ${subChunkIndex} is undefined.`);
-    return;
+    console.error(`SubChunk at index ${subChunkIndex} is undefined.`)
+    return
   }
 
-  subChunk.blocks[index(x, localY, z)] = type;
+  subChunk.blocks[index(x, localY, z)] = type
 }
 
 function getBlock(c: chunk, x: number, y: number, z: number): blockTypes {
   // Check if coordinates are within chunk bounds
-  if (x < 0 || x >= sChunkX || y < 0 || y >= sChunkYA * sChunkY || z < 0 || z >= sChunkZ) {
+  if (
+    x < 0 ||
+    x >= sChunkX ||
+    y < 0 ||
+    y >= sChunkYA * sChunkY ||
+    z < 0 ||
+    z >= sChunkZ
+  ) {
     // Return a safe, non-solid block type for out-of-bounds requests
-    return blockTypes.air;
+    return blockTypes.air
   }
 
-  const subChunkIndex = Math.floor(y / sChunkY);
-  const localY = y % sChunkY;
-  const subChunk = c.subChunks[subChunkIndex];
+  const subChunkIndex = Math.floor(y / sChunkY)
+  const localY = y % sChunkY
+  const subChunk = c.subChunks[subChunkIndex]
 
   // Safeguard check, though the bounds check should handle it
   if (!subChunk) {
-    return blockTypes.air;
+    return blockTypes.air
   }
 
-  return subChunk.blocks[index(x, localY, z)];
+  return subChunk.blocks[index(x, localY, z)]
 }
 
 const world: world = { chunks: [] }
 
-for (let cx = 0; cx <= 0; cx++) {
-  for (let cz = 0; cz <= 0; cz++) {
+for (let cx = 0; cx <= 1; cx++) {
+  for (let cz = 0; cz <= 1; cz++) {
     const c = createChunk(cx, cz)
 
     for (let x = 0; x < sChunkX; x++) {
       for (let z = 0; z < sChunkZ; z++) {
         for (let y = 2; y < sChunkY; y++) {
           if (y < sChunkY - 2) {
-            setBlock(c, x, y, z, blockTypes.stone)   // unten Stein
+            setBlock(c, x, y, z, blockTypes.stone) // unten Stein
           } else if (y === sChunkY - 2) {
-            setBlock(c, x, y, z, blockTypes.dirt)    // dann Dirt
+            setBlock(c, x, y, z, blockTypes.dirt) // dann Dirt
           } else if (y === sChunkY - 1) {
-            setBlock(c, x, y, z, blockTypes.grass)   // oben Gras
+            setBlock(c, x, y, z, blockTypes.grass) // oben Gras
           }
         }
       }
@@ -359,80 +375,337 @@ function init() {
   camera.yawSin = Math.sin(camera.yaw)
   camera.pitchCos = Math.cos(camera.pitch)
   camera.pitchSin = Math.sin(camera.pitch)
-  for (const c of world.chunks) {
-    for (let x = 0; x < sChunkX; x++) {
-      for (let y = 0; y < sChunkYA * sChunkY; y++) {
-        for (let z = 0; z < sChunkZ; z++) {
-          const blockType = getBlock(c, x, y, z);
+  for (const c of world.chunks as any) {
+    c.mesh = buildChunkMesh(c)
+  }
+}
 
-          if (blockType !== blockTypes.air) {
-            addBlockFaces(c, x, y, z, blockType);
+function buildChunkMesh(c: chunk) {
+  // First pass for top faces
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    greedyTopFace(c, y);
+  }
+
+  // Second pass for side faces on the X-axis
+  for (let x = 0; x < sChunkX; x++) {
+    greedyXFace(c, x);
+  }
+
+  // Third pass for side faces on the Z-axis
+  for (let z = 0; z < sChunkZ; z++) {
+    greedyZFace(c, z);
+  }
+}
+
+function addBlockFaces(c: chunk, x: number, y: number, z: number, type: blockTypes) {
+  const blockSize = 1
+  const halfSize = blockSize / 2
+  const cx = c.x * sChunkX + x
+  const cy = y
+  const cz = c.z * sChunkZ + z
+
+  const v: Vec3[] = [
+    [cx - halfSize, cy - halfSize, cz - halfSize],
+    [cx + halfSize, cy - halfSize, cz - halfSize],
+    [cx - halfSize, cy + halfSize, cz - halfSize],
+    [cx + halfSize, cy + halfSize, cz - halfSize],
+    [cx - halfSize, cy - halfSize, cz + halfSize],
+    [cx + halfSize, cy - halfSize, cz + halfSize],
+    [cx - halfSize, cy + halfSize, cz + halfSize],
+    [cx + halfSize, cy + halfSize, cz + halfSize],
+  ]
+  const push = (i1: number, i2: number, i3: number, color: number) =>
+    scene.push([v[i1], v[i2], v[i3], color])
+  const colors = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00,
+  }
+  const color = colors[blockTypes[type] as keyof typeof colors]
+
+  if (getBlockWorld(cx + 1, cy, cz) === blockTypes.air) {
+    push(5, 1, 3, color)
+    push(5, 3, 7, color)
+  }
+  if (getBlockWorld(cx - 1, cy, cz) === blockTypes.air) {
+    push(0, 4, 6, color)
+    push(0, 6, 2, color)
+  }
+  if (getBlockWorld(cx, cy + 1, cz) === blockTypes.air) {
+    push(2, 6, 7, color)
+    push(2, 7, 3, color)
+  }
+  if (getBlockWorld(cx, cy - 1, cz) === blockTypes.air) {
+    push(0, 1, 5, color)
+    push(0, 5, 4, color)
+  }
+  if (getBlockWorld(cx, cy, cz + 1) === blockTypes.air) {
+    push(4, 5, 7, color)
+    push(4, 7, 6, color)
+  }
+  if (getBlockWorld(cx, cy, cz - 1) === blockTypes.air) {
+    push(1, 0, 2, color)
+    push(1, 2, 3, color)
+  }
+}
+
+function greedyTopFace(c: chunk, y: number) {
+  const mask: (number | null)[][] = []
+  
+  // 1. Maske erstellen
+  for (let z = 0; z < sChunkZ; z++) {
+    mask[z] = []
+    for (let x = 0; x < sChunkX; x++) {
+      const block = getBlock(c, x, y, z)
+      const above = getBlock(c, x, y + 1, z)
+      mask[z][x] = (block !== blockTypes.air && above === blockTypes.air) ? block : null
+    }
+  }
+
+  // 2. Masken-Scan für Rechtecke
+  const visited: boolean[][] = Array.from({ length: sChunkZ }, () => Array(sChunkX).fill(false))
+
+  for (let z = 0; z < sChunkZ; z++) {
+    for (let x = 0; x < sChunkX; x++) {
+      if (visited[z][x] || mask[z][x] === null) continue
+
+      const color = mask[z][x]
+
+      let width = 1
+      while (x + width < sChunkX && mask[z][x + width] === color && !visited[z][x + width]) width++
+
+      let height = 1
+      let keep = true
+      while (keep && z + height < sChunkZ) {
+        for (let k = 0; k < width; k++) {
+          if (mask[z + height][x + k] !== color || visited[z + height][x + k]) {
+            keep = false
+            break
           }
+        }
+        if (keep) height++
+      }
+
+      // 3. Dreiecke für das Rechteck erzeugen
+      const x0 = c.x * sChunkX + x
+      const z0 = c.z * sChunkZ + z
+      if (color !== null) {
+        console.log("added quad", color, width, height)
+        addQuadTop([x0, y, z0], width, height, color)
+      }
+        
+      // 4. Rechteck markieren
+      for (let dz = 0; dz < height; dz++) {
+        for (let dx = 0; dx < width; dx++) {
+          visited[z + dz][x + dx] = true
         }
       }
     }
   }
 }
 
-function addBlockFaces(c: chunk, x: number, y: number, z: number, type: blockTypes) {
-  const blockSize = 1; // Assuming a block size of 1
-  const halfSize = blockSize / 2;
-  const cx = c.x * sChunkX + x;
-  const cy = y;
-  const cz = c.z * sChunkZ + z;
+function greedyXFace(c: chunk, x: number) {
+  const mask: (number | null)[][] = [];
 
-  // Cube vertices relative to block center
-  const v: Vec3[] = [
-    [cx - halfSize, cy - halfSize, cz - halfSize], // 0
-    [cx + halfSize, cy - halfSize, cz - halfSize], // 1
-    [cx - halfSize, cy + halfSize, cz - halfSize], // 2
-    [cx + halfSize, cy + halfSize, cz - halfSize], // 3
-    [cx - halfSize, cy - halfSize, cz + halfSize], // 4
-    [cx + halfSize, cy - halfSize, cz + halfSize], // 5
-    [cx - halfSize, cy + halfSize, cz + halfSize], // 6
-    [cx + halfSize, cy + halfSize, cz + halfSize], // 7
-  ];
-  const push = (i1: number, i2: number, i3: number, color: number) =>
-    scene.push([v[i1], v[i2], v[i3], color]);
-  const colors = {
-    // You can define colors based on block type
+  // 1. Create the mask
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    mask[y] = [];
+    for (let z = 0; z < sChunkZ; z++) {
+      const block = getBlock(c, x, y, z);
+      const neighbor = getBlock(c, x - 1, y, z); // Left neighbor
+
+      if (block !== blockTypes.air && isTransparent(neighbor)) {
+        mask[y][z] = block; // We need a face here
+      } else {
+        mask[y][z] = null;
+      }
+    }
+  }
+
+  // 2. Scan the mask for rectangles and add quads
+  const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
+    Array(sChunkZ).fill(false),
+  );
+
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    for (let z = 0; z < sChunkZ; z++) {
+      if (visited[y][z] || mask[y][z] === null) continue;
+
+      const color = mask[y][z];
+      let height = 1;
+      while (
+        y + height < sChunkYA * sChunkY &&
+        mask[y + height][z] === color &&
+        !visited[y + height][z]
+      )
+        height++;
+
+      let width = 1;
+      let keep = true;
+      while (keep && z + width < sChunkZ) {
+        for (let k = 0; k < height; k++) {
+          if (mask[y + k][z + width] !== color || visited[y + k][z + width]) {
+            keep = false;
+            break;
+          }
+        }
+        if (keep) width++;
+      }
+
+      // 3. Generate the quads
+      const wx0 = c.x * sChunkX + x;
+      const wy0 = y;
+      const wz0 = c.z * sChunkZ + z;
+      addQuadX([wx0, wy0, wz0], height, width, color);
+
+      // 4. Mark the rectangle as visited
+      for (let dy = 0; dy < height; dy++) {
+        for (let dz = 0; dz < width; dz++) {
+          visited[y + dy][z + dz] = true;
+        }
+      }
+    }
+  }
+}
+
+function greedyZFace(c: chunk, z: number) {
+  const mask: (number | null)[][] = [];
+
+  // 1. Create the mask
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    mask[y] = [];
+    for (let x = 0; x < sChunkX; x++) {
+      const block = getBlock(c, x, y, z);
+      const neighbor = getBlock(c, x, y, z - 1); // Back neighbor
+
+      if (block !== blockTypes.air && isTransparent(neighbor)) {
+        mask[y][x] = block; // We need a face here
+      } else {
+        mask[y][x] = null;
+      }
+    }
+  }
+
+  // 2. Scan the mask for rectangles and add quads
+  const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
+    Array(sChunkX).fill(false),
+  );
+
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    for (let x = 0; x < sChunkX; x++) {
+      if (visited[y][x] || mask[y][x] === null) continue;
+
+      const color = mask[y][x];
+      let height = 1;
+      while (
+        y + height < sChunkYA * sChunkY &&
+        mask[y + height][x] === color &&
+        !visited[y + height][x]
+      )
+        height++;
+
+      let width = 1;
+      let keep = true;
+      while (keep && x + width < sChunkX) {
+        for (let k = 0; k < height; k++) {
+          if (mask[y + k][x + width] !== color || visited[y + k][x + width]) {
+            keep = false;
+            break;
+          }
+        }
+        if (keep) width++;
+      }
+
+      // 3. Generate the quads
+      const wx0 = c.x * sChunkX + x;
+      const wy0 = y;
+      const wz0 = c.z * sChunkZ + z;
+      addQuadZ([wx0, wy0, wz0], height, width, color);
+
+      // 4. Mark the rectangle as visited
+      for (let dy = 0; dy < height; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          visited[y + dy][x + dx] = true;
+        }
+      }
+    }
+  }
+}
+
+function addQuadX(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x = start[0];
+  const y0 = start[1];
+  const z0 = start[2];
+  const colorMap = {
     stone: 0x808080,
     dirt: 0x654321,
     grass: 0x00ff00,
   };
-  const color = colors[blockTypes[type] as keyof typeof colors];
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap];
 
-  // Check neighbors and add visible faces
-  // Right face (+X)
-  if (getBlock(c, x + 1, y, z) === blockTypes.air) {
-    push(5, 1, 3, color);
-    push(5, 3, 7, color);
+  const v0: Vec3 = [x, y0, z0];
+  const v1: Vec3 = [x, y0 + h, z0];
+  const v2: Vec3 = [x, y0, z0 + w];
+  const v3: Vec3 = [x, y0 + h, z0 + w];
+
+  scene.push([v0, v3, v1, color]); // First triangle
+  scene.push([v0, v2, v3, color]); // Second triangle
+}
+
+function addQuadZ(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x0 = start[0];
+  const y0 = start[1];
+  const z = start[2];
+  const colorMap = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00,
+  };
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap];
+
+  const v0: Vec3 = [x0, y0, z];
+  const v1: Vec3 = [x0 + w, y0, z];
+  const v2: Vec3 = [x0, y0 + h, z];
+  const v3: Vec3 = [x0 + w, y0 + h, z];
+
+  scene.push([v0, v3, v1, color]); // First triangle
+  scene.push([v0, v2, v3, color]); // Second triangle
+}
+
+function addQuadTop(start: Vec3, w: number, h: number, blockType: blockTypes) {
+  const x0 = start[0]
+  const y = start[1]
+  const z0 = start[2]
+  const colorMap = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00
   }
-  // Left face (-X)
-  if (getBlock(c, x - 1, y, z) === blockTypes.air) {
-    push(0, 4, 6, color);
-    push(0, 6, 2, color);
-  }
-  // Top face (+Y)
-  if (getBlock(c, x, y + 1, z) === blockTypes.air) {
-    push(2, 6, 7, color);
-    push(2, 7, 3, color);
-  }
-  // Bottom face (-Y)
-  if (getBlock(c, x, y - 1, z) === blockTypes.air) {
-    push(0, 1, 5, color);
-    push(0, 5, 4, color);
-  }
-  // Front face (+Z)
-  if (getBlock(c, x, y, z + 1) === blockTypes.air) {
-    push(4, 5, 7, color);
-    push(4, 7, 6, color);
-  }
-  // Back face (-Z)
-  if (getBlock(c, x, y, z - 1) === blockTypes.air) {
-    push(1, 0, 2, color);
-    push(1, 2, 3, color);
-  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+  
+  const v0: Vec3 = [x0, y + 1, z0]
+  const v1: Vec3 = [x0 + w, y + 1, z0]
+  const v2: Vec3 = [x0, y + 1, z0 + h]
+  const v3: Vec3 = [x0 + w, y + 1, z0 + h]
+
+  scene.push([v0, v3, v1, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function getBlockWorld(wx: number, wy: number, wz: number): blockTypes {
+  const cx = Math.floor(wx / sChunkX)
+  const cz = Math.floor(wz / sChunkZ)
+  const lx = ((wx % sChunkX) + sChunkX) % sChunkX // local X
+  const lz = ((wz % sChunkZ) + sChunkZ) % sChunkZ // local Z
+
+  const chunk = getChunkAt(cx, cz)
+  if (!chunk) return blockTypes.air
+
+  return getBlock(chunk, lx, wy, lz)
+}
+
+function getChunkAt(cx: number, cz: number): chunk | undefined {
+  return world.chunks.find(ch => ch.x === cx && ch.z === cz)
 }
 
 // ==================== Main Loop ====================
