@@ -452,7 +452,6 @@ function addBlockFaces(c: chunk, x: number, y: number, z: number, type: blockTyp
 function greedyTopFace(c: chunk, y: number) {
   const mask: (number | null)[][] = []
   
-  // 1. Maske erstellen
   for (let z = 0; z < sChunkZ; z++) {
     mask[z] = []
     for (let x = 0; x < sChunkX; x++) {
@@ -462,7 +461,6 @@ function greedyTopFace(c: chunk, y: number) {
     }
   }
 
-  // 2. Masken-Scan für Rechtecke
   const visited: boolean[][] = Array.from({ length: sChunkZ }, () => Array(sChunkX).fill(false))
 
   for (let z = 0; z < sChunkZ; z++) {
@@ -486,7 +484,6 @@ function greedyTopFace(c: chunk, y: number) {
         if (keep) height++
       }
 
-      // 3. Dreiecke für das Rechteck erzeugen
       const x0 = c.x * sChunkX + x
       const z0 = c.z * sChunkZ + z
       if (color !== null) {
@@ -505,171 +502,220 @@ function greedyTopFace(c: chunk, y: number) {
 }
 
 function greedyXFace(c: chunk, x: number) {
-  const mask: (number | null)[][] = [];
+  const maskLeft: (number | null)[][] = []
+  const maskRight: (number | null)[][] = []
 
-  // 1. Create the mask
   for (let y = 0; y < sChunkYA * sChunkY; y++) {
-    mask[y] = [];
+    maskLeft[y] = []
+    maskRight[y] = []
     for (let z = 0; z < sChunkZ; z++) {
-      const block = getBlock(c, x, y, z);
-      const neighbor = getBlock(c, x - 1, y, z); // Left neighbor
+      const block = getBlock(c, x, y, z)
+      const leftNeighbor = getBlockWorld(c.x * sChunkX + x - 1, y, c.z * sChunkZ + z)
+      const rightNeighbor = getBlockWorld(c.x * sChunkX + x + 1, y, c.z * sChunkZ + z)
 
-      if (block !== blockTypes.air && isTransparent(neighbor)) {
-        mask[y][z] = block; // We need a face here
+      if (block !== blockTypes.air && isTransparent(leftNeighbor)) {
+        maskLeft[y][z] = block
       } else {
-        mask[y][z] = null;
+        maskLeft[y][z] = null
+      }
+
+      if (block !== blockTypes.air && isTransparent(rightNeighbor)) {
+        maskRight[y][z] = block
+      } else {
+        maskRight[y][z] = null
       }
     }
   }
 
-  // 2. Scan the mask for rectangles and add quads
-  const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
-    Array(sChunkZ).fill(false),
-  );
-
-  for (let y = 0; y < sChunkYA * sChunkY; y++) {
-    for (let z = 0; z < sChunkZ; z++) {
-      if (visited[y][z] || mask[y][z] === null) continue;
-
-      const color = mask[y][z];
-      let height = 1;
-      while (
-        y + height < sChunkYA * sChunkY &&
-        mask[y + height][z] === color &&
-        !visited[y + height][z]
-      )
-        height++;
-
-      let width = 1;
-      let keep = true;
-      while (keep && z + width < sChunkZ) {
-        for (let k = 0; k < height; k++) {
-          if (mask[y + k][z + width] !== color || visited[y + k][z + width]) {
-            keep = false;
-            break;
-          }
-        }
-        if (keep) width++;
-      }
-
-      // 3. Generate the quads
-      const wx0 = c.x * sChunkX + x;
-      const wy0 = y;
-      const wz0 = c.z * sChunkZ + z;
-      addQuadX([wx0, wy0, wz0], height, width, color);
-
-      // 4. Mark the rectangle as visited
-      for (let dy = 0; dy < height; dy++) {
-        for (let dz = 0; dz < width; dz++) {
-          visited[y + dy][z + dz] = true;
-        }
-      }
-    }
-  }
+  generateQuadsFromMask(maskLeft, c, x, addQuadLeft)
+  generateQuadsFromMask(maskRight, c, x, addQuadRight)
 }
 
 function greedyZFace(c: chunk, z: number) {
-  const mask: (number | null)[][] = [];
+  const maskBack: (number | null)[][] = []
+  const maskFront: (number | null)[][] = []
 
-  // 1. Create the mask
   for (let y = 0; y < sChunkYA * sChunkY; y++) {
-    mask[y] = [];
+    maskBack[y] = []
+    maskFront[y] = []
     for (let x = 0; x < sChunkX; x++) {
-      const block = getBlock(c, x, y, z);
-      const neighbor = getBlock(c, x, y, z - 1); // Back neighbor
+      const block = getBlock(c, x, y, z)
+      const backNeighbor = getBlockWorld(c.x * sChunkX + x, y, c.z * sChunkZ + z - 1)
+      const frontNeighbor = getBlockWorld(c.x * sChunkX + x, y, c.z * sChunkZ + z + 1)
 
-      if (block !== blockTypes.air && isTransparent(neighbor)) {
-        mask[y][x] = block; // We need a face here
+      if (block !== blockTypes.air && isTransparent(backNeighbor)) {
+        maskBack[y][x] = block
       } else {
-        mask[y][x] = null;
+        maskBack[y][x] = null
+      }
+
+      if (block !== blockTypes.air && isTransparent(frontNeighbor)) {
+        maskFront[y][x] = block
+      } else {
+        maskFront[y][x] = null
       }
     }
   }
 
-  // 2. Scan the mask for rectangles and add quads
-  const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
-    Array(sChunkX).fill(false),
-  );
-
-  for (let y = 0; y < sChunkYA * sChunkY; y++) {
-    for (let x = 0; x < sChunkX; x++) {
-      if (visited[y][x] || mask[y][x] === null) continue;
-
-      const color = mask[y][x];
-      let height = 1;
-      while (
-        y + height < sChunkYA * sChunkY &&
-        mask[y + height][x] === color &&
-        !visited[y + height][x]
-      )
-        height++;
-
-      let width = 1;
-      let keep = true;
-      while (keep && x + width < sChunkX) {
-        for (let k = 0; k < height; k++) {
-          if (mask[y + k][x + width] !== color || visited[y + k][x + width]) {
-            keep = false;
-            break;
-          }
-        }
-        if (keep) width++;
-      }
-
-      // 3. Generate the quads
-      const wx0 = c.x * sChunkX + x;
-      const wy0 = y;
-      const wz0 = c.z * sChunkZ + z;
-      addQuadZ([wx0, wy0, wz0], height, width, color);
-
-      // 4. Mark the rectangle as visited
-      for (let dy = 0; dy < height; dy++) {
-        for (let dx = 0; dx < width; dx++) {
-          visited[y + dy][x + dx] = true;
-        }
-      }
-    }
-  }
+  generateQuadsFromMask(maskBack, c, z, addQuadBack)
+  generateQuadsFromMask(maskFront, c, z, addQuadFront)
 }
 
 function addQuadX(start: Vec3, h: number, w: number, blockType: blockTypes) {
-  const x = start[0];
-  const y0 = start[1];
-  const z0 = start[2];
+  const x = start[0]
+  const y0 = start[1]
+  const z0 = start[2]
   const colorMap = {
     stone: 0x808080,
     dirt: 0x654321,
     grass: 0x00ff00,
-  };
-  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap];
+  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
 
-  const v0: Vec3 = [x, y0, z0];
-  const v1: Vec3 = [x, y0 + h, z0];
-  const v2: Vec3 = [x, y0, z0 + w];
-  const v3: Vec3 = [x, y0 + h, z0 + w];
+  const v0: Vec3 = [x, y0, z0]
+  const v1: Vec3 = [x, y0 + h, z0]
+  const v2: Vec3 = [x, y0, z0 + w]
+  const v3: Vec3 = [x, y0 + h, z0 + w]
 
-  scene.push([v0, v3, v1, color]); // First triangle
-  scene.push([v0, v2, v3, color]); // Second triangle
+  scene.push([v0, v3, v1, color])
+  scene.push([v0, v2, v3, color])
 }
 
 function addQuadZ(start: Vec3, h: number, w: number, blockType: blockTypes) {
-  const x0 = start[0];
-  const y0 = start[1];
-  const z = start[2];
+  const x0 = start[0]
+  const y0 = start[1]
+  const z = start[2]
   const colorMap = {
     stone: 0x808080,
     dirt: 0x654321,
     grass: 0x00ff00,
-  };
-  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap];
+  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
 
-  const v0: Vec3 = [x0, y0, z];
-  const v1: Vec3 = [x0 + w, y0, z];
-  const v2: Vec3 = [x0, y0 + h, z];
-  const v3: Vec3 = [x0 + w, y0 + h, z];
+  const v0: Vec3 = [x0, y0, z]
+  const v1: Vec3 = [x0 + w, y0, z]
+  const v2: Vec3 = [x0, y0 + h, z]
+  const v3: Vec3 = [x0 + w, y0 + h, z]
 
-  scene.push([v0, v3, v1, color]); // First triangle
-  scene.push([v0, v2, v3, color]); // Second triangle
+  scene.push([v0, v3, v1, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function addQuadLeft(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x = start[0]
+  const y0 = start[1]
+  const z0 = start[2]
+  const colorMap = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00,
+  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+  const v0: Vec3 = [x, y0 + h, z0]
+  const v1: Vec3 = [x, y0, z0]
+  const v2: Vec3 = [x, y0, z0 + w]
+  const v3: Vec3 = [x, y0 + h, z0 + w]
+  scene.push([v0, v1, v2, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function addQuadRight(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x = start[0] + 1
+  const y0 = start[1]
+  const z0 = start[2]
+  const colorMap = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00,
+  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+  const v0: Vec3 = [x, y0, z0]
+  const v1: Vec3 = [x, y0 + h, z0]
+  const v2: Vec3 = [x, y0 + h, z0 + w]
+  const v3: Vec3 = [x, y0, z0 + w]
+  scene.push([v0, v1, v2, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function addQuadBack(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x0 = start[0]
+  const y0 = start[1]
+  const z = start[2]
+  const colorMap = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00,
+  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+  const v0: Vec3 = [x0 + w, y0, z]
+  const v1: Vec3 = [x0, y0, z]
+  const v2: Vec3 = [x0, y0 + h, z]
+  const v3: Vec3 = [x0 + w, y0 + h, z]
+  scene.push([v0, v1, v2, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function addQuadFront(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x0 = start[0]
+  const y0 = start[1]
+  const z = start[2] + 1
+  const colorMap = {
+    stone: 0x808080,
+    dirt: 0x654321,
+    grass: 0x00ff00,
+  }
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+  const v0: Vec3 = [x0, y0, z]
+  const v1: Vec3 = [x0 + w, y0, z]
+  const v2: Vec3 = [x0 + w, y0 + h, z]
+  const v3: Vec3 = [x0, y0 + h, z]
+  scene.push([v0, v1, v2, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function generateQuadsFromMask(mask: (number | null)[][], c: chunk, axisCoord: number, addQuadFunc: (start: Vec3, h: number, w: number, blockType: blockTypes) => void) {
+  const isXAxis = addQuadFunc === addQuadLeft || addQuadFunc === addQuadRight
+  const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
+    Array(isXAxis ? sChunkZ : sChunkX).fill(false)
+  )
+  
+  const ySize = sChunkYA * sChunkY
+  const otherSize = isXAxis ? sChunkZ : sChunkX
+
+  for (let y = 0; y < ySize; y++) {
+    for (let other = 0; other < otherSize; other++) {
+      if (visited[y][other] || mask[y][other] === null) continue
+
+      const color = mask[y][other]
+      let height = 1
+      while (y + height < ySize && mask[y + height][other] === color && !visited[y + height][other]) {
+        height++
+      }
+
+      let width = 1
+      let keep = true
+      while (keep && other + width < otherSize) {
+        for (let k = 0; k < height; k++) {
+          if (mask[y + k][other + width] !== color || visited[y + k][other + width]) {
+            keep = false
+            break
+          }
+        }
+        if (keep) width++
+      }
+
+      const x0 = isXAxis ? axisCoord : other
+      const y0 = y
+      const z0 = isXAxis ? other : axisCoord
+      addQuadFunc([c.x * sChunkX + x0, y0, c.z * sChunkZ + z0], height, width, color)
+
+      for (let dy = 0; dy < height; dy++) {
+        for (let dw = 0; dw < width; dw++) {
+          visited[y + dy][other + dw] = true
+        }
+      }
+    }
+  }
 }
 
 function addQuadTop(start: Vec3, w: number, h: number, blockType: blockTypes) {
