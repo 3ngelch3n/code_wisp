@@ -399,6 +399,16 @@ function fragmentShader(a: Vec3, b: Vec3, c: Vec3, color: number) {
   const p1 = projectToScreen(b)
   const p2 = projectToScreen(c)
 
+  const allLeft  = p0[0] < -SW2 && p1[0] < -SW2 && p2[0] < -SW2
+  const allRight = p0[0] >  SW2 && p1[0] >  SW2 && p2[0] >  SW2
+
+  const allTop    = p0[1] < -SH2 && p1[1] < -SH2 && p2[1] < -SH2
+  const allBottom = p0[1] >  SH2 && p1[1] >  SH2 && p2[1] >  SH2
+
+  if (allLeft || allRight || allTop || allBottom) {
+    return
+  }
+  
   drawTriangle(
    [p0[0],
     p0[1],
@@ -448,7 +458,7 @@ function projectToScreen(p: Vec3) {
 
 function drawTriangle(points: number[], color: number) {
   if (renderType == renderTypes.CloneVersion) {
-    CV_drawTriangle(points[0], points[1], points[2], points[3], points[4], points[5], color, Math.min(points[6], points[7], points[8]))
+    CV_drawTriangle(points[0], points[1], points[2], points[3], points[4], points[5], color, -Math.min(points[6], points[7], points[8]))
   } else {
     console.warn("ADD OTHER RENDER TYPE HERE")
   }
@@ -568,6 +578,8 @@ function init() {
 }
 // _____ VARIABLES _____
 let t = 0
+const SW2 = Game.width / 2
+const SH2 = Game.height / 2
 
 // ==================== Main Loop ====================
 forever(function () {
@@ -1019,8 +1031,6 @@ function addQuadTop(start: Vec3, w: number, h: number, blockType: blockTypes) {
 
 //globals.gameRunning = true
 //const triAmt = 400
-const SW2 = Game.width / 2
-const SH2 = Game.height / 2
 /*function createFrame() {
   for (let i = 0; i < triAmt; i++) {
     drawTriangle(
