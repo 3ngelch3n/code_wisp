@@ -1,9 +1,12 @@
-//GAME
-const sChunkX = 16
-const sChunkY = 16
-const sChunkYA = 4
-const sChunkZ = 16
+enum renderTypes {
+  CloneVersion,
+  TextBased
+}
 
+const renderType: renderTypes = renderTypes.CloneVersion 
+
+// ================ WORLD ================
+// ============ WORLD - DATA =============
 interface subChunk {
   y: number
   fullAir: boolean
@@ -27,7 +30,6 @@ enum blockTypes {
   grass,
 }
 
-// Perlin Noise helper
 class PerlinNoise {
   permutation: number[] = []
 
@@ -42,7 +44,10 @@ class PerlinNoise {
 
     for (let i = 255; i > 0; i--) {
       const j = Math.floor(random(i) * (i + 1))
-      ;[this.permutation[i], this.permutation[j]] = [this.permutation[j], this.permutation[i]]
+      ;[this.permutation[i], this.permutation[j]] = [
+        this.permutation[j],
+        this.permutation[i],
+      ]
     }
 
     // duplicate for overflow
@@ -81,60 +86,101 @@ class PerlinNoise {
     const bb = p[p[xi + 1] + yi + 1]
 
     const x1 = this.lerp(this.grad(aa, xf, yf), this.grad(ba, xf - 1, yf), u)
-    const x2 = this.lerp(this.grad(ab, xf, yf - 1), this.grad(bb, xf - 1, yf - 1), u)
+    const x2 = this.lerp(
+      this.grad(ab, xf, yf - 1),
+      this.grad(bb, xf - 1, yf - 1),
+      u,
+    )
     return (this.lerp(x1, x2, v) + 1) / 2 // normalize 0..1
   }
 }
 
-const perlin = new PerlinNoise(42); // seed
+const perlin = new PerlinNoise(42)
 
+// ========= WORLD - GENERATION ==========
 function createChunk(cx: number, cz: number): chunk {
-  const subChunks: subChunk[] = [];
-  const noiseScale = 0.05;       // smoothness
-  const baseHeight = 40;         // base height
-  const heightVariation = 10;    // variation from noise
+  const subChunks: subChunk[] = []
+  const noiseScale = 0.05 // smoothness
+  const baseHeight = 40 // base height
+  const heightVariation = 10 // variation from noise
 
   // Precompute heightmap for chunk
-  const heightMap: number[][] = [];
+  const heightMap: number[][] = []
   for (let lx = 0; lx < sChunkX; lx++) {
-    heightMap[lx] = [];
+    heightMap[lx] = []
     for (let lz = 0; lz < sChunkZ; lz++) {
-      const wx = cx * sChunkX + lx;
-      const wz = cz * sChunkZ + lz;
-      const h = Math.floor(perlin.noise(wx * noiseScale, wz * noiseScale) * heightVariation + baseHeight);
-      heightMap[lx][lz] = h;
+      const wx = cx * sChunkX + lx
+      const wz = cz * sChunkZ + lz
+      const h = Math.floor(
+        perlin.noise(wx * noiseScale, wz * noiseScale) * heightVariation +
+          baseHeight,
+      )
+      heightMap[lx][lz] = h
     }
   }
 
   // Generate subChunks
   for (let sy = 0; sy < sChunkYA; sy++) {
-    const blocks: blockTypes[] = new Array(sChunkX * sChunkY * sChunkZ).fill(blockTypes.air);
-    let fullAir = true;
+    const blocks: blockTypes[] = new Array(sChunkX * sChunkY * sChunkZ).fill(
+      blockTypes.air,
+    )
+    let fullAir = true
 
     for (let lx = 0; lx < sChunkX; lx++) {
       for (let lz = 0; lz < sChunkZ; lz++) {
-        const columnHeight = heightMap[lx][lz];
+        const columnHeight = heightMap[lx][lz]
 
         for (let ly = 0; ly < sChunkY; ly++) {
-          const globalY = sy * sChunkY + ly;
+          const globalY = sy * sChunkY + ly
           if (globalY <= columnHeight) {
-            let blockType = blockTypes.stone;
-            if (globalY === columnHeight) blockType = blockTypes.grass;
-            else if (globalY > columnHeight - 3) blockType = blockTypes.dirt;
+            let blockType = blockTypes.stone
+            if (globalY === columnHeight) blockType = blockTypes.grass
+            else if (globalY > columnHeight - 3) blockType = blockTypes.dirt
 
-            blocks[index(lx, ly, lz)] = blockType;
-            fullAir = false;
+            blocks[index(lx, ly, lz)] = blockType
+            fullAir = false
           }
         }
       }
     }
 
-    subChunks.push({ y: sy, fullAir, blocks });
+    subChunks.push({ y: sy, fullAir, blocks })
   }
 
-  return { x: cx, z: cz, subChunks };
+  return { x: cx, z: cz, subChunks }
 }
 
+// ========= WORLD - INIT ==========
+const sChunkX = 16
+const sChunkY = 16
+const sChunkYA = 4
+const sChunkZ = 16
+const world: world = { chunks: [] }
+function generateStartChunks() {
+for (let cx = -1; cx <= 1; cx++) {
+  for (let cz = -1; cz <= 1; cz++) {
+    const c = createChunk(cx, cz)
+
+    for (let x = 0; x < sChunkX; x++) {
+      for (let z = 0; z < sChunkZ; z++) {
+        for (let y = 2; y < sChunkY; y++) {
+          if (y < sChunkY - 3) {
+            setBlock(c, x, y, z, blockTypes.stone) // unten Stein
+          } else if (y === sChunkY - 2 || y === sChunkY - 3) {
+            setBlock(c, x, y, z, blockTypes.dirt) // dann Dirt
+          } else if (y === sChunkY - 1) {
+            setBlock(c, x, y, z, blockTypes.grass) // oben Gras
+          }
+        }
+      }
+    }
+
+    world.chunks.push(c)
+  }
+}
+}
+
+// ========= WORLD - CONTROL ==========
 function index(x: number, y: number, z: number): number {
   return y * sChunkX * sChunkZ + z * sChunkX + x
 }
@@ -195,42 +241,105 @@ function getBlock(c: chunk, x: number, y: number, z: number): blockTypes {
   return subChunk.blocks[index(x, localY, z)]
 }
 
-const world: world = { chunks: [] }
-
-for (let cx = -1; cx <= 1; cx++) {
-  for (let cz = -1; cz <= 1; cz++) {
-    const c = createChunk(cx, cz)
-
-    for (let x = 0; x < sChunkX; x++) {
-      for (let z = 0; z < sChunkZ; z++) {
-        for (let y = 2; y < sChunkY; y++) {
-          if (y < sChunkY - 3) {
-            setBlock(c, x, y, z, blockTypes.stone) // unten Stein
-          } else if (y === sChunkY - 2 || y === sChunkY - 3) {
-            setBlock(c, x, y, z, blockTypes.dirt) // dann Dirt
-          } else if (y === sChunkY - 1) {
-            setBlock(c, x, y, z, blockTypes.grass) // oben Gras
-          }
-        }
-      }
-    }
-
-    world.chunks.push(c)
-  }
-}
-
 function isTransparent(type: blockTypes): boolean {
   return type === blockTypes.air
 }
 
-// ==================== 3D Renderer + Camera ====================
+function getBlockWorld(wx: number, wy: number, wz: number): blockTypes {
+  const cx = Math.floor(wx / sChunkX)
+  const cz = Math.floor(wz / sChunkZ)
+  const lx = ((wx % sChunkX) + sChunkX) % sChunkX // local X
+  const lz = ((wz % sChunkZ) + sChunkZ) % sChunkZ // local Z
 
+  const chunk = getChunkAt(cx, cz)
+  if (!chunk) return blockTypes.air
+
+  return getBlock(chunk, lx, wy, lz)
+}
+
+function getChunkAt(cx: number, cz: number): chunk | undefined {
+  return world.chunks.find((ch) => ch.x === cx && ch.z === cz)
+}
+
+// ==================== DEPRICATED 3D ====================
+
+/* DEPRICATED::
+
+function rotate3D(p: Vec3, yawCos: number, yawSin: number, pitchCos: number, pitchSin: number): Vec3 {
+  const x1 = p[0] * yawCos - p[2] * yawSin
+  const z1 = p[0] * yawSin + p[2] * yawCos
+
+  const y2 = p[1] * pitchCos - z1 * pitchSin
+  const z2 = p[1] * pitchSin + z1 * pitchCos
+
+  return [x1, y2, z2]
+}
+
+*/
+
+// =================== GAMEPLAY =====================
+function gameplay() {
+  inputs()
+}
+
+function inputs() {
+  const speed = 0.2,
+    rotSpeed = 2
+  let rotatedY = false
+  let rotatedP = false
+  if (Keyboard.keyHeld(Key.J)) {
+    camera.yaw -= rotSpeed
+    rotatedY = true
+  }
+  if (Keyboard.keyHeld(Key.L)) {
+    camera.yaw += rotSpeed
+    rotatedY = true
+  }
+  if (Keyboard.keyHeld(Key.I)) {
+    camera.pitch += rotSpeed
+    rotatedP = true
+  }
+  if (Keyboard.keyHeld(Key.K)) {
+    camera.pitch -= rotSpeed
+    rotatedP = true
+  }
+
+  if (rotatedY) {
+    camera.yawCos = Math.cos(camera.yaw)
+    camera.yawSin = Math.sin(camera.yaw)
+  }
+  if (rotatedP) {
+    camera.pitchCos = Math.cos(camera.pitch)
+    camera.pitchSin = Math.sin(camera.pitch)
+  }
+
+  if (Keyboard.keyHeld(Key.W)) {
+    camera.x += camera.yawSin * speed
+    camera.z += camera.yawCos * speed
+  }
+  if (Keyboard.keyHeld(Key.S)) {
+    camera.x -= camera.yawSin * speed
+    camera.z -= camera.yawCos * speed
+  }
+  if (Keyboard.keyHeld(Key.A)) {
+    camera.x -= camera.yawCos * speed
+    camera.z += camera.yawSin * speed
+  }
+  if (Keyboard.keyHeld(Key.D)) {
+    camera.x += camera.yawCos * speed
+    camera.z -= camera.yawSin * speed
+  }
+  if (Keyboard.keyHeld(Key.H)) camera.y += speed
+  if (Keyboard.keyHeld(Key.F)) camera.y -= speed
+}
+
+// =================== RENDERER ======================
 type Vec3 = [number, number, number]
 type Triangle = [Vec3, Vec3, Vec3, number]
 
 const camera = {
   x: 0,
-  y: 20,
+  y: 50,
   z: -10,
   yaw: 0,
   pitch: 0,
@@ -244,6 +353,106 @@ const camera = {
   scale: 30,
 }
 let scene: Triangle[] = []
+
+function rendering() {
+  renderScene()
+  if (renderType == renderTypes.CloneVersion) {
+    CV_drawFrame()
+  } else {
+    console.warn("ADD OTHER RENDER TYPE HERE")
+  }
+}
+
+function renderScene() {
+  for (let tri of scene as any) {
+    if (!isFrontface(tri)) continue
+    const a = vertexShader(tri[0])
+    const b = vertexShader(tri[1])
+    const c = vertexShader(tri[2])
+    if (!a || !b || !c) continue
+    fragmentShader(a, b, c, tri[3])
+  }
+}
+
+function vertexShader(p: Vec3): Vec3 | null {
+  const dx = p[0] - camera.x
+  const dy = p[1] - camera.y
+  const dz = p[2] - camera.z
+
+  /*const x1 = dx * camera.yawCos - dz * camera.yawSin
+  const z1 = dx * camera.yawSin + dz * camera.yawCos
+
+  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
+  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos*/
+  const x1 = dx * camera.yawCos - dz * camera.yawSin
+  const z1 = dx * camera.yawSin + dz * camera.yawCos
+
+  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
+  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos
+
+  if (z2 <= camera.nearZ) return null
+  return [x1, y2, z2]
+}
+
+function fragmentShader(a: Vec3, b: Vec3, c: Vec3, color: number) {
+  const p0 = projectToScreen(a)
+  const p1 = projectToScreen(b)
+  const p2 = projectToScreen(c)
+
+  drawTriangle(
+   [p0[0],
+    p0[1],
+    p1[0],
+    p1[1],
+    p2[0],
+    p2[1],
+    p0[2],
+    p1[2],
+    p2[2],],
+    color
+  )
+}
+
+function isFrontface(tri: Triangle): boolean {
+  const p1 = tri[0]
+  const p2 = tri[1]
+  const p3 = tri[2]
+
+  const ux = p2[0] - p1[0]
+  const uy = p2[1] - p1[1]
+  const uz = p2[2] - p1[2]
+
+  const vx = p3[0] - p1[0]
+  const vy = p3[1] - p1[1]
+  const vz = p3[2] - p1[2]
+
+  const dx = p1[0] - camera.x
+  const dy = p1[1] - camera.y
+  const dz = p1[2] - camera.z
+
+  const dot =
+    (uy * vz - uz * vy) * dx +
+    (uz * vx - ux * vz) * dy +
+    (ux * vy - uy * vx) * dz
+
+  return dot < 0
+}
+
+function projectToScreen(p: Vec3) {
+  const s = camera.scale
+  const f = camera.focalLength
+  const x = (p[0] / p[2] / s) * f
+  const y = (p[1] / p[2] / s) * f
+  return [x, y, p[2]]
+}
+
+function drawTriangle(points: number[], color: number) {
+  if (renderType == renderTypes.CloneVersion) {
+    CV_drawTriangle(points[0], points[1], points[2], points[3], points[4], points[5], color, Math.min(points[6], points[7], points[8]))
+  } else {
+    console.warn("ADD OTHER RENDER TYPE HERE")
+  }
+}
 
 function addCube(center: Vec3, size: number = 1, colors?: any) {
   const c = size / 2
@@ -300,182 +509,116 @@ function addCube(center: Vec3, size: number = 1, colors?: any) {
   push(5, 3, 7, col.right)
 }
 
-function isFrontface(tri: Triangle): boolean {
-  const p1 = tri[0]
-  const p2 = tri[1]
-  const p3 = tri[2]
+// ==================== PERFOMANCE =======================
+///*#
+let lastTime = performance.now()
+let frames = 0
+let fps = 0
+let avgFps = 0
+const samples: number[] = []
+const maxSamples = 100
+const fpsTxt = Game.createText("")
+const cloneTxt = Game.createText("")
+const cloneTTxt = Game.createText("")
+fpsTxt.x = -300
+fpsTxt.y = 220
+fpsTxt.style.align = "left"
+cloneTxt.x = -300
+cloneTxt.y = 180
+cloneTxt.style.align = "left"
+cloneTTxt.x = -300
+cloneTTxt.y = 140
+cloneTTxt.style.align = "left"
+let clonesThisFrame = 0
+function measureFPS() {
+  frames++
+  const now = performance.now()
+  const diff = now - lastTime
 
-  const ux = p2[0] - p1[0]
-  const uy = p2[1] - p1[1]
-  const uz = p2[2] - p1[2]
+  if (diff >= 1000) {
+    fps = (frames * 1000) / diff
 
-  const vx = p3[0] - p1[0]
-  const vy = p3[1] - p1[1]
-  const vz = p3[2] - p1[2]
+    samples.push(fps)
+    if (samples.length > maxSamples) {
+      samples.shift()
+    }
 
-  const dx = p1[0] - camera.x
-  const dy = p1[1] - camera.y
-  const dz = p1[2] - camera.z
+    avgFps = samples.reduce((a, b) => a + b, 0) / samples.length
 
-  const dot =
-    (uy * vz - uz * vy) * dx +
-    (uz * vx - ux * vz) * dy +
-    (ux * vy - uy * vx) * dz
+    frames = 0
+    lastTime = now
+  }
 
-  return dot < 0
+  return { fps, avgFps }
 }
 
-function vertexShader(p: Vec3): Vec3 | null {
-  const dx = p[0] - camera.x
-  const dy = p[1] - camera.y
-  const dz = p[2] - camera.z
+// ======================= Init =======================
+init()
 
-  /*const x1 = dx * camera.yawCos - dz * camera.yawSin
-  const z1 = dx * camera.yawSin + dz * camera.yawCos
-
-  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
-  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos*/
-  const x1 = dx * camera.yawCos - dz * camera.yawSin
-  const z1 = dx * camera.yawSin + dz * camera.yawCos
-
-  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
-  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos
-
-  if (z2 <= camera.nearZ) return null
-  return [x1, y2, z2]
-}
-
-function projectToScreen(p: Vec3) {
-  const s = camera.scale
-  const f = camera.focalLength
-  const x = (p[0] / p[2] / s) * f
-  const y = (p[1] / p[2] / s) * f
-  return [x, y, p[2]]
-}
-
-function fragmentShader(a: Vec3, b: Vec3, c: Vec3, color: number) {
-  const p0 = projectToScreen(a)
-  const p1 = projectToScreen(b)
-  const p2 = projectToScreen(c)
-
-  drawTriangle(
-    p0[0],
-    p0[1],
-    p1[0],
-    p1[1],
-    p2[0],
-    p2[1],
-    color,
-    -Math.min(p0[2], p1[2], p2[2]),
-  )
-}
-
-function renderScene() {
-  for (let tri of scene as any) {
-    if (!isFrontface(tri)) continue
-    const a = vertexShader(tri[0])
-    const b = vertexShader(tri[1])
-    const c = vertexShader(tri[2])
-    if (!a || !b || !c) continue
-    fragmentShader(a, b, c, tri[3])
-  }
-}
-
-function inputs() {
-  const speed = 0.2,
-    rotSpeed = 2
-  let rotatedY = false
-  let rotatedP = false
-  if (Keyboard.keyHeld(Key.J)) {
-    camera.yaw -= rotSpeed
-    rotatedY = true
-  }
-  if (Keyboard.keyHeld(Key.L)) {
-    camera.yaw += rotSpeed
-    rotatedY = true
-  }
-  if (Keyboard.keyHeld(Key.I)) {
-    camera.pitch += rotSpeed
-    rotatedP = true
-  }
-  if (Keyboard.keyHeld(Key.K)) {
-    camera.pitch -= rotSpeed
-    rotatedP = true
-  }
-
-  if (rotatedY) {
-    camera.yawCos = Math.cos(camera.yaw)
-    camera.yawSin = Math.sin(camera.yaw)
-  }
-  if (rotatedP) {
-    camera.pitchCos = Math.cos(camera.pitch)
-    camera.pitchSin = Math.sin(camera.pitch)
-  }
-
-  if (Keyboard.keyHeld(Key.W)) {
-    camera.x += camera.yawSin * speed
-    camera.z += camera.yawCos * speed
-  }
-  if (Keyboard.keyHeld(Key.S)) {
-    camera.x -= camera.yawSin * speed
-    camera.z -= camera.yawCos * speed
-  }
-  if (Keyboard.keyHeld(Key.A)) {
-    camera.x -= camera.yawCos * speed
-    camera.z += camera.yawSin * speed
-  }
-  if (Keyboard.keyHeld(Key.D)) {
-    camera.x += camera.yawCos * speed
-    camera.z -= camera.yawSin * speed
-  }
-  if (Keyboard.keyHeld(Key.H)) camera.y += speed
-  if (Keyboard.keyHeld(Key.F)) camera.y -= speed
-}
-
-/* DEPRICATED::
-
-function rotate3D(p: Vec3, yawCos: number, yawSin: number, pitchCos: number, pitchSin: number): Vec3 {
-  const x1 = p[0] * yawCos - p[2] * yawSin
-  const z1 = p[0] * yawSin + p[2] * yawCos
-
-  const y2 = p[1] * pitchCos - z1 * pitchSin
-  const z2 = p[1] * pitchSin + z1 * pitchCos
-
-  return [x1, y2, z2]
-}
-
-*/
-
-// ====================== INIT =======================
 function init() {
   camera.scale = Math.tan(camera.fov / 2)
   camera.yawCos = Math.cos(camera.yaw)
   camera.yawSin = Math.sin(camera.yaw)
   camera.pitchCos = Math.cos(camera.pitch)
   camera.pitchSin = Math.sin(camera.pitch)
+  generateStartChunks()
   for (const c of world.chunks as any) {
     c.mesh = buildChunkMesh(c)
   }
 }
+// _____ VARIABLES _____
+let t = 0
 
+// ==================== Main Loop ====================
+forever(function () {
+  t++
+  gameplay()
+  rendering()
+  fpsTxt.text = measureFPS().avgFps + ""
+  cloneTxt.text = sprite.clones.length + ""
+  cloneTTxt.text = clonesThisFrame + ""
+  //inputs()
+  /*scene = []
+  // Beispielwürfel
+  addCube([0, 0, 5], 2)
+  addCube([3, 0, 8], 1, {
+    front: 0xffff00,
+    back: 0xff00ff,
+    top: 0x00ffff,
+    bottom: 0xff0000,
+    left: 0x00ff00,
+    right: 0x0000ff,
+  })*/
+  //renderScene()
+  //drawFrame()
+
+})
+
+// =================== CHUNK MESHES ==========================
 function buildChunkMesh(c: chunk) {
   // First pass for top faces
   for (let y = 0; y < sChunkYA * sChunkY; y++) {
-    greedyTopFace(c, y);
+    greedyTopFace(c, y)
   }
 
   // Second pass for side faces on the X-axis
   for (let x = 0; x < sChunkX; x++) {
-    greedyXFace(c, x);
+    greedyXFace(c, x)
   }
 
   // Third pass for side faces on the Z-axis
   for (let z = 0; z < sChunkZ; z++) {
-    greedyZFace(c, z);
+    greedyZFace(c, z)
   }
 }
 
-function addBlockFaces(c: chunk, x: number, y: number, z: number, type: blockTypes) {
+function addBlockFaces(
+  c: chunk,
+  x: number,
+  y: number,
+  z: number,
+  type: blockTypes,
+) {
   const blockSize = 1
   const halfSize = blockSize / 2
   const cx = c.x * sChunkX + x
@@ -529,17 +672,20 @@ function addBlockFaces(c: chunk, x: number, y: number, z: number, type: blockTyp
 
 function greedyTopFace(c: chunk, y: number) {
   const mask: (number | null)[][] = []
-  
+
   for (let z = 0; z < sChunkZ; z++) {
     mask[z] = []
     for (let x = 0; x < sChunkX; x++) {
       const block = getBlock(c, x, y, z)
       const above = getBlock(c, x, y + 1, z)
-      mask[z][x] = (block !== blockTypes.air && above === blockTypes.air) ? block : null
+      mask[z][x] =
+        block !== blockTypes.air && above === blockTypes.air ? block : null
     }
   }
 
-  const visited: boolean[][] = Array.from({ length: sChunkZ }, () => Array(sChunkX).fill(false))
+  const visited: boolean[][] = Array.from({ length: sChunkZ }, () =>
+    Array(sChunkX).fill(false),
+  )
 
   for (let z = 0; z < sChunkZ; z++) {
     for (let x = 0; x < sChunkX; x++) {
@@ -548,7 +694,12 @@ function greedyTopFace(c: chunk, y: number) {
       const color = mask[z][x]
 
       let width = 1
-      while (x + width < sChunkX && mask[z][x + width] === color && !visited[z][x + width]) width++
+      while (
+        x + width < sChunkX &&
+        mask[z][x + width] === color &&
+        !visited[z][x + width]
+      )
+        width++
 
       let height = 1
       let keep = true
@@ -568,7 +719,7 @@ function greedyTopFace(c: chunk, y: number) {
         console.log("added quad", color, width, height)
         addQuadTop([x0, y, z0], width, height, color)
       }
-        
+
       // 4. Rechteck markieren
       for (let dz = 0; dz < height; dz++) {
         for (let dx = 0; dx < width; dx++) {
@@ -588,8 +739,16 @@ function greedyXFace(c: chunk, x: number) {
     maskRight[y] = []
     for (let z = 0; z < sChunkZ; z++) {
       const block = getBlock(c, x, y, z)
-      const leftNeighbor = getBlockWorld(c.x * sChunkX + x - 1, y, c.z * sChunkZ + z)
-      const rightNeighbor = getBlockWorld(c.x * sChunkX + x + 1, y, c.z * sChunkZ + z)
+      const leftNeighbor = getBlockWorld(
+        c.x * sChunkX + x - 1,
+        y,
+        c.z * sChunkZ + z,
+      )
+      const rightNeighbor = getBlockWorld(
+        c.x * sChunkX + x + 1,
+        y,
+        c.z * sChunkZ + z,
+      )
 
       if (block !== blockTypes.air && isTransparent(leftNeighbor)) {
         maskLeft[y][z] = block
@@ -618,8 +777,16 @@ function greedyZFace(c: chunk, z: number) {
     maskFront[y] = []
     for (let x = 0; x < sChunkX; x++) {
       const block = getBlock(c, x, y, z)
-      const backNeighbor = getBlockWorld(c.x * sChunkX + x, y, c.z * sChunkZ + z - 1)
-      const frontNeighbor = getBlockWorld(c.x * sChunkX + x, y, c.z * sChunkZ + z + 1)
+      const backNeighbor = getBlockWorld(
+        c.x * sChunkX + x,
+        y,
+        c.z * sChunkZ + z - 1,
+      )
+      const frontNeighbor = getBlockWorld(
+        c.x * sChunkX + x,
+        y,
+        c.z * sChunkZ + z + 1,
+      )
 
       if (block !== blockTypes.air && isTransparent(backNeighbor)) {
         maskBack[y][x] = block
@@ -697,7 +864,12 @@ function addQuadLeft(start: Vec3, h: number, w: number, blockType: blockTypes) {
   scene.push([v0, v2, v3, color])
 }
 
-function addQuadRight(start: Vec3, h: number, w: number, blockType: blockTypes) {
+function addQuadRight(
+  start: Vec3,
+  h: number,
+  w: number,
+  blockType: blockTypes,
+) {
   const x = start[0] + 1
   const y0 = start[1]
   const z0 = start[2]
@@ -733,7 +905,12 @@ function addQuadBack(start: Vec3, h: number, w: number, blockType: blockTypes) {
   scene.push([v0, v2, v3, color])
 }
 
-function addQuadFront(start: Vec3, h: number, w: number, blockType: blockTypes) {
+function addQuadFront(
+  start: Vec3,
+  h: number,
+  w: number,
+  blockType: blockTypes,
+) {
   const x0 = start[0]
   const y0 = start[1]
   const z = start[2] + 1
@@ -751,12 +928,22 @@ function addQuadFront(start: Vec3, h: number, w: number, blockType: blockTypes) 
   scene.push([v0, v2, v3, color])
 }
 
-function generateQuadsFromMask(mask: (number | null)[][], c: chunk, axisCoord: number, addQuadFunc: (start: Vec3, h: number, w: number, blockType: blockTypes) => void) {
+function generateQuadsFromMask(
+  mask: (number | null)[][],
+  c: chunk,
+  axisCoord: number,
+  addQuadFunc: (
+    start: Vec3,
+    h: number,
+    w: number,
+    blockType: blockTypes,
+  ) => void,
+) {
   const isXAxis = addQuadFunc === addQuadLeft || addQuadFunc === addQuadRight
   const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
-    Array(isXAxis ? sChunkZ : sChunkX).fill(false)
+    Array(isXAxis ? sChunkZ : sChunkX).fill(false),
   )
-  
+
   const ySize = sChunkYA * sChunkY
   const otherSize = isXAxis ? sChunkZ : sChunkX
 
@@ -766,7 +953,11 @@ function generateQuadsFromMask(mask: (number | null)[][], c: chunk, axisCoord: n
 
       const color = mask[y][other]
       let height = 1
-      while (y + height < ySize && mask[y + height][other] === color && !visited[y + height][other]) {
+      while (
+        y + height < ySize &&
+        mask[y + height][other] === color &&
+        !visited[y + height][other]
+      ) {
         height++
       }
 
@@ -774,7 +965,10 @@ function generateQuadsFromMask(mask: (number | null)[][], c: chunk, axisCoord: n
       let keep = true
       while (keep && other + width < otherSize) {
         for (let k = 0; k < height; k++) {
-          if (mask[y + k][other + width] !== color || visited[y + k][other + width]) {
+          if (
+            mask[y + k][other + width] !== color ||
+            visited[y + k][other + width]
+          ) {
             keep = false
             break
           }
@@ -785,7 +979,12 @@ function generateQuadsFromMask(mask: (number | null)[][], c: chunk, axisCoord: n
       const x0 = isXAxis ? axisCoord : other
       const y0 = y
       const z0 = isXAxis ? other : axisCoord
-      addQuadFunc([c.x * sChunkX + x0, y0, c.z * sChunkZ + z0], height, width, color)
+      addQuadFunc(
+        [c.x * sChunkX + x0, y0, c.z * sChunkZ + z0],
+        height,
+        width,
+        color,
+      )
 
       for (let dy = 0; dy < height; dy++) {
         for (let dw = 0; dw < width; dw++) {
@@ -803,10 +1002,10 @@ function addQuadTop(start: Vec3, w: number, h: number, blockType: blockTypes) {
   const colorMap = {
     stone: 0x808080,
     dirt: 0x654321,
-    grass: 0x00ff00
+    grass: 0x00ff00,
   }
   const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
-  
+
   const v0: Vec3 = [x0, y + 1, z0]
   const v1: Vec3 = [x0 + w, y + 1, z0]
   const v2: Vec3 = [x0, y + 1, z0 + h]
@@ -816,60 +1015,13 @@ function addQuadTop(start: Vec3, w: number, h: number, blockType: blockTypes) {
   scene.push([v0, v2, v3, color])
 }
 
-function getBlockWorld(wx: number, wy: number, wz: number): blockTypes {
-  const cx = Math.floor(wx / sChunkX)
-  const cz = Math.floor(wz / sChunkZ)
-  const lx = ((wx % sChunkX) + sChunkX) % sChunkX // local X
-  const lz = ((wz % sChunkZ) + sChunkZ) % sChunkZ // local Z
+// ================ CLONE VERSION - TRIANGLE & LINE RENDERER ================
 
-  const chunk = getChunkAt(cx, cz)
-  if (!chunk) return blockTypes.air
-
-  return getBlock(chunk, lx, wy, lz)
-}
-
-function getChunkAt(cx: number, cz: number): chunk | undefined {
-  return world.chunks.find(ch => ch.x === cx && ch.z === cz)
-}
-
-// ==================== Main Loop ====================
-let t = 0
-init()
-forever(function () {
-  t++
-  inputs()
-  /*scene = []
-  // Beispielwürfel
-  addCube([0, 0, 5], 2)
-  addCube([3, 0, 8], 1, {
-    front: 0xffff00,
-    back: 0xff00ff,
-    top: 0x00ffff,
-    bottom: 0xff0000,
-    left: 0x00ff00,
-    right: 0x0000ff,
-  })*/
-  renderScene()
-  drawFrame()
-  fpsTxt.text = measureFPS().avgFps + ""
-})
-
-const fpsTxt = Game.createText("")
-const cloneTxt = Game.createText("")
-fpsTxt.x = -300
-fpsTxt.y = 220
-fpsTxt.style.align = "left"
-cloneTxt.x = -300
-cloneTxt.y = 180
-cloneTxt.style.align = "left"
-globals.gameRunning = true
-
-const triAmt = 400
-
+//globals.gameRunning = true
+//const triAmt = 400
 const SW2 = Game.width / 2
 const SH2 = Game.height / 2
-
-function createFrame() {
+/*function createFrame() {
   for (let i = 0; i < triAmt; i++) {
     drawTriangle(
       Math.random(-SW2, SW2),
@@ -882,18 +1034,14 @@ function createFrame() {
       Math.random(-100, -1),
     )
   }
-}
+}*/
 
-//------------- TRIANGLE RENDERER -------------
 const xPixelSize = 2650 / 8 / Game.width
 const yPixelSize = 1880 / 8 / Game.height
 const triangleM = 64 / 55
 sprite.x = 1000
 sprite.y = 1000
 sprite.size = 1
-const t1 = "triangle_yh"
-const t1_l = "triangle_yh_l"
-const t1_r = "triangle_yh_r"
 
 const allSprites = [
   "triangle_yh",
@@ -940,7 +1088,8 @@ onCloneStart(function (clone) {
   })
 })
 
-function drawFrame() {
+function CV_drawFrame() {
+  clonesThisFrame = 0
   // Ein temporäres Objekt, um zu verfolgen, welche Klone in diesem Frame verwendet werden
   const usedClonesInThisFrame: { [key: string]: boolean } = {}
 
@@ -977,6 +1126,7 @@ function drawFrame() {
       clone.rotation = entry.rotation
       clone.tint = entry.color
       clone.visible = true
+      clonesThisFrame++
     }
 
     // Setze den Zähler für die nächste Runde
@@ -1004,37 +1154,7 @@ function drawFrame() {
   }
 }
 
-///*#
-let lastTime = performance.now()
-let frames = 0
-let fps = 0
-let avgFps = 0
-const samples: number[] = []
-const maxSamples = 100
-
-function measureFPS() {
-  frames++
-  const now = performance.now()
-  const diff = now - lastTime
-
-  if (diff >= 1000) {
-    fps = (frames * 1000) / diff
-
-    samples.push(fps)
-    if (samples.length > maxSamples) {
-      samples.shift()
-    }
-
-    avgFps = samples.reduce((a, b) => a + b, 0) / samples.length
-
-    frames = 0
-    lastTime = now
-  }
-
-  return { fps, avgFps }
-} //#
-
-function drawTriangle(
+function CV_drawTriangle(
   x1: number,
   y1: number,
   x2: number,
@@ -1141,8 +1261,8 @@ function drawTrianglePartRA(
   const angle = angleBetween(k1, k2) + rot
   const moved = move(midX, midY, angle, -height / 12.6)
 
-  let drawSprite = t1_r
-  if (rot == 90) drawSprite = t1_l
+  let drawSprite = "triangle_yh_r"
+  if (rot == 90) drawSprite = "triangle_yh_l"
   addToDrawList({
     width: baseLength * xPixelSize * 1.91,
     height: height * yPixelSize * triangleM,
@@ -1183,7 +1303,7 @@ function trianglePieceHyp(
     x: moved.x,
     y: moved.y,
     rotation: angle + 90,
-    texture: t1,
+    texture: "triangle_yh",
     color: c,
     dist: dist,
   })
@@ -1361,8 +1481,8 @@ function distance(p1: any, p2: any): number {
   const dy = p2.y - p1.y
   return Math.sqrt(dx * dx + dy * dy)
 }
-//*/
 
+// ============= PIXEL RENDERER ===============
 /*
 const textSize = 20
 const textScX = 0.55
@@ -1425,29 +1545,7 @@ forever(function () {
   fpsTxt.text = measureFPS().avgFps + ""
 })
 
-let lastTime = performance.now()
-let frames = 0
-let fps = 0
-let avgFps = 0
-const samples: number[] = []
-const maxSamples = 100
 
-function measureFPS() {
-  frames++
-  const now = performance.now()
-  const diff = now - lastTime
-
-  if (diff >= 1000) {
-    fps = (frames * 1000) / diff
-    samples.push(fps)
-    if (samples.length > maxSamples) samples.shift()
-    avgFps = samples.reduce((a, b) => a + b, 0) / samples.length
-    frames = 0
-    lastTime = now
-  }
-
-  return { fps, avgFps }
-}
 //EVERY PIXEL ONE TEXT DISPLAY
 */
-//OPTIMIZED
+
