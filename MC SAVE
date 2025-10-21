@@ -1,0 +1,5373 @@
+//ADD SNEAKING, TREES, CAVES?, RANDOM TICK, GRASS/FLOWERS/WHEAT,
+//HEALTH, FOOD, INVENTORY, CRAFTING
+enum renderTypes {
+  CloneVersion,
+  PixelVersion,
+  RaycastVersion,
+}
+//TEXTURES ONLY WORK IN PIXELVERSION CURRENTLY
+
+const useItems = false
+
+const TEXTURES_ENABLED = true
+
+const useLinear = false
+
+const nonfullchunkSafeLimRate = 0.1
+
+let renderType: renderTypes = renderTypes.PixelVersion
+const textSize = 6.5
+const raycastDist = 55
+
+globals.renderM = 1000
+
+//GENERATION
+const noiseScale = 0.05 // smoothness
+const baseHeight = 40 // base level
+const heightVariation = 10
+
+const CSrenderDistance = 2
+const CSlod1Add = 1
+const CSlod2Add = 1
+const CSlod3Add = 1
+const CSloadedAdd = 1
+
+const RENDER_RADIUS = 1
+const LOAD_RADIUS = 2
+
+const CS = 1
+const collisionEnabled = true
+const clampViewP = true
+const clampPVals = [-90, 90]
+
+const maxChunkViewDist = 256
+const minCCullD = 16
+const minCCullD22 = minCCullD * minCCullD
+
+let toggleSprint: boolean = false
+const sprintMultiplier = 1.3
+const sprintFovMultiplier = 1.1
+const jumpBoost = 1.1
+const gravity = -0.03 // Minecraft ~0.08 pro Tick
+const jumpStrength = 0.32 // Standard-Jump
+const accel = 0.1 // Beschleunigung am Boden
+const frictionGround = 0.2 // Reibung am Boden (vanilla ~0.91)
+const frictionAir = 0.2 // Reibung in der Luft
+
+const maxSpeed = 0.15 // Maximalgeschwindigkeit beim Laufen
+
+let onGround = false
+
+const backgroundColor = 0xadd8e6
+
+const Tspeed = 1 // 1 is default higher makes the game run faster, lower slower
+
+enum gamemodes {
+  survival,
+  creative,
+}
+
+const camera = {
+  x: 0,
+  y: 50,
+  z: -10,
+  yaw: 0,
+  pitch: 0,
+  baseFov: 90,
+  fov: 90,
+  nearZ: 0.1,
+  focalLength: 300,
+  yawCos: 0,
+  yawSin: 0,
+  pitchCos: 0,
+  pitchSin: 0,
+  scale: 30,
+  hp: 20,
+  //height: 10,
+  reach: 7,
+  width: 0.6,
+  height: 1.8,
+  depth: 0.6,
+  xMag: 0,
+  zMag: 0,
+  xVel: 0,
+  yVel: 0,
+  zVel: 0,
+  gamemode: 0,
+  hitBlock: [] as number[],
+  hitSide: "x" as "x" | "y" | "z",
+}
+
+const epsilon = 0.001
+
+// ================ WORLD ================
+// ============ WORLD - DATA =============
+
+interface subChunk {
+  y: number
+  fullAir: boolean
+  blocks: blockTypes[]
+  changed: boolean
+}
+
+interface chunk {
+  x: number
+  z: number
+  subChunks: subChunk[]
+  mesh: Triangle[]
+  loaded: boolean
+  has_mesh: boolean
+}
+
+interface blockChange {
+  sCy: number
+  index: number
+  type: blockTypes
+}
+
+interface chunkChangesI {
+  cx: number
+  cz: number
+  subChunks?: subChunk[]
+  blockChange?: blockChange[]
+}
+
+interface world {
+  chunks: chunk[]
+}
+/*
+enum blockTypes {
+  air,
+  stone,
+  dirt,
+  grass,
+}*/
+//const blockTypeNames = ["air", "stone", "dirt", "grass"]
+
+enum blockTypes {
+  air,
+  stone,
+  smoothstone,
+  cobblestone,
+  stonebrick,
+  sandstone,
+  bedrock,
+  dirt,
+  grass,
+  sand,
+  gravel,
+  coal_ore,
+  iron_ore,
+  diamond_ore,
+  redstone_ore,
+  coal_block,
+  iron_block,
+  diamond_block,
+  redstone_block,
+  oak_log,
+  birch_log,
+  spruce_log,
+  oak_leaves,
+  birch_leaves,
+  spruce_leaves,
+  oak_planks,
+  birch_planks,
+  spruce_planks,
+  sapling,
+  cactus,
+  deadbush,
+  pumpkin,
+  melon,
+  tall_grass,
+  fern,
+  crafting_table,
+  furnace,
+  chest,
+  door,
+  lever,
+  redstone,
+  redstone_torch,
+  repeater,
+  redstone_lamp,
+  piston,
+  sticky_piston,
+  slime_block,
+  water,
+  lava,
+}
+
+const blockTypeNames = [
+  "air",
+  "stone",
+  "smoothstone",
+  "cobblestone",
+  "stonebrick",
+  "sandstone",
+  "bedrock",
+  "dirt",
+  "grass",
+  "sand",
+  "gravel",
+  "coal_ore",
+  "iron_ore",
+  "diamond_ore",
+  "redstone_ore",
+  "coal_block",
+  "iron_block",
+  "diamond_block",
+  "redstone_block",
+  "oak_log",
+  "birch_log",
+  "spruce_log",
+  "oak_leaves",
+  "birch_leaves",
+  "spruce_leaves",
+  "oak_planks",
+  "birch_planks",
+  "spruce_planks",
+  "sapling",
+  "cactus",
+  "deadbush",
+  "pumpkin",
+  "melon",
+  "tall_grass",
+  "fern",
+  "crafting_table",
+  "furnace",
+  "chest",
+  "door",
+  "lever",
+  "redstone",
+  "redstone_torch",
+  "repeater",
+  "redstone_lamp",
+  "piston",
+  "sticky_piston",
+  "slime_block",
+  "water",
+  "lava",
+]
+
+interface item {
+  identifier: string
+  blockID?: blockTypes
+  display_name: string
+  max_stack_size: number
+}
+
+interface InventorySlot {
+  item: item | null
+  count: number
+}
+/*
+const items: { [id: string]: item } = {
+  grass: {
+    identifier: "grass",
+    blockID: blockTypes.grass,
+    display_name: "Grass Block",
+    max_stack_size: 64,
+  },
+  stone: {
+    identifier: "stone",
+    blockID: blockTypes.stone,
+    display_name: "Stone",
+    max_stack_size: 64,
+  },
+  dirt: {
+    identifier: "dirt",
+    blockID: blockTypes.dirt,
+    display_name: "Dirt",
+    max_stack_size: 64,
+  },
+}*/
+
+const items: { [id: string]: item } = {
+  stone: {
+    identifier: "stone",
+    blockID: blockTypes.stone,
+    display_name: "Stone",
+    max_stack_size: 64,
+  },
+  smoothstone: {
+    identifier: "smoothstone",
+    blockID: blockTypes.smoothstone,
+    display_name: "Smooth Stone",
+    max_stack_size: 64,
+  },
+  cobblestone: {
+    identifier: "cobblestone",
+    blockID: blockTypes.cobblestone,
+    display_name: "Cobblestone",
+    max_stack_size: 64,
+  },
+  stonebrick: {
+    identifier: "stonebrick",
+    blockID: blockTypes.stonebrick,
+    display_name: "Stone Brick",
+    max_stack_size: 64,
+  },
+  sandstone: {
+    identifier: "sandstone",
+    blockID: blockTypes.sandstone,
+    display_name: "Sandstone",
+    max_stack_size: 64,
+  },
+  bedrock: {
+    identifier: "bedrock",
+    blockID: blockTypes.bedrock,
+    display_name: "Bedrock",
+    max_stack_size: 64,
+  },
+  dirt: {
+    identifier: "dirt",
+    blockID: blockTypes.dirt,
+    display_name: "Dirt",
+    max_stack_size: 64,
+  },
+  grass: {
+    identifier: "grass",
+    blockID: blockTypes.grass,
+    display_name: "Grass Block",
+    max_stack_size: 64,
+  },
+  sand: {
+    identifier: "sand",
+    blockID: blockTypes.sand,
+    display_name: "Sand",
+    max_stack_size: 64,
+  },
+  gravel: {
+    identifier: "gravel",
+    blockID: blockTypes.gravel,
+    display_name: "Gravel",
+    max_stack_size: 64,
+  },
+  coal_ore: {
+    identifier: "coal_ore",
+    blockID: blockTypes.coal_ore,
+    display_name: "Coal Ore",
+    max_stack_size: 64,
+  },
+  iron_ore: {
+    identifier: "iron_ore",
+    blockID: blockTypes.iron_ore,
+    display_name: "Iron Ore",
+    max_stack_size: 64,
+  },
+  diamond_ore: {
+    identifier: "diamond_ore",
+    blockID: blockTypes.diamond_ore,
+    display_name: "Diamond Ore",
+    max_stack_size: 64,
+  },
+  redstone_ore: {
+    identifier: "redstone_ore",
+    blockID: blockTypes.redstone_ore,
+    display_name: "Redstone Ore",
+    max_stack_size: 64,
+  },
+  coal_block: {
+    identifier: "coal_block",
+    blockID: blockTypes.coal_block,
+    display_name: "Block of Coal",
+    max_stack_size: 64,
+  },
+  iron_block: {
+    identifier: "iron_block",
+    blockID: blockTypes.iron_block,
+    display_name: "Block of Iron",
+    max_stack_size: 64,
+  },
+  diamond_block: {
+    identifier: "diamond_block",
+    blockID: blockTypes.diamond_block,
+    display_name: "Block of Diamond",
+    max_stack_size: 64,
+  },
+  redstone_block: {
+    identifier: "redstone_block",
+    blockID: blockTypes.redstone_block,
+    display_name: "Block of Redstone",
+    max_stack_size: 64,
+  },
+  oak_log: {
+    identifier: "oak_log",
+    blockID: blockTypes.oak_log,
+    display_name: "Oak Log",
+    max_stack_size: 64,
+  },
+  birch_log: {
+    identifier: "birch_log",
+    blockID: blockTypes.birch_log,
+    display_name: "Birch Log",
+    max_stack_size: 64,
+  },
+  spruce_log: {
+    identifier: "spruce_log",
+    blockID: blockTypes.spruce_log,
+    display_name: "Spruce Log",
+    max_stack_size: 64,
+  },
+  oak_leaves: {
+    identifier: "oak_leaves",
+    blockID: blockTypes.oak_leaves,
+    display_name: "Oak Leaves",
+    max_stack_size: 64,
+  },
+  birch_leaves: {
+    identifier: "birch_leaves",
+    blockID: blockTypes.birch_leaves,
+    display_name: "Birch Leaves",
+    max_stack_size: 64,
+  },
+  spruce_leaves: {
+    identifier: "spruce_leaves",
+    blockID: blockTypes.spruce_leaves,
+    display_name: "Spruce Leaves",
+    max_stack_size: 64,
+  },
+  oak_planks: {
+    identifier: "oak_planks",
+    blockID: blockTypes.oak_planks,
+    display_name: "Oak Planks",
+    max_stack_size: 64,
+  },
+  birch_planks: {
+    identifier: "birch_planks",
+    blockID: blockTypes.birch_planks,
+    display_name: "Birch Planks",
+    max_stack_size: 64,
+  },
+  spruce_planks: {
+    identifier: "spruce_planks",
+    blockID: blockTypes.spruce_planks,
+    display_name: "Spruce Planks",
+    max_stack_size: 64,
+  },
+  sapling: {
+    identifier: "sapling",
+    blockID: blockTypes.sapling,
+    display_name: "Sapling",
+    max_stack_size: 64,
+  },
+  cactus: {
+    identifier: "cactus",
+    blockID: blockTypes.cactus,
+    display_name: "Cactus",
+    max_stack_size: 64,
+  },
+  deadbush: {
+    identifier: "deadbush",
+    blockID: blockTypes.deadbush,
+    display_name: "Dead Bush",
+    max_stack_size: 64,
+  },
+  pumpkin: {
+    identifier: "pumpkin",
+    blockID: blockTypes.pumpkin,
+    display_name: "Pumpkin",
+    max_stack_size: 64,
+  },
+  melon: {
+    identifier: "melon",
+    blockID: blockTypes.melon,
+    display_name: "Melon",
+    max_stack_size: 64,
+  },
+  tall_grass: {
+    identifier: "tall_grass",
+    blockID: blockTypes.tall_grass,
+    display_name: "Tall Grass",
+    max_stack_size: 64,
+  },
+  fern: {
+    identifier: "fern",
+    blockID: blockTypes.fern,
+    display_name: "Fern",
+    max_stack_size: 64,
+  },
+  crafting_table: {
+    identifier: "crafting_table",
+    blockID: blockTypes.crafting_table,
+    display_name: "Crafting Table",
+    max_stack_size: 64,
+  },
+  furnace: {
+    identifier: "furnace",
+    blockID: blockTypes.furnace,
+    display_name: "Furnace",
+    max_stack_size: 64,
+  },
+  chest: {
+    identifier: "chest",
+    blockID: blockTypes.chest,
+    display_name: "Chest",
+    max_stack_size: 64,
+  },
+  door: {
+    identifier: "door",
+    blockID: blockTypes.door,
+    display_name: "Door",
+    max_stack_size: 64,
+  },
+  lever: {
+    identifier: "lever",
+    blockID: blockTypes.lever,
+    display_name: "Lever",
+    max_stack_size: 64,
+  },
+  redstone: {
+    identifier: "redstone",
+    blockID: blockTypes.redstone,
+    display_name: "Redstone Dust",
+    max_stack_size: 64,
+  },
+  redstone_torch: {
+    identifier: "redstone_torch",
+    blockID: blockTypes.redstone_torch,
+    display_name: "Redstone Torch",
+    max_stack_size: 64,
+  },
+  repeater: {
+    identifier: "repeater",
+    blockID: blockTypes.repeater,
+    display_name: "Repeater",
+    max_stack_size: 64,
+  },
+  redstone_lamp: {
+    identifier: "redstone_lamp",
+    blockID: blockTypes.redstone_lamp,
+    display_name: "Redstone Lamp",
+    max_stack_size: 64,
+  },
+  piston: {
+    identifier: "piston",
+    blockID: blockTypes.piston,
+    display_name: "Piston",
+    max_stack_size: 64,
+  },
+  sticky_piston: {
+    identifier: "sticky_piston",
+    blockID: blockTypes.sticky_piston,
+    display_name: "Sticky Piston",
+    max_stack_size: 64,
+  },
+  slime_block: {
+    identifier: "slime_block",
+    blockID: blockTypes.slime_block,
+    display_name: "Slime Block",
+    max_stack_size: 64,
+  },
+  water: {
+    identifier: "water",
+    blockID: blockTypes.water,
+    display_name: "Water",
+    max_stack_size: 1,
+  },
+  lava: {
+    identifier: "lava",
+    blockID: blockTypes.lava,
+    display_name: "Lava",
+    max_stack_size: 1,
+  },
+}
+
+class PerlinNoise {
+  permutation: number[] = []
+
+  constructor(seed: number = 0) {
+    this.permutation = Array.from({ length: 256 }, (_, i) => i)
+
+    // Simple seeded shuffle
+    let random = (x: number) => {
+      const t = Math.sin(x + seed) * 10000
+      return t - Math.floor(t)
+    }
+
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(random(i) * (i + 1))
+      const t = this.permutation[i]
+      this.permutation[i] = this.permutation[j] as any
+      this.permutation[j] = t as any
+      /*[this.permutation[i], this.permutation[j]] = [
+        this.permutation[j],
+        this.permutation[i],
+      ]*/
+    }
+
+    // duplicate for overflow
+    this.permutation = this.permutation.concat(this.permutation)
+  }
+
+  fade(t: number) {
+    // 6t^5 - 15t^4 + 10t^3 smoothstep
+    return t * t * t * (t * (t * 6 - 15) + 10)
+  }
+
+  lerp(a: number, b: number, t: number) {
+    return a + t * (b - a)
+  }
+
+  grad(hash: number, x: number, y: number = 0) {
+    const h = hash & 3
+    const u = h < 2 ? x : y
+    const v = h < 2 ? y : x
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v)
+  }
+
+  noise(x: number, y: number = 0) {
+    const xi = Math.floor(x) & 255
+    const yi = Math.floor(y) & 255
+    const xf = x - Math.floor(x)
+    const yf = y - Math.floor(y)
+
+    const u = this.fade(xf)
+    const v = this.fade(yf)
+
+    const p = this.permutation
+    const aa = p[p[xi] + yi]
+    const ab = p[p[xi] + yi + 1]
+    const ba = p[p[xi + 1] + yi]
+    const bb = p[p[xi + 1] + yi + 1]
+
+    const x1 = this.lerp(this.grad(aa, xf, yf), this.grad(ba, xf - 1, yf), u)
+    const x2 = this.lerp(
+      this.grad(ab, xf, yf - 1),
+      this.grad(bb, xf - 1, yf - 1),
+      u,
+    )
+    return (this.lerp(x1, x2, v) + 1) / 2 // normalize 0..1
+  }
+}
+
+const perlin = new PerlinNoise(41)
+
+// ========= WORLD - GENERATION ==========
+function createChunk(cx: number, cz: number): chunk {
+  const subChunks: subChunk[] = []
+
+  // Precompute heightmap for this chunk
+  const heightMap: number[][] = generateHeightMap(cx, cz)
+
+  // Generate subChunks
+  for (let sy = 0; sy < sChunkYA; sy++) {
+    const sc = generateSubChunk(sy, heightMap)
+
+    if (!sc.fullAir)
+      subChunks.push({
+        y: sy,
+        fullAir: false,
+        changed: false,
+        blocks: sc.blocks,
+      })
+    else subChunks.push({ y: sy, fullAir: true, changed: false, blocks: [] })
+  }
+
+  return { x: cx, z: cz, mesh: [], loaded: true, has_mesh: false, subChunks }
+}
+
+function generateSubChunk(scY: number, heightMap: number[][]) {
+  const blocks: blockTypes[] = new Array(sChunkX * sChunkY * sChunkZ).fill(
+    blockTypes.air,
+  )
+  let fullAir = true
+
+  for (let lx = 0; lx < sChunkX; lx++) {
+    for (let lz = 0; lz < sChunkZ; lz++) {
+      const columnHeight = heightMap[lx][lz]
+
+      for (let ly = 0; ly < sChunkY; ly++) {
+        const globalY = scY * sChunkY + ly
+        if (globalY <= columnHeight) {
+          let blockType = blockTypes.stone
+          if (globalY === columnHeight) {
+            blockType = blockTypes.grass
+          } else if (globalY > columnHeight - 3) {
+            blockType = blockTypes.dirt
+          }
+
+          blocks[index(lx, ly, lz)] = blockType
+          fullAir = false
+        }
+      }
+    }
+  }
+  return { fullAir: fullAir, blocks: blocks }
+}
+
+function generateHeightMap(cx: number, cz: number) {
+  const heightMap: number[][] = []
+  for (let lx = 0; lx < sChunkX; lx++) {
+    heightMap[lx] = []
+    for (let lz = 0; lz < sChunkZ; lz++) {
+      const wx = cx * sChunkX + lx
+      const wz = cz * sChunkZ + lz
+      const h = Math.floor(
+        perlin.noise(wx * noiseScale, wz * noiseScale) * heightVariation +
+          baseHeight,
+      )
+      heightMap[lx][lz] = h
+    }
+  }
+  return heightMap
+}
+
+// ========= WORLD - INIT ==========
+const sChunkX = 16
+const sChunkY = 16
+const sChunkYA = 4
+const sChunkZ = 16
+const sChunkXYZ = sChunkX * sChunkY * sChunkZ
+const chunkSaveR = Math.round(nonfullchunkSafeLimRate * sChunkXYZ)
+interface ChunkJob {
+  x: number
+  z: number
+  priority: number
+  type: "load" | "mesh" | "unmesh" | "unload"
+}
+
+const chunkQueue: ChunkJob[] = []
+const world: world = { chunks: [] }
+const chunkChanges: chunkChangesI[] = []
+function generateStartChunks() {
+  for (let cx = -CS; cx <= CS; cx++) {
+    for (let cz = -CS; cz <= CS; cz++) {
+      generateChunk(cx, cz)
+    }
+  }
+}
+
+function saveChunk(x: number, z: number) {
+  const c = getChunkAt(x, z)
+  if (!c) return
+
+  let newChunkChange: chunkChangesI = { cx: x, cz: z }
+
+  for (const sc of c.subChunks as any) {
+    if (!sc.changed) continue
+
+    const heightMap = generateHeightMap(x, z)
+    const defaultSC = generateSubChunk(sc.y, heightMap)
+
+    const changedBlocks: blockChange[] = []
+
+    for (let i = 0; i < sc.blocks.length; i++) {
+      if (sc.blocks[i] !== defaultSC.blocks[i]) {
+        changedBlocks.push({ sCy: sc.y, index: i, type: sc.blocks[i] })
+      }
+    }
+
+    if (changedBlocks.length > chunkSaveR) {
+      if (!newChunkChange.subChunks) newChunkChange.subChunks = []
+      newChunkChange.subChunks.push({ ...sc })
+    } else if (changedBlocks.length > 0) {
+      if (!newChunkChange.blockChange) newChunkChange.blockChange = []
+      newChunkChange.blockChange.push(...(changedBlocks as any))
+    }
+
+    sc.changed = false
+  }
+
+  if (
+    (newChunkChange.subChunks && newChunkChange.subChunks.length) ||
+    (newChunkChange.blockChange && newChunkChange.blockChange.length)
+  ) {
+    const existing = chunkChanges.find((ch) => ch.cx === x && ch.cz === z)
+    if (existing) Object.assign(existing, newChunkChange)
+    else chunkChanges.push(newChunkChange)
+  }
+}
+
+/*
+function saveChunk(x: number, z: number) {
+  const c = getChunkAt(x, z)
+  if (!c) return
+  const id = chunkChanges.findIndex((ch) => ch.cx == x && ch.cz == z)
+  if (id >= 0) chunkChanges.splice(id, 1)
+  const subChunks = c.subChunks.filter((ch) => ch.changed == true)
+  if (subChunks.length == 0) return
+  const heightMap: number[][] = generateHeightMap(x, z)
+  for (const chCH of subChunks as any) {
+    const defaultChunk = generateSubChunk(chCH.y, heightMap)
+    let changes = 0
+    for (let i = 0; i < chCH.blocks.length; i++) {
+      if (chCH.blocks[i] !== defaultChunk.blocks[i]) changes++
+    }
+    const t = chunkChanges.find((ch) => ch.cx == x && ch.cz == z)
+    if (!t) {
+      if (changes > chunkSaveR) {
+        chunkChanges.push({
+          cx: x,
+          cz: z,
+          subChunks: [chCH],
+        })
+      } else {
+        chunkChanges.push({
+          cx: x,
+          cz: z,
+          blockChange: [],
+        })
+      }
+    }
+
+    //chunkChanges.push({
+    //    cx: x,
+    //    cz: z,
+    //    subChunks: chCH
+    //  })
+  }
+}
+*/
+
+function generateChunk(x: number, y: number) {
+  const c = createChunk(x, y)
+  world.chunks.push(c)
+  return c
+}
+
+function queueJob(
+  x: number,
+  z: number,
+  type: "load" | "mesh" | "unmesh" | "unload",
+  priority: number,
+) {
+  // Vermeide doppelte Jobs
+  if (!chunkQueue.find((j) => j.x === x && j.z === z && j.type === type))
+    chunkQueue.push({ x, z, type, priority })
+  //console.log(chunkQueue)
+}
+
+function getNextJob(): ChunkJob | undefined {
+  // sortiere nach Priority (niedrig = hohe Prio)
+  chunkQueue.sort((a, b) => a.priority - b.priority)
+  return chunkQueue.shift()
+}
+/*
+function isJobQueued(cx: number, cz: number): boolean {
+  return chunkQueue.some((job) => job.x === cx && job.z === cz)
+}
+
+function clearJobsForChunk(x: number, z: number) {
+  for (let i = chunkQueue.length - 1; i >= 0; i--) {
+    if (chunkQueue[i].x === x && chunkQueue[i].z === z) {
+      chunkQueue.splice(i, 1)
+    }
+  }
+}
+*/
+function processChunkQueue() {
+  const maxJobsPerTick = 1 // z. B. 1 Chunk pro Frame
+  for (let i = 0; i < maxJobsPerTick; i++) {
+    const job = getNextJob()
+    if (!job) return
+    //console.log("JOB: ", job)
+
+    switch (job.type) {
+      case "load": {
+        const gc = generateChunk(job.x, job.z) // generiere Standardchunk
+        const cChange = chunkChanges.find(
+          (ch) => ch.cx === job.x && ch.cz === job.z,
+        )
+
+        if (cChange) {
+          // Ganze Subchunks überschreiben
+          if (cChange.subChunks) {
+            for (const changedSC of cChange.subChunks as any) {
+              const sc = gc.subChunks.find((s) => s.y === changedSC.y)
+              if (sc) sc.blocks = [...changedSC.blocks]
+            }
+          }
+
+          // Einzelne Blockänderungen anwenden
+          if (cChange.blockChange) {
+            for (const bc of cChange.blockChange as any) {
+              const sc = gc.subChunks[bc.sCy]
+              if (sc) sc.blocks[bc.index] = bc.type
+            }
+          }
+        }
+
+        // Chunk in Welt einfügen
+        const existingChunkIdx = world.chunks.findIndex(
+          (ch) => ch.x === job.x && ch.z === job.z,
+        )
+        if (existingChunkIdx >= 0) world.chunks[existingChunkIdx] = gc
+        else world.chunks.push(gc)
+        break
+      }
+      case "mesh": {
+        const c = getChunkAt(job.x, job.z)
+        if (!c || c.has_mesh) break
+        c.mesh = []
+        buildChunkMesh(c)
+        c.has_mesh = true
+        break
+      }
+      case "unmesh": {
+        const c = getChunkAt(job.x, job.z)
+        if (!c || !c.has_mesh) break
+        disposeMesh(c)
+        break
+      }
+      case "unload": {
+        const c = getChunkAt(job.x, job.z)
+        if (c) {
+          if (c.has_mesh) disposeMesh(c)
+          //console.log("save chunk!:", job.x, job.z)
+
+          saveChunk(job.x, job.z)
+
+          const index = world.chunks.findIndex(
+            (ch) => ch.x === job.x && ch.z === job.z,
+          )
+          if (index >= 0) world.chunks.splice(index, 1)
+        }
+        break
+        /*saveChunk(job.x, job.z)
+        const index = world.chunks.findIndex(
+          (ch) => ch.x === job.x && ch.z === job.z,
+        )
+        if (index >= 0) world.chunks.splice(index, 1)
+        break*/
+      }
+    }
+    /*
+    continue
+    if (job.type === "load") {
+      // Daten generieren
+
+      //generateChunk(job.x, job.z)
+      //console.log("Loaded chunk: \n", getChunkAt(job.x, job.z))
+      createChunk
+      const c: chunk = createChunk(job.x, job.z)
+      //c. = ChunkState.Loaded
+      world.chunks.push(c)
+      //queueJob(job.x, job.z, "mesh", job.priority + 1)
+      //console.log("job", job, job.priority, c, c.has_mesh, world.chunks)
+      //clearJobsForChunk(job.x, job.z)
+      continue
+    }
+
+    if (job.type === "mesh") {
+      const c = getChunkAt(job.x, job.z)
+      //console.log("build MESH!")
+      console.log("Building mesh for chunk: \n", c)
+      if (!c || c.has_mesh) continue
+      //c.state = ChunkState.Meshing
+      //console.log("build MESH!2")
+      c.mesh = []
+      buildChunkMesh(c)
+      //console.log(c.mesh)
+      c.has_mesh = true
+      console.log("BUILT mesh for chunk: \n", c)
+      //clearJobsForChunk(job.x, job.z)
+      continue
+    }
+    
+    if (job.type === "unload") {
+      for (let i = 0; i < world.chunks.length; i++) {
+        const ch = world.chunks[i]
+        if (ch.x === job.x && ch.z === job.z) {
+          world.chunks.splice(i, 1)
+          break
+        }
+      }
+      //clearJobsForChunk(job.x, job.z)
+      continue
+    }*/
+  }
+}
+
+function disposeMesh(chunk: chunk) {
+  chunk.mesh = []
+  chunk.has_mesh = false
+}
+
+/*
+function unloadFarChunks() {
+  const camChunk = worldToChunk(camera.x, camera.z)
+
+  for (let i = world.chunks.length - 1; i >= 0; i--) {
+    const c = world.chunks[i]
+    const dx = c.x - camChunk.cx
+    const dz = c.z - camChunk.cz
+    const dist2 = dx * dx + dz * dz
+
+    if (dist2 > LOAD_RADIUS * LOAD_RADIUS) {
+      // Chunk entfernen
+      world.chunks.splice(i, 1)
+    }
+  }
+}
+*/
+function updateChunks() {
+  const cP = worldToChunk(camera.x, camera.z)
+
+  for (let dx = -LOAD_RADIUS; dx <= LOAD_RADIUS; dx++) {
+    for (let dz = -LOAD_RADIUS; dz <= LOAD_RADIUS; dz++) {
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      const cx = cP.cx + dx
+      const cz = cP.cz + dz
+      const chunk = getChunkAt(cx, cz)
+
+      // Laden wenn fehlt
+      if (dist <= LOAD_RADIUS && !chunk) {
+        //console.log("load!! ", cx, cz, getChunkAt(cx, cz))
+        queueJob(cx, cz, "load", dist)
+        continue
+      }
+      if (!chunk) continue
+
+      // Mesh bauen wenn nah
+      if (dist <= RENDER_RADIUS && chunk.has_mesh === false) {
+        queueJob(cx, cz, "mesh", dist + 5)
+      }
+
+      if (dist > RENDER_RADIUS && chunk.has_mesh === true) {
+        //console.log("UNMESH")
+        queueJob(cx, cz, "unmesh", dist)
+      }
+
+      if (dist > LOAD_RADIUS) {
+        //console.log("UNLOAD")
+        queueJob(cx, cz, "unload", dist)
+      }
+    }
+  }
+  if (chunkQueue.length > 0) {
+    //console.log("JOBS:   - ")
+    //console.log(chunkQueue)
+  }
+}
+
+//console.log("chunkD:", world.chunks[0])
+
+// ========= WORLD - CONTROL ==========
+function index(x: number, y: number, z: number): number {
+  return y * sChunkX * sChunkZ + z * sChunkX + x
+}
+
+function setBlock(c: chunk, x: number, y: number, z: number, type: blockTypes) {
+  // Check if coordinates are within chunk bounds
+  if (
+    x < 0 ||
+    x >= sChunkX ||
+    y < 0 ||
+    y >= sChunkYA * sChunkY ||
+    z < 0 ||
+    z >= sChunkZ
+  ) {
+    // Log an error or simply do nothing if the block is outside the chunk
+    console.error(
+      `Attempted to set a block outside of chunk bounds: (${x}, ${y}, ${z})`,
+    )
+    return
+  }
+
+  const subChunkIndex = Math.floor(y / sChunkY)
+  const localY = y % sChunkY
+  const subChunk = c.subChunks[subChunkIndex]
+
+  // This check is a safeguard, though the bounds check above should prevent it
+  if (!subChunk) {
+    console.error(`SubChunk at index ${subChunkIndex} is undefined.`)
+    return
+  }
+
+  subChunk.changed = true
+  if (subChunk.fullAir) {
+    subChunk.fullAir = false
+    subChunk.blocks = new Array(4096).fill(0)
+  }
+  subChunk.blocks[index(x, localY, z)] = type
+}
+
+function getBlock(c: chunk, x: number, y: number, z: number): blockTypes {
+  // Check if coordinates are within chunk bounds
+  if (
+    x < 0 ||
+    x >= sChunkX ||
+    y < 0 ||
+    y >= sChunkYA * sChunkY ||
+    z < 0 ||
+    z >= sChunkZ
+  ) {
+    // Return a safe, non-solid block type for out-of-bounds requests
+    return blockTypes.air
+  }
+
+  const subChunkIndex = Math.floor(y / sChunkY)
+  const localY = y % sChunkY
+  const subChunk = c.subChunks[subChunkIndex]
+
+  // Safeguard check, though the bounds check should handle it
+  if (!subChunk) {
+    return blockTypes.air
+  }
+  if (subChunk.fullAir) return blockTypes.air
+
+  return subChunk.blocks[index(x, localY, z)]
+}
+
+function isTransparent(type: blockTypes): boolean {
+  return type === blockTypes.air
+}
+
+function getBlockWorld(wx: number, wy: number, wz: number): blockTypes {
+  const cx = Math.floor(wx / sChunkX)
+  const cz = Math.floor(wz / sChunkZ)
+  const lx = ((wx % sChunkX) + sChunkX) % sChunkX // local X
+  const lz = ((wz % sChunkZ) + sChunkZ) % sChunkZ // local Z
+
+  const chunk = getChunkAt(cx, cz)
+  if (!chunk) return blockTypes.air
+
+  return getBlock(chunk, lx, wy, lz)
+}
+
+function getChunkAt(cx: number, cz: number): chunk | undefined {
+  return world.chunks.find((ch) => ch.x === cx && ch.z === cz)
+}
+
+// ==================== !DEPRICATED 3D ====================
+
+/* DEPRICATED::
+
+function rotate3D(p: Vec3, yawCos: number, yawSin: number, pitchCos: number, pitchSin: number): Vec3 {
+  const x1 = p[0] * yawCos - p[2] * yawSin
+  const z1 = p[0] * yawSin + p[2] * yawCos
+
+  const y2 = p[1] * pitchCos - z1 * pitchSin
+  const z2 = p[1] * pitchSin + z1 * pitchCos
+
+  return [x1, y2, z2]
+}
+
+*/
+
+// =================== !GAMEPLAY =====================
+function gameplay() {
+  inputs()
+  blockAiming()
+  blockInteractions()
+
+  const p = worldToChunk(camera.x, camera.z)
+  /*if (!chunk) return
+  const lx = ((camera.x % sChunkX) + sChunkX) % sChunkX
+  const lz = ((camera.z % sChunkZ) + sChunkZ) % sChunkZ*/
+  chunkPos.text = "CP: " + p.cx + " " + p.cz //!!
+
+  //unloadFarChunks()
+  /*if (Keyboard.keyDown(Key.Five)) */
+  updateChunks()
+  processChunkQueue()
+  if (Keyboard.keyDown(Key.Six)) {
+    console.log("s", chunkChanges)
+    saveChunk(p.cx, p.cz)
+    console.log("e", chunkChanges)
+  }
+  if (Keyboard.keyDown(Key.Seven)) {
+    for (const c of world.chunks as any) {
+      //console.log(c)
+    }
+  }
+
+  /*
+  const cP = worldToChunk(camera.x, camera.z)
+  for (let x = -CSrenderDistance; x <= CSrenderDistance; x += 1) {
+    for (let z = -CSrenderDistance; z <= CSrenderDistance; z += 1) {
+      if (!getChunkAt(cP.cx + x, cP.cz + z)) {
+        generateChunk(cP.cx + x, cP.cz + z)
+        const neighbors = [
+          [0, 0], // aktueller Chunk
+          [-1, 0], // links
+          [1, 0], // rechts
+          [0, -1], // oben
+          [0, 1], // unten
+        ]
+
+        for (const [dx, dz] of neighbors as any) {
+          const nx = cP.cx + x + dx
+          const nz = cP.cz + z + dz
+          const chunk = getChunkAt(nx, nz)
+          if (!chunk) continue
+          chunk.mesh = []
+          buildChunkMesh(chunk)
+          console.log("BUILD CHUNK MESHEEE")
+        }
+      }
+    }
+  }*/
+}
+
+function worldToChunk(x: number, z: number): { cx: number; cz: number } {
+  const cx = Math.floor(x / sChunkX)
+  const cz = Math.floor(z / sChunkZ)
+  return { cx, cz }
+}
+
+type KeyAction = () => void
+interface KeyBindHold {
+  keys: Key[]
+  action: KeyAction
+}
+
+interface KeyBindDown {
+  keys: Key[]
+  action: KeyAction
+}
+
+const speed = 0.3,
+  rotSpeed = 2
+let rotatedY = false
+let rotatedP = false
+let use = false
+let attack = false
+
+const keyBindsHold: KeyBindHold[] = [
+  {
+    keys: [Key.W],
+    action: () => {
+      camera.xMag += camera.yawSin // * speed// * globals.deltaTime
+      camera.zMag += camera.yawCos // * speed// * globals.deltaTime
+      //camera.x += camera.yawSin * speed * globals.deltaTime
+      //camera.z += camera.yawCos * speed * globals.deltaTime
+    },
+  },
+  {
+    keys: [Key.S],
+    action: () => {
+      camera.xMag -= camera.yawSin // * speed// * globals.deltaTime
+      camera.zMag -= camera.yawCos // * speed// * globals.deltaTime
+      //camera.x -= camera.yawSin * speed * globals.deltaTime
+      //camera.z -= camera.yawCos * speed * globals.deltaTime
+    },
+  },
+  {
+    keys: [Key.A],
+    action: () => {
+      camera.xMag -= camera.yawCos // * speed// * globals.deltaTime
+      camera.zMag += camera.yawSin // * speed// * globals.deltaTime
+      //camera.x -= camera.yawCos * speed * globals.deltaTime
+      //camera.z += camera.yawSin * speed * globals.deltaTime
+    },
+  },
+  {
+    keys: [Key.D],
+    action: () => {
+      camera.xMag += camera.yawCos // * speed// * globals.deltaTime
+      camera.zMag -= camera.yawSin // * speed// * globals.deltaTime
+      //camera.x += camera.yawCos * speed * globals.deltaTime
+      //camera.z -= camera.yawSin * speed * globals.deltaTime
+    },
+  },
+  {
+    keys: [Key.J, Key.ArrowLeft],
+    action: () => {
+      camera.yaw -= rotSpeed * globals.deltaTime
+      rotatedY = true
+    },
+  },
+  {
+    keys: [Key.L, Key.ArrowRight],
+    action: () => {
+      camera.yaw += rotSpeed * globals.deltaTime
+      rotatedY = true
+    },
+  },
+  {
+    keys: [Key.I, Key.ArrowUp],
+    action: () => {
+      if (clampPVals)
+        camera.pitch = Math.min(
+          clampPVals[1],
+          camera.pitch + rotSpeed * globals.deltaTime,
+        )
+      else camera.pitch += rotSpeed * globals.deltaTime
+      rotatedP = true
+    },
+  },
+  {
+    keys: [Key.K, Key.ArrowDown],
+    action: () => {
+      if (clampPVals)
+        camera.pitch = Math.max(
+          clampPVals[0],
+          camera.pitch - rotSpeed * globals.deltaTime,
+        )
+      else camera.pitch -= rotSpeed * globals.deltaTime
+      //camera.pitch -= rotSpeed * globals.deltaTime
+      rotatedP = true
+    },
+  },
+]
+
+const keyBindsDown: KeyBindDown[] = [
+  {
+    keys: [Key.Q, Key.O],
+    action: () => {
+      use = true
+    },
+  },
+  {
+    keys: [Key.E, Key.U],
+    action: () => {
+      attack = true
+    },
+  },
+  {
+    keys: [Key.N],
+    action: () => {
+      globals.updateHotbar = 1
+      globals.hotbarSlot = (globals.hotbarSlot + 1) % 9
+    },
+  },
+  {
+    keys: [Key.C],
+    action: () => {
+      globals.updateHotbar = 1
+      globals.hotbarSlot =
+        (globals.hotbarSlot - 1) % 9 < 0 ? 8 : (globals.hotbarSlot - 1) % 9
+    },
+  },
+  {
+    keys: [Key.R],
+    action: () => {
+      toggleSprint = !toggleSprint
+    },
+  },
+]
+
+function inputs() {
+  rotatedY = false
+  rotatedP = false
+  use = false
+  attack = false
+  //globals.deltaTime = 1
+  /*
+  if (Keyboard.keyHeld(Key.J) || Keyboard.keyHeld(Key.ArrowLeft)) {
+    
+  }
+  if (Keyboard.keyHeld(Key.L) || Keyboard.keyHeld(Key.ArrowRight)) {
+    camera.yaw += rotSpeed * globals.deltaTime
+    rotatedY = true
+  }
+  if (Keyboard.keyHeld(Key.I) || Keyboard.keyHeld(Key.ArrowUp)) {
+    camera.pitch += rotSpeed * globals.deltaTime
+    rotatedP = true
+  }
+  if (Keyboard.keyHeld(Key.K) || Keyboard.keyHeld(Key.ArrowDown)) {
+    camera.pitch -= rotSpeed * globals.deltaTime
+    rotatedP = true
+  }*/
+  camera.xMag = 0
+  camera.zMag = 0
+
+  keyBindsHold.forEach((bind) => {
+    bind.keys.forEach((k) => {
+      if (Keyboard.keyHeld(k)) {
+        bind.action()
+      }
+    })
+  })
+  keyBindsDown.forEach((bind) => {
+    bind.keys.forEach((k) => {
+      if (Keyboard.keyDown(k)) {
+        bind.action()
+      }
+    })
+  })
+
+  const len = Math.hypot(camera.xMag, camera.zMag) || 1
+  const nx = camera.xMag / len
+  const nz = camera.zMag / len
+
+  // Beschleunigung
+  camera.xVel += nx * accel * globals.deltaTime * Tspeed
+  camera.zVel += nz * accel * globals.deltaTime * Tspeed
+
+  //camera.x += camera.xMag * speed * globals.deltaTime
+  //camera.z += camera.zMag * speed * globals.deltaTime
+  //console.log(camera.xMag + camera.zMag)
+
+  if (rotatedY) {
+    camera.yawCos = Math.cos(camera.yaw)
+    camera.yawSin = Math.sin(camera.yaw)
+  }
+  if (rotatedP) {
+    camera.pitchCos = Math.cos(camera.pitch)
+    camera.pitchSin = Math.sin(camera.pitch)
+  }
+
+  if (
+    ((Keyboard.keyHeld(Key.H) || Keyboard.keyHeld(Key.Space)) &&
+      onGround &&
+      camera.gamemode == gamemodes.survival) ||
+    ((Keyboard.keyHeld(Key.H) || Keyboard.keyHeld(Key.Space)) &&
+      camera.gamemode == gamemodes.creative)
+  ) {
+    camera.yVel = jumpStrength
+    camera.xVel *= jumpBoost
+    camera.zVel *= jumpBoost
+    onGround = false
+  }
+
+  // Sneak / runterdrücken
+  /*if (Keyboard.keyHeld(Key.F) || Keyboard.keyHeld(Key.Shift)) {
+    camera.yVel -= accel * globals.deltaTime
+  }*/
+
+  updatePhysics()
+  //moveCamera(dx, dy, dz)
+}
+
+function updatePhysics() {
+  if (camera.gamemode === gamemodes.survival) {
+    camera.yVel += gravity * globals.deltaTime * Tspeed
+  }
+
+  // Friction
+  const friction = onGround ? frictionGround : frictionAir
+  camera.xVel -= camera.xVel * friction * globals.deltaTime * Tspeed
+  camera.zVel -= camera.zVel * friction * globals.deltaTime * Tspeed
+
+  // Max-Speed
+  let currentMaxSpeed = toggleSprint ? maxSpeed * sprintMultiplier : maxSpeed
+  const horizSpeed = Math.hypot(camera.xVel, camera.zVel)
+  if (horizSpeed > currentMaxSpeed) {
+    const excess = horizSpeed - currentMaxSpeed
+    const reduction = excess * 0.9 // nur 10% pro Tick abbauen
+    const scale = (horizSpeed - reduction) / horizSpeed
+    camera.xVel *= scale
+    camera.zVel *= scale
+  }
+
+  // Bewegung + Kollisionscheck
+  onGround = false
+  moveCamera(
+    camera.xVel * globals.deltaTime * Tspeed,
+    camera.yVel * globals.deltaTime * Tspeed,
+    camera.zVel * globals.deltaTime * Tspeed,
+  )
+}
+
+function moveCamera(dx: number, dy: number, dz: number) {
+  camera.y += dy
+  if (collisionEnabled && collidesAxis("y", dy)) {
+    if (dy < 0) onGround = true // nur wenn runter → Boden
+    camera.y -= dy
+    camera.yVel = 0
+  }
+
+  camera.x += dx
+  if (collisionEnabled && collidesAxis("x", dx)) {
+    camera.x -= dx
+    camera.xVel = 0
+  }
+
+  // Z
+  camera.z += dz
+  if (collisionEnabled && collidesAxis("z", dz)) {
+    camera.z -= dz
+    camera.zVel = 0
+  }
+  const moving =
+    Math.abs(camera.xVel) > epsilon || Math.abs(camera.zVel) > epsilon
+  const targetFov =
+    toggleSprint && moving
+      ? camera.baseFov * sprintFovMultiplier
+      : camera.baseFov
+  const fovLerp = 0.1 // Geschwindigkeit des FOV-Übergangs (0.05-0.2)
+  camera.fov += (targetFov - camera.fov) * fovLerp
+  camera.scale = Math.tan(camera.fov / 2)
+}
+
+function collidesAxis(axis: "x" | "y" | "z", delta: number): boolean {
+  const minX = Math.floor(camera.x - camera.width / 2)
+  const maxX = Math.floor(camera.x + camera.width / 2)
+  const minY = Math.floor(camera.y - camera.height)
+  const maxY = Math.floor(camera.y)
+  const minZ = Math.floor(camera.z - camera.depth / 2)
+  const maxZ = Math.floor(camera.z + camera.depth / 2)
+
+  if (axis === "x") {
+    const checkX = delta > 0 ? maxX : minX
+    for (let y = minY; y <= maxY; y++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        if (getBlockWorld(checkX, y, z) !== blockTypes.air) {
+          return true
+        }
+      }
+    }
+  }
+
+  if (axis === "y") {
+    const checkY = delta > 0 ? maxY : minY
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        if (getBlockWorld(x, checkY, z) !== blockTypes.air) {
+          return true
+        }
+      }
+    }
+  }
+
+  if (axis === "z") {
+    const checkZ = delta > 0 ? maxZ : minZ
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        if (getBlockWorld(x, y, checkZ) !== blockTypes.air) {
+          return true
+        }
+      }
+    }
+  }
+
+  return false
+}
+
+function isInsideBlock(): boolean {
+  const minX = Math.floor(camera.x - camera.width / 2)
+  const maxX = Math.floor(camera.x + camera.width / 2)
+  const minY = Math.floor(camera.y - camera.height)
+  const maxY = Math.floor(camera.y)
+  const minZ = Math.floor(camera.z - camera.depth / 2)
+  const maxZ = Math.floor(camera.z + camera.depth / 2)
+
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        if (getBlockWorld(x, y, z) !== blockTypes.air) {
+          return true // Kamera befindet sich in einem Block
+        }
+      }
+    }
+  }
+
+  return false // alles frei
+}
+
+function blockAiming() {
+  const rayDir = cameraRayForHit()
+  const hit = voxelRaycastWorld(
+    [camera.x, camera.y, camera.z],
+    rayDir,
+    camera.reach,
+  )
+  if (hit) {
+    camera.hitBlock = hit.pos
+    camera.hitSide = hit.face
+  } else {
+    camera.hitBlock = []
+  }
+}
+
+function blockInteractions() {
+  if (!(attack || use) || !camera.hitBlock.length) return
+
+  let updated = false
+  let [bx, by, bz] = camera.hitBlock as any
+
+  if (attack) {
+    const cx = Math.floor(bx / sChunkX),
+      cz = Math.floor(bz / sChunkZ),
+      cy = Math.floor(by)
+    const chunk = getChunkAt(cx, cz)
+    if (!chunk) return
+    const lx = ((bx % sChunkX) + sChunkX) % sChunkX
+    const lz = ((bz % sChunkZ) + sChunkZ) % sChunkZ
+    const bblock = getBlock(chunk, lx, cy, lz)
+    //console.log("b", bblock, blockTypeNames[bblock])
+    if (useItems) addItemToNearestSlot(items[blockTypeNames[bblock]], 1)
+    setBlock(chunk, lx, cy, lz, blockTypes.air)
+
+    updated = true
+  }
+
+  if (use) {
+    //const currentItem = globals.hotbar[globals.hotbarSlot].item
+    const currentItem = findSelectedSlot(globals.hotbarSlot)
+    if (currentItem && currentItem.item) {
+      if (currentItem.item.blockID !== undefined) {
+        const setBlockType = currentItem.item.blockID
+        let [px, py, pz] = [bx, by, bz] as any
+        const rayDir = cameraRayForHit()
+        if (camera.hitSide === "x") px -= rayDir[0] > 0 ? 1 : -1
+        if (camera.hitSide === "y") py -= rayDir[1] > 0 ? 1 : -1
+        if (camera.hitSide === "z") pz -= rayDir[2] > 0 ? 1 : -1
+
+        if (getBlockWorld(px, py, pz) === blockTypes.air) {
+          const cx = Math.floor(px / sChunkX),
+            cz = Math.floor(pz / sChunkZ),
+            cy = Math.floor(py)
+          const chunk = getChunkAt(cx, cz)
+          if (!chunk) return
+          const lx = ((px % sChunkX) + sChunkX) % sChunkX
+          const lz = ((pz % sChunkZ) + sChunkZ) % sChunkZ
+          const oldBlock = getBlock(chunk, lx, cy, lz)
+          setBlock(chunk, lx, cy, lz, setBlockType)
+          if (isInsideBlock()) {
+            setBlock(chunk, lx, cy, lz, oldBlock)
+          } else {
+            updated = true
+            if (camera.gamemode == gamemodes.survival && useItems) {
+              //console.log("removing item: " + currentItem, globals.hotbar, globals.hotbar[globals.hotbarSlot])
+              //currentItem.count -= 1
+              currentItem.count -= 1
+              //console.log(globals.inventory, currentItem)
+              if (currentItem.count <= 0) {
+                const rmIdx = findSelectedIndex(currentItem.slot)
+                if (rmIdx) globals.inventory.splice(rmIdx, 1)
+              }
+              /*globals.hotbar[globals.hotbarSlot].count -= 1
+            if (globals.hotbar[globals.hotbarSlot].count == 0) {
+              globals.hotbar[globals.hotbarSlot].count = 0
+              globals.hotbar[globals.hotbarSlot].item = null
+            }*/
+              globals.updateHotbar = 2
+            }
+          }
+        }
+      } else {
+        console.warn("NON PLACEABLE ITEM!")
+      }
+    }
+  }
+
+  if (updated) {
+    const cx = Math.floor(bx / sChunkX),
+      cz = Math.floor(bz / sChunkZ),
+      cy = Math.floor(by)
+    const chunk = getChunkAt(cx, cz)
+    const lx = ((bx % sChunkX) + sChunkX) % sChunkX
+    const lz = ((bz % sChunkZ) + sChunkZ) % sChunkZ
+
+    const neighbors: [number, number, boolean][] = [
+      [1, 0, lx === sChunkX - 1],
+      [-1, 0, lx === 0],
+      [0, 1, lz === sChunkZ - 1],
+      [0, -1, lz === 0],
+    ]
+
+    const toUpdate: chunk[] = chunk ? [chunk] : []
+    for (const [dx, dz, shouldUpdate] of neighbors as any)
+      if (shouldUpdate) {
+        const nc = getChunkAt(cx + dx, cz + dz)
+        if (nc) toUpdate.push(nc)
+      }
+
+    for (const c of toUpdate as any) {
+      c.mesh = []
+      buildChunkMesh(c)
+    }
+  }
+}
+
+// =================== !INVENTORY!! =====================
+globals.hotbarSlot = 0
+const hotbarSize = 9
+interface invSlot {
+  slot: number
+  item: null | item
+  count: number
+}
+globals.inventory = []
+
+const invSlotItem: invSlot = { slot: 0, item: items["grass"], count: 3 }
+//globals.inventory.push(invSlotItem)
+
+addItemToNearestSlot(items["stonebrick"], 65)
+
+function findSelectedSlot(id: number): invSlot | undefined {
+  const selectedSlot: invSlot | undefined = globals.inventory.find(
+    (inventarSlot: invSlot) => inventarSlot.slot === id,
+  )
+  return selectedSlot
+}
+
+function findSelectedIndex(id: number): number {
+  return globals.inventory.findIndex(
+    (inventarSlot: invSlot) => inventarSlot.slot === id,
+  )
+}
+
+function addItemToNearestSlotNC(item: item, count: number) {}
+
+function addItemToNearestSlot(item: item, count: number) {
+  let remainingCount = count
+  if (!item) {
+    //console.log("r", item)
+    return
+  }
+  const MAX_STACK_SIZE = item.max_stack_size
+  for (const slot of globals.inventory) {
+    if (slot.item === item && slot.count < MAX_STACK_SIZE) {
+      const spaceAvailable = MAX_STACK_SIZE - slot.count
+      const amountToAdd = Math.min(remainingCount, spaceAvailable)
+
+      slot.count += amountToAdd
+      remainingCount -= amountToAdd
+
+      if (remainingCount === 0) {
+        //slot.count
+        globals.updateHotbar = 2
+        return
+      }
+    }
+  }
+
+  //while (remainingCount > 0) {
+  for (let i = 0; i <= 36; i++) {
+    const slot = findSelectedSlot(i)
+    if (slot === undefined) {
+      const amountToPlace = Math.min(remainingCount, MAX_STACK_SIZE)
+      //slot.item = item
+      //slot.count = amountToPlace
+      remainingCount -= amountToPlace
+      const invSlotItem: invSlot = {
+        slot: i,
+        item: item,
+        count: amountToPlace,
+      }
+      globals.inventory.push(invSlotItem)
+      globals.updateHotbar = 2
+      return
+      //globals.inventory.push({})
+    } /* else {
+        // Keine leeren Slots mehr gefunden.
+        // Hier könntest du normalerweise einen neuen Slot erstellen,
+        // aber wir gehen davon aus, dass die Inventar-Größe fest ist.
+        console.warn(
+          `Inventar ist voll. ${globals.inventory}  ${remainingCount} ${item.display_name} konnten nicht hinzugefügt werden.`,
+        )
+        remainingCount = 0
+        globals.updateHotbar = 2
+        break
+      }*/
+  }
+  //}
+  //console.log("dind do nan")
+  globals.updateHotbar = 2
+}
+
+function setItemToSlotITEM(slot: number, item: item, count: number) {}
+
+function setItemToSlotSLOT(slot: invSlot) {}
+// =================== !RENDERER ======================
+type Vec2 = [number, number]
+type Vec3 = [number, number, number]
+type TriangleColor = [Vec3, Vec3, Vec3, number]
+type TriangleTexture = [Vec3, Vec3, Vec3, Vec2, Vec2, Vec2, string]
+
+type Triangle = TriangleColor | TriangleTexture
+//globals.hotbar = Array.from({ length: hotbarSize }, () => ())
+//globals.hotbar[1] = { item: items["grass_block"], count: 3 }
+//console.log(globals.hotbar)
+
+//globals.inventory = []
+
+let scene: Triangle[] = []
+
+function isTextured(tri: Triangle): tri is TriangleTexture {
+  return (tri as TriangleTexture)[6] !== undefined
+}
+
+function rendering() {
+  if (renderType == renderTypes.CloneVersion) {
+  } else if (renderType == renderTypes.PixelVersion) {
+    PV_fillGrid(backgroundColor)
+    PV_clearZBuffer()
+  } else {
+    PV_fillGrid(backgroundColor)
+  }
+
+  if (renderType != renderTypes.RaycastVersion) {
+    renderScene3D()
+    //fragmentShader([-100, 50, 20], [40, -20, 0], [SW2 + 10 + Math.sin(t * 3) * 100, 80, 5], 0xff0000)
+  } else {
+    renderSceneRaycast()
+  }
+  renderBlockOutline3D()
+
+  if (renderType == renderTypes.CloneVersion) {
+    CV_drawFrame()
+  }
+}
+
+function renderScene3D() {
+  for (let tri of scene as any) {
+    if (isTextured(tri)) {
+      if (!isFrontface(tri)) continue
+      const a = vertexShader(tri[0])
+      const b = vertexShader(tri[1])
+      const c = vertexShader(tri[2])
+      const uvs: [Vec2, Vec2, Vec2] = [tri[3], tri[4], tri[5]]
+      const texture = tri[6]
+      //console.log("!!: ", a, b, c, uvs[0], uvs[1], uvs[2], texture)
+      fragmentShaderTextured(a, b, c, uvs, texture)
+    } else {
+      if (!isFrontface(tri)) continue
+      const a = vertexShader(tri[0])
+      const b = vertexShader(tri[1])
+      const c = vertexShader(tri[2])
+      const color = tri[3]
+      fragmentShader(a, b, c, color)
+    }
+  }
+}
+
+function renderBlockOutline3D() {
+  if (!camera.hitBlock) {
+    //console.log("returned")
+    return
+  }
+  const [bx, by, bz] = camera.hitBlock as any
+
+  // Alle 8 Eckpunkte des Blocks
+  const corners: Vec3[] = [
+    [bx, by, bz],
+    [bx + 1, by, bz],
+    [bx, by + 1, bz],
+    [bx + 1, by + 1, bz],
+    [bx, by, bz + 1],
+    [bx + 1, by, bz + 1],
+    [bx, by + 1, bz + 1],
+    [bx + 1, by + 1, bz + 1],
+  ]
+
+  // Transformiere in Screen-Space
+  const projected = corners.map((c) => projectToScreen(vertexShader(c)))
+
+  // Kanten des Würfels (Index-Paare)
+  const edges = [
+    [0, 1],
+    [1, 3],
+    [3, 2],
+    [2, 0], // unten
+    [4, 5],
+    [5, 7],
+    [7, 6],
+    [6, 4], // oben
+    [0, 4],
+    [1, 5],
+    [2, 6],
+    [3, 7], // Seiten
+  ]
+
+  for (const [i1, i2] of edges as any) {
+    const p1 = projected[i1]
+    const p2 = projected[i2]
+    if (renderType == (renderTypes.CloneVersion as any))
+      drawLine(p1[0], p1[1], p2[0], p2[1], 4, 0x000000, Math.min(p1[2], p2[2]))
+    else if (renderType == (renderTypes.PixelVersion as any)) {
+      PV_drawLineNZB([p1[0], p1[1], p1[2]], [p2[0], p2[1], p2[2]], 0x000000)
+    } else {
+      PV_drawLineNZB([p1[0], p1[1], 0], [p2[0], p2[1], 0], 0x000000)
+    }
+  }
+}
+
+function renderSceneRaycast() {
+  const maxDist = raycastDist
+
+  for (let y = 0; y < textHeight; y++) {
+    for (let x = 0; x < textWidth; x++) {
+      const rayDir = cameraRayForPixel(x, y)
+
+      const hit = voxelRaycastWorld(
+        [camera.x, camera.y, camera.z],
+        rayDir,
+        maxDist,
+      )
+
+      const color = hit ? shade(hit.block, hit.face, hit.dist) : backgroundColor
+
+      PV_setPixel(x, y, color)
+    }
+  }
+}
+
+function shade(block: blockTypes, face: "x" | "y" | "z", dist: number): number {
+  // direkter Zugriff auf colorMap statt extra Map
+  const colors = getBlockColors(block)
+  if (!colors) return backgroundColor
+
+  let baseColor: number
+  switch (face) {
+    case "x":
+      baseColor = colors.eColor ?? colors.ssColor ?? colors.aColor
+      break
+    case "y":
+      baseColor = colors.topColor
+      break
+    case "z":
+      baseColor = colors.sColor ?? colors.ssColor ?? colors.aColor
+      break
+    default:
+      baseColor = colors.aColor
+  }
+
+  //colorMap[blockTypes[block] as keyof typeof colorMap] ?? backgroundColor
+
+  let r = (baseColor >> 16) & 0xff
+  let g = (baseColor >> 8) & 0xff
+  let b = baseColor & 0xff
+
+  // einfache Helligkeit nach Face
+  let brightness = 1.0
+  if (face === "x") brightness = 0.7
+  if (face === "y") brightness = 1.0
+  if (face === "z") brightness = 0.5
+
+  // Distanz-Faktor
+  const fog = Math.max(0, dist / distColor)
+  const distanceLightFactor = Math.max(0.1, 1.0 - fog)
+
+  r = Math.floor(r * brightness * distanceLightFactor)
+  g = Math.floor(g * brightness * distanceLightFactor)
+  b = Math.floor(b * brightness * distanceLightFactor)
+
+  const prefinal = (r << 16) | (g << 8) | b
+  const blended = blendColor(prefinal, backgroundColor, fog)
+
+  return blended
+}
+
+function cameraRayForPixel(px: number, py: number): Vec3 {
+  const SW = textWidth
+  const SH = textHeight
+
+  const nx = (2 * (px + 0.5)) / SW - 1
+  const ny = (2 * (py + 0.5)) / SH - 1
+
+  let rx = nx * (SW / SH)
+  let ry = ny
+  let rz = 1
+
+  const tempY_pitch = ry * camera.pitchCos + rz * camera.pitchSin
+  const tempZ_pitch = -ry * camera.pitchSin + rz * camera.pitchCos
+  ry = tempY_pitch
+  rz = tempZ_pitch
+
+  const tempX_yaw = rx * camera.yawCos + rz * camera.yawSin
+  const tempZ_yaw = -rx * camera.yawSin + rz * camera.yawCos
+  rx = tempX_yaw
+  rz = tempZ_yaw
+
+  const len = Math.hypot(rx, ry, rz)
+  return [rx / len, ry / len, rz / len] as Vec3
+}
+
+function cameraRayForHit(): Vec3 {
+  const nx = 0
+  const ny = 0
+  //drawDot(SW2,SH2, 5, 0xff0000, -10000)
+
+  let rx = nx * (SW / SH)
+  let ry = ny
+  let rz = 1
+
+  const tempY_pitch = ry * camera.pitchCos + rz * camera.pitchSin
+  const tempZ_pitch = -ry * camera.pitchSin + rz * camera.pitchCos
+  ry = tempY_pitch
+  rz = tempZ_pitch
+
+  const tempX_yaw = rx * camera.yawCos + rz * camera.yawSin
+  const tempZ_yaw = -rx * camera.yawSin + rz * camera.yawCos
+  rx = tempX_yaw
+  rz = tempZ_yaw
+
+  const len = Math.hypot(rx, ry, rz)
+  return [rx / len, ry / len, rz / len] as Vec3
+}
+
+function voxelRaycastWorld(
+  origin: [number, number, number],
+  dir: [number, number, number],
+  maxDist: number,
+) {
+  let [x, y, z] = origin
+  let [dx, dy, dz] = dir
+
+  let ix = Math.floor(x)
+  let iy = Math.floor(y)
+  let iz = Math.floor(z)
+
+  const stepX = dx > 0 ? 1 : -1
+  const stepY = dy > 0 ? 1 : -1
+  const stepZ = dz > 0 ? 1 : -1
+
+  const tDeltaX = Math.abs(1 / dx)
+  const tDeltaY = Math.abs(1 / dy)
+  const tDeltaZ = Math.abs(1 / dz)
+
+  let tMaxX = (dx > 0 ? ix + 1 - x : x - ix) * tDeltaX
+  let tMaxY = (dy > 0 ? iy + 1 - y : y - iy) * tDeltaY
+  let tMaxZ = (dz > 0 ? iz + 1 - z : z - iz) * tDeltaZ
+
+  let dist = 0
+  let lastStep: "x" | "y" | "z" = "x"
+
+  while (dist <= maxDist) {
+    const block = getBlockWorld(ix, iy, iz)
+    if (block !== blockTypes.air) {
+      return { block, pos: [ix, iy, iz], face: lastStep, dist }
+    }
+
+    if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+      ix += stepX
+      dist = tMaxX
+      tMaxX += tDeltaX
+      lastStep = "x"
+    } else if (tMaxY < tMaxZ) {
+      iy += stepY
+      dist = tMaxY
+      tMaxY += tDeltaY
+      lastStep = "y"
+    } else {
+      iz += stepZ
+      dist = tMaxZ
+      tMaxZ += tDeltaZ
+      lastStep = "z"
+    }
+  }
+
+  return null
+}
+
+function vertexShader(p: Vec3): Vec3 {
+  const dx = p[0] - camera.x
+  const dy = p[1] - camera.y
+  const dz = p[2] - camera.z
+
+  const x1 = dx * camera.yawCos - dz * camera.yawSin
+  const z1 = dx * camera.yawSin + dz * camera.yawCos
+
+  const y2 = dy * camera.pitchCos - z1 * camera.pitchSin
+  const z2 = dy * camera.pitchSin + z1 * camera.pitchCos
+
+  return [x1, y2, z2]
+}
+
+function fragmentShader(a: Vec3, b: Vec3, c: Vec3, color: number) {
+  const nearClipped = clipTriangleToNearZ(a, b, c, camera.nearZ)
+  if (nearClipped.length === 0) return
+  for (const triNC of nearClipped as any) {
+    const p0 = projectToScreen(triNC[0])
+    const p1 = projectToScreen(triNC[1])
+    const p2 = projectToScreen(triNC[2])
+
+    const screenClipped = clipTriangleToScreen(p0, p1, p2, SW2, SH2)
+    for (const triSC of screenClipped as any) {
+      drawTriangle(
+        [
+          triSC[0][0],
+          triSC[0][1],
+          triSC[1][0],
+          triSC[1][1],
+          triSC[2][0],
+          triSC[2][1],
+          triSC[0][2],
+          triSC[1][2],
+          triSC[2][2],
+        ],
+        color,
+      )
+    }
+  }
+}
+
+function fragmentShaderTextured(
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  uvs: [Vec2, Vec2, Vec2],
+  texId: string,
+) {
+  const nearClipped = clipTriangleToNearZWithUV(a, b, c, uvs, camera.nearZ)
+  if (nearClipped.length === 0) return
+
+  for (const tri of nearClipped as any) {
+    const screenClipped = clipTriangleToScreenWithUV(
+      tri[0].pos,
+      tri[1].pos,
+      tri[2].pos,
+      [tri[0].uv, tri[1].uv, tri[2].uv],
+      SW2,
+      SH2,
+    )
+
+    for (const scTri of screenClipped as any) {
+      const pa = projectToScreen(scTri[0].pos)
+      const pb = projectToScreen(scTri[1].pos)
+      const pc = projectToScreen(scTri[2].pos)
+
+      PV_drawTriangleTextured(
+        pa,
+        pb,
+        pc,
+        [scTri[0].uv, scTri[1].uv, scTri[2].uv],
+        texId,
+      )
+    }
+  }
+}
+
+function clipTriangleToNearZ(
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  nearZ: number,
+): Vec3[][] {
+  let poly: Vec3[] = [a, b, c]
+
+  poly = clipPolygon(
+    poly,
+    (p) => p[2] >= nearZ, // Punkte vor der Kamera sind drin
+    (p1, p2) => intersectZ(p1, p2, nearZ), // Schnittpunkt mit nearZ
+  )
+
+  if (poly.length < 3) return []
+
+  const tris: Vec3[][] = []
+  for (let i = 1; i < poly.length - 1; i++) {
+    tris.push([poly[0], poly[i], poly[i + 1]])
+  }
+  return tris
+}
+
+function intersectZ(p1: Vec3, p2: Vec3, zClip: number): Vec3 {
+  const t = (zClip - p1[2]) / (p2[2] - p1[2])
+  return [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1]), zClip]
+}
+
+function clipTriangleToScreen(
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  SW2: number,
+  SH2: number,
+): Vec3[][] {
+  let poly: Vec3[] = [a, b, c]
+
+  // clip sequentially against 4 boundaries
+  poly = clipPolygon(
+    poly,
+    (p) => p[0] >= -SW2,
+    (p1, p2) => intersectX(p1, p2, -SW2),
+  )
+  poly = clipPolygon(
+    poly,
+    (p) => p[0] <= SW2,
+    (p1, p2) => intersectX(p1, p2, SW2),
+  )
+  poly = clipPolygon(
+    poly,
+    (p) => p[1] >= -SH2,
+    (p1, p2) => intersectY(p1, p2, -SH2),
+  )
+  poly = clipPolygon(
+    poly,
+    (p) => p[1] <= SH2,
+    (p1, p2) => intersectY(p1, p2, SH2),
+  )
+
+  if (poly.length < 3) return [] // nichts sichtbar
+
+  // triangulate polygon fan-style
+  const tris: Vec3[][] = []
+  for (let i = 1; i < poly.length - 1; i++) {
+    tris.push([poly[0], poly[i], poly[i + 1]])
+  }
+  return tris
+}
+
+function clipPolygon(
+  poly: Vec3[],
+  inside: (p: Vec3) => boolean,
+  intersect: (p1: Vec3, p2: Vec3) => Vec3,
+): Vec3[] {
+  const output: Vec3[] = []
+  for (let i = 0; i < poly.length; i++) {
+    const curr = poly[i]
+    const prev = poly[(i + poly.length - 1) % poly.length]
+    const currIn = inside(curr)
+    const prevIn = inside(prev)
+
+    if (currIn && prevIn) {
+      // beide drin
+      output.push(curr)
+    } else if (prevIn && !currIn) {
+      // rausgehend → Schnittpunkt
+      output.push(intersect(prev, curr))
+    } else if (!prevIn && currIn) {
+      // reinkommend → Schnittpunkt + Punkt
+      output.push(intersect(prev, curr))
+      output.push(curr)
+    }
+    // beide draußen → nix
+  }
+  return output
+}
+
+type VertexUV = { pos: Vec3; uv: Vec2 }
+
+function clipTriangleToNearZWithUV(
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  uvs: [Vec2, Vec2, Vec2],
+  nearZ: number,
+): VertexUV[][] {
+  let poly: VertexUV[] = [
+    { pos: a, uv: uvs[0] },
+    { pos: b, uv: uvs[1] },
+    { pos: c, uv: uvs[2] },
+  ]
+
+  poly = clipPolygonUV(
+    poly,
+    (v) => v.pos[2] >= nearZ,
+    (v1, v2) => intersectZWithUV(v1, v2, nearZ),
+  )
+  if (poly.length < 3) return []
+
+  const tris: VertexUV[][] = []
+  for (let i = 1; i < poly.length - 1; i++) {
+    tris.push([poly[0], poly[i], poly[i + 1]])
+  }
+  return tris
+}
+
+function intersectZWithUV(v1: VertexUV, v2: VertexUV, zClip: number): VertexUV {
+  const t = (zClip - v1.pos[2]) / (v2.pos[2] - v1.pos[2])
+  return {
+    pos: [
+      v1.pos[0] + t * (v2.pos[0] - v1.pos[0]),
+      v1.pos[1] + t * (v2.pos[1] - v1.pos[1]),
+      zClip,
+    ],
+    uv: [
+      v1.uv[0] + t * (v2.uv[0] - v1.uv[0]),
+      v1.uv[1] + t * (v2.uv[1] - v1.uv[1]),
+    ],
+  }
+}
+
+function clipTriangleToScreenWithUV(
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  uvs: [Vec2, Vec2, Vec2],
+  SW2: number,
+  SH2: number,
+): VertexUV[][] {
+  let poly: VertexUV[] = [
+    { pos: a, uv: uvs[0] },
+    { pos: b, uv: uvs[1] },
+    { pos: c, uv: uvs[2] },
+  ]
+
+  poly = clipPolygonUV(
+    poly,
+    (v) => v.pos[0] >= -SW2,
+    (v1, v2) => intersectXWithUV(v1, v2, -SW2),
+  )
+  poly = clipPolygonUV(
+    poly,
+    (v) => v.pos[0] <= SW2,
+    (v1, v2) => intersectXWithUV(v1, v2, SW2),
+  )
+  poly = clipPolygonUV(
+    poly,
+    (v) => v.pos[1] >= -SH2,
+    (v1, v2) => intersectYWithUV(v1, v2, -SH2),
+  )
+  poly = clipPolygonUV(
+    poly,
+    (v) => v.pos[1] <= SH2,
+    (v1, v2) => intersectYWithUV(v1, v2, SH2),
+  )
+
+  if (poly.length < 3) return []
+
+  const tris: VertexUV[][] = []
+  for (let i = 1; i < poly.length - 1; i++) {
+    tris.push([poly[0], poly[i], poly[i + 1]])
+  }
+  return tris
+}
+
+function intersectXWithUV(v1: VertexUV, v2: VertexUV, xClip: number): VertexUV {
+  const t = (xClip - v1.pos[0]) / (v2.pos[0] - v1.pos[0])
+  return {
+    pos: [
+      xClip,
+      v1.pos[1] + t * (v2.pos[1] - v1.pos[1]),
+      v1.pos[2] + t * (v2.pos[2] - v1.pos[2]),
+    ],
+    uv: [
+      v1.uv[0] + t * (v2.uv[0] - v1.uv[0]),
+      v1.uv[1] + t * (v2.uv[1] - v1.uv[1]),
+    ],
+  }
+}
+
+function intersectYWithUV(v1: VertexUV, v2: VertexUV, yClip: number): VertexUV {
+  const t = (yClip - v1.pos[1]) / (v2.pos[1] - v1.pos[1])
+  return {
+    pos: [
+      v1.pos[0] + t * (v2.pos[0] - v1.pos[0]),
+      yClip,
+      v1.pos[2] + t * (v2.pos[2] - v1.pos[2]),
+    ],
+    uv: [
+      v1.uv[0] + t * (v2.uv[0] - v1.uv[0]),
+      v1.uv[1] + t * (v2.uv[1] - v1.uv[1]),
+    ],
+  }
+}
+
+function clipPolygonUV(
+  poly: VertexUV[],
+  inside: (v: VertexUV) => boolean,
+  intersect: (v1: VertexUV, v2: VertexUV) => VertexUV,
+): VertexUV[] {
+  const output: VertexUV[] = []
+  for (let i = 0; i < poly.length; i++) {
+    const curr = poly[i]
+    const prev = poly[(i + poly.length - 1) % poly.length]
+    const currIn = inside(curr)
+    const prevIn = inside(prev)
+
+    if (currIn && prevIn) {
+      output.push(curr)
+    } else if (prevIn && !currIn) {
+      output.push(intersect(prev, curr))
+    } else if (!prevIn && currIn) {
+      output.push(intersect(prev, curr))
+      output.push(curr)
+    }
+  }
+  return output
+}
+
+function intersectX(p1: Vec3, p2: Vec3, xClip: number): Vec3 {
+  const t = (xClip - p1[0]) / (p2[0] - p1[0])
+  return [xClip, p1[1] + t * (p2[1] - p1[1]), p1[2] + t * (p2[2] - p1[2])]
+}
+
+function intersectY(p1: Vec3, p2: Vec3, yClip: number): Vec3 {
+  const t = (yClip - p1[1]) / (p2[1] - p1[1])
+  return [p1[0] + t * (p2[0] - p1[0]), yClip, p1[2] + t * (p2[2] - p1[2])]
+}
+
+function hash2D(x: number, y: number): number {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
+  return s - Math.floor(s)
+}
+
+function colorFromPos(x: number, y: number): number {
+  const r = Math.floor(hash2D(x, y) * 255)
+  const g = Math.floor(hash2D(x + 19.19, y + 47.77) * 255)
+  const b = Math.floor(hash2D(x + 73.31, y + 12.34) * 255)
+  return (r << 16) | (g << 8) | b
+}
+
+function isFrontface(tri: Triangle): boolean {
+  const p1 = tri[0]
+  const p2 = tri[1]
+  const p3 = tri[2]
+
+  const ux = p2[0] - p1[0]
+  const uy = p2[1] - p1[1]
+  const uz = p2[2] - p1[2]
+
+  const vx = p3[0] - p1[0]
+  const vy = p3[1] - p1[1]
+  const vz = p3[2] - p1[2]
+
+  const dx = p1[0] - camera.x
+  const dy = p1[1] - camera.y
+  const dz = p1[2] - camera.z
+
+  const dot =
+    (uy * vz - uz * vy) * dx +
+    (uz * vx - ux * vz) * dy +
+    (ux * vy - uy * vx) * dz
+
+  return dot < 0
+}
+
+function projectToScreen(p: Vec3): Vec3 {
+  const s = camera.scale
+  const f = camera.focalLength
+  const x = (p[0] / p[2] / s) * f
+  const y = (p[1] / p[2] / s) * f
+  return [x, y, p[2]]
+}
+
+function drawTriangle(points: number[], color: number) {
+  if (
+    Math.max(points[0], points[2], points[4]) -
+      Math.min(points[0], points[2], points[4]) <
+    1
+  )
+    return
+  if (
+    Math.max(points[1], points[3], points[5]) -
+      Math.min(points[1], points[3], points[5]) <
+    1
+  )
+    return
+  if (renderType == renderTypes.CloneVersion) {
+    CV_drawTriangle(
+      points[0],
+      points[1],
+      points[2],
+      points[3],
+      points[4],
+      points[5],
+      color,
+      -(points[6] + points[7] + points[8]),
+    )
+  } else if (renderType == renderTypes.PixelVersion) {
+    PV_drawTriangle(
+      [points[0], points[1], points[6]],
+      [points[2], points[3], points[7]],
+      [points[4], points[5], points[8]],
+      color,
+    )
+  } else {
+    console.warn("ADD OTHER RENDER TYPE HERE")
+  }
+}
+
+function addCube(center: Vec3, size: number = 1, colors?: any) {
+  const c = size / 2
+  const cx = center[0]
+  const cy = center[1]
+  const cz = center[2]
+
+  const v: Vec3[] = [
+    [-c, -c, -c],
+    [c, -c, -c],
+    [-c, c, -c],
+    [c, c, -c],
+    [-c, -c, c],
+    [c, -c, c],
+    [-c, c, c],
+    [c, c, c],
+  ]
+
+  for (let i = 0; i < v.length; i++) {
+    v[i][0] += cx
+    v[i][1] += cy
+    v[i][2] += cz
+  }
+
+  const col = colors || {
+    front: 0xff0000,
+    back: 0x00ff00,
+    top: 0x0000ff,
+    bottom: 0xffff00,
+    left: 0xff00ff,
+    right: 0x00ffff,
+  }
+
+  const push = (i1: number, i2: number, i3: number, color: number) =>
+    scene.push([v[i1], v[i2], v[i3], color])
+
+  // Front
+  push(4, 5, 7, col.front)
+  push(4, 7, 6, col.front)
+  // Back
+  push(1, 0, 2, col.back)
+  push(1, 2, 3, col.back)
+  // Top
+  push(2, 6, 7, col.top)
+  push(2, 7, 3, col.top)
+  // Bottom
+  push(0, 1, 5, col.bottom)
+  push(0, 5, 4, col.bottom)
+  // Left
+  push(0, 4, 6, col.left)
+  push(0, 6, 2, col.left)
+  // Right
+  push(5, 1, 3, col.right)
+  push(5, 3, 7, col.right)
+}
+
+// ==================== !PERFOMANCE =======================
+///*#
+let lastTime = performance.now()
+let frames = 0
+let fps = 0
+let avgFps = 0
+const samples: number[] = []
+const maxSamples = 100
+let clonesThisFrame = 0
+function measureFPS() {
+  frames++
+  const now = performance.now()
+  const diff = now - lastTime
+
+  if (diff >= 1000) {
+    fps = (frames * 1000) / diff
+
+    samples.push(fps)
+    if (samples.length > maxSamples) {
+      samples.shift()
+    }
+
+    avgFps = samples.reduce((a, b) => a + b, 0) / samples.length
+
+    frames = 0
+    lastTime = now
+  }
+
+  return { fps, avgFps }
+}
+let lastFrameTime = performance.now()
+
+function perfomanceInit() {
+  fpsTxt.x = -300
+  fpsTxt.y = 220
+  fpsTxt.style.align = "left"
+  cloneTxt.x = -300
+  cloneTxt.y = 180
+  cloneTxt.style.align = "left"
+  cloneTTxt.x = -300
+  cloneTTxt.y = 140
+  cloneTTxt.style.align = "left"
+}
+
+function calcDeltaTime() {
+  const now = performance.now()
+  globals.deltaTime = Math.max(0.01, (now - lastFrameTime) / 25)
+  lastFrameTime = now
+}
+
+// ======================= !Init =======================
+function init() {
+  camera.scale = Math.tan(camera.baseFov / 2)
+  camera.yawCos = Math.cos(camera.yaw)
+  camera.yawSin = Math.sin(camera.yaw)
+  camera.pitchCos = Math.cos(camera.pitch)
+  camera.pitchSin = Math.sin(camera.pitch)
+  loadTextures8_8()
+  //generateStartChunks()
+  /*for (const c of world.chunks as any) {
+    c.mesh = []
+    buildChunkMesh(c)
+  }*/
+
+  if (renderType != renderTypes.CloneVersion) {
+    PV_init()
+    PV_fillGrid(0xffff44)
+    PV_initZBuffer()
+  }
+}
+// _____ VARIABLES _____
+let t = 0
+const SW2 = Game.width / 2
+const SH2 = Game.height / 2
+const SW = Game.width
+const SH = Game.height
+globals.deltaTime = 1
+interface blockColors {
+  blockType: blockTypes
+  topColor: number
+  nColor?: number
+  eColor?: number
+  sColor?: number
+  wColor?: number
+  aColor: number
+  ssColor: number
+  bottomColor: number
+}
+
+const colorMap = {
+  stone: 0x808080,
+  dirt: 0x654321,
+  grass: 0x00ff00,
+  stonebrick: 0x808080,
+} as any
+
+globals.blockPalette = [
+  {
+    blockType: blockTypes.stone,
+    topColor: 0x505050,
+    ssColor: 0x505050,
+    bottomColor: 0x505050,
+  },
+  {
+    blockType: blockTypes.dirt,
+    topColor: 0xa37539,
+    ssColor: 0xa37539,
+    bottomColor: 0xa37539,
+  },
+  {
+    blockType: blockTypes.stonebrick,
+    topColor: 0x505050,
+    ssColor: 0x505050,
+    bottomColor: 0x505050,
+  },
+  {
+    blockType: blockTypes.grass,
+    topColor: 0x33b035,
+    ssColor: 0xa37539,
+    bottomColor: 0xa37539,
+  },
+]
+const blockPalette: blockColors[] = globals.blockPalette
+
+interface texture {
+  id: string
+  xs: number
+  ys: number
+  texture: number[]
+}
+
+//const textureAtlas: texture[] = []
+
+function getBlockColors(block: blockTypes): blockColors | null {
+  return blockPalette.find((b) => b.blockType === block) ?? null
+}
+
+const textScX = 0.55
+let textWidth = Math.ceil(Game.width / (textSize * textScX) / 1.86)
+let textHeight = Math.ceil(Game.height / textSize)
+let totalPixels = textWidth * textHeight
+console.log(totalPixels)
+
+const textObjects: Text[] = []
+const pixelColors: number[] = []
+const zBuffer: number[] = []
+
+const distColor = raycastDist
+
+init()
+const fpsTxt = Game.createText("", { fill: 0x000000 })
+const cloneTxt = Game.createText("", { fill: 0x000000 })
+const cloneTTxt = Game.createText("", { fill: 0x000000 })
+
+const chunkPos = Game.createText("311", { fill: 0x000000 })
+chunkPos.x = 50
+chunkPos.y = 50
+
+const t1 = Game.createText("2", { fill: 0x000000 })
+const t2 = Game.createText("5", { fill: 0x000000 })
+t1.y = -50
+t2.y = -100
+t1.x = 100
+t2.x = 100
+let t11 = 0
+let t12 = 0
+perfomanceInit()
+// ==================== !Main Loop ====================
+forever(function () {
+  t++
+  calcDeltaTime()
+  gameplay()
+  getNewMesh()
+
+  t1.setText(t11 + " | rendert")
+  t2.setText(t12 + " | unrendert loaded")
+  //console.log(scene)
+  rendering() /*
+  PV_drawTriangleRGB(
+    [0, 0, 0],
+    [50, 100, 0],
+    [100, 0, 0],
+    0xff0000, // rot
+    0x00ff00, // grün
+    0x0000ff, // blau
+  )
+  const ll = 100
+  PV_drawTriangleTextured(
+    [0, 100 - ll, 0],
+    [100, 100 - ll, 0],
+    [100, 0 - ll, 0],
+    [
+      [0, 1], // rot
+      [1, 1], // grün
+      [1, 0],
+    ],
+    "grass_top",
+  )
+  PV_drawTriangleTextured(
+    [0, 0 - ll, 0],
+    [0, 100 - ll, 0],
+    [100, 0 - ll, 0],
+    [
+      [0, 0], // rot
+      [0, 1], // grün
+      [1, 0],
+    ],
+    "grass_top",
+  )*/
+  fpsTxt.text = measureFPS().avgFps + ""
+  if (renderType == (renderTypes.CloneVersion as any)) {
+    cloneTxt.text = sprite.clones.length + ""
+    cloneTTxt.text = clonesThisFrame + ""
+  } else if (renderType == (renderTypes.PixelVersion as any)) {
+    cloneTxt.text = textObjects.length + ""
+  }
+  //inputs()
+  /*scene = []
+  // Beispielwürfel
+  addCube([0, 0, 5], 2)
+  addCube([3, 0, 8], 1, {
+    front: 0xffff00,
+    back: 0xff00ff,
+    top: 0x00ffff,
+    bottom: 0xff0000,
+    left: 0x00ff00,
+    right: 0x0000ff,
+  })*/
+  //renderScene()
+  //drawFrame()
+})
+
+// =================== !UI ==========================
+//!
+
+// =================== !CHUNK MESHES ==========================
+function getNewMesh() {
+  t11 = 0
+  t12 = 0
+  scene = []
+
+  const camChunk = worldToChunk(camera.x, camera.z)
+  for (const c of world.chunks as any) {
+    if (!c || !c.has_mesh) continue
+    t12++
+    const dx = c.x - camChunk.cx
+    const dz = c.z - camChunk.cz
+    const dist2 = dx * dx + dz * dz
+    if (dist2 > RENDER_RADIUS * RENDER_RADIUS) continue
+    //if (!isChunkInFrustum(c)) continue // <-- Frustum-Culling check
+    t12--
+    t11++
+    for (let i = 0; i < c.mesh.length; i++) {
+      scene.push(c.mesh[i])
+    }
+  }
+}
+
+function isChunkInFrustum(chunk: chunk): boolean {
+  const chunkSizeX = sChunkX
+  const chunkSizeY = sChunkYA * sChunkY
+  const chunkSizeZ = sChunkZ
+
+  // Chunk-Mittelpunkt
+  const cx = chunk.x * sChunkX + chunkSizeX / 2
+  const cy = chunkSizeY / 2
+  const cz = chunk.z * sChunkZ + chunkSizeZ / 2
+
+  const dx = cx - camera.x
+  const dy = cy - camera.y
+  const dz = cz - camera.z
+
+  const dist2 = dx * dx + dz * dz
+  if (dist2 < minCCullD22) return true
+
+  const forward = [camera.yawSin, 0, camera.yawCos] // grob: Kamera-Richtung
+  const dot = dx * forward[0] + dy * forward[1] + dz * forward[2]
+  if (dot < 0) return false // hinter der Kamera
+
+  // Distanzlimit optional
+  //const dist = Math.hypot(dx, dy, dz)
+  //if (dist > maxChunkViewDist) return false
+
+  return true
+}
+
+function getChunkLOD(c: chunk): number {
+  const cx = c.x * sChunkX + sChunkX / 2
+  const cz = c.z * sChunkZ + sChunkZ / 2
+  const dx = cx - camera.x
+  const dz = cz - camera.z
+  const distSq = dx * dx + dz * dz
+
+  if (distSq < 64) return 0 // volle Detailtiefe
+  if (distSq < 256) return 1 // LOD1
+  if (distSq < 1024) return 2 // LOD2
+  return 3 // LOD3 (nur grobe Blöcke)
+}
+
+function buildChunkMesh(c: chunk) {
+  //const lod = getChunkLOD(c)
+  //const step = Math.pow(2, lod)
+  for (let y = 0; y < sChunkYA * sChunkY; y += 1) {
+    greedyYFace(c, y)
+  }
+
+  // Second pass for side faces on the X-axis
+  for (let x = 0; x < sChunkX; x += 1) {
+    greedyXFace(c, x)
+  }
+
+  // Third pass for side faces on the Z-axis
+  for (let z = 0; z < sChunkZ; z += 1) {
+    greedyZFace(c, z)
+  }
+}
+
+function addBlockFaces(
+  c: chunk,
+  x: number,
+  y: number,
+  z: number,
+  type: blockTypes,
+) {
+  const blockSize = 1
+  const halfSize = blockSize / 2
+  const cx = c.x * sChunkX + x
+  const cy = y
+  const cz = c.z * sChunkZ + z
+
+  const v: Vec3[] = [
+    [cx - halfSize, cy - halfSize, cz - halfSize],
+    [cx + halfSize, cy - halfSize, cz - halfSize],
+    [cx - halfSize, cy + halfSize, cz - halfSize],
+    [cx + halfSize, cy + halfSize, cz - halfSize],
+    [cx - halfSize, cy - halfSize, cz + halfSize],
+    [cx + halfSize, cy - halfSize, cz + halfSize],
+    [cx - halfSize, cy + halfSize, cz + halfSize],
+    [cx + halfSize, cy + halfSize, cz + halfSize],
+  ]
+  const push = (i1: number, i2: number, i3: number, color: number) =>
+    scene.push([v[i1], v[i2], v[i3], color])
+
+  const color = 0xff0000
+
+  if (getBlockWorld(cx + 1, cy, cz) === blockTypes.air) {
+    push(5, 1, 3, color)
+    push(5, 3, 7, color)
+  }
+  if (getBlockWorld(cx - 1, cy, cz) === blockTypes.air) {
+    push(0, 4, 6, color)
+    push(0, 6, 2, color)
+  }
+  if (getBlockWorld(cx, cy + 1, cz) === blockTypes.air) {
+    push(2, 6, 7, color)
+    push(2, 7, 3, color)
+  }
+  if (getBlockWorld(cx, cy - 1, cz) === blockTypes.air) {
+    push(0, 1, 5, color)
+    push(0, 5, 4, color)
+  }
+  if (getBlockWorld(cx, cy, cz + 1) === blockTypes.air) {
+    push(4, 5, 7, color)
+    push(4, 7, 6, color)
+  }
+  if (getBlockWorld(cx, cy, cz - 1) === blockTypes.air) {
+    push(1, 0, 2, color)
+    push(1, 2, 3, color)
+  }
+}
+
+function greedyTopFace(c: chunk, y: number) {
+  const mask: (number | null)[][] = []
+
+  for (let z = 0; z < sChunkZ; z++) {
+    mask[z] = []
+    for (let x = 0; x < sChunkX; x++) {
+      const block = getBlock(c, x, y, z)
+      const above = getBlock(c, x, y + 1, z)
+      mask[z][x] =
+        block !== blockTypes.air && above === blockTypes.air ? block : null
+    }
+  }
+
+  const visited: boolean[][] = Array.from({ length: sChunkZ }, () =>
+    Array(sChunkX).fill(false),
+  )
+
+  for (let z = 0; z < sChunkZ; z++) {
+    for (let x = 0; x < sChunkX; x++) {
+      if (visited[z][x] || mask[z][x] === null) continue
+
+      const color = mask[z][x]
+
+      let width = 1
+      while (
+        x + width < sChunkX &&
+        mask[z][x + width] === color &&
+        !visited[z][x + width]
+      )
+        width++
+
+      let height = 1
+      let keep = true
+      while (keep && z + height < sChunkZ) {
+        for (let k = 0; k < width; k++) {
+          if (mask[z + height][x + k] !== color || visited[z + height][x + k]) {
+            keep = false
+            break
+          }
+        }
+        if (keep) height++
+      }
+
+      const x0 = c.x * sChunkX + x
+      const z0 = c.z * sChunkZ + z
+      if (color !== null) {
+        addQuadTop([x0, y, z0], width, height, color, c)
+      }
+
+      // 4. Rechteck markieren
+      for (let dz = 0; dz < height; dz++) {
+        for (let dx = 0; dx < width; dx++) {
+          visited[z + dz][x + dx] = true
+        }
+      }
+    }
+  }
+}
+
+function greedyXFace(c: chunk, x: number) {
+  const maskLeft: (number | null)[][] = []
+  const maskRight: (number | null)[][] = []
+
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    maskLeft[y] = []
+    maskRight[y] = []
+    for (let z = 0; z < sChunkZ; z++) {
+      const block = getBlock(c, x, y, z)
+      const leftNeighbor = getBlockWorld(
+        c.x * sChunkX + x - 1,
+        y,
+        c.z * sChunkZ + z,
+      )
+      const rightNeighbor = getBlockWorld(
+        c.x * sChunkX + x + 1,
+        y,
+        c.z * sChunkZ + z,
+      )
+
+      if (block !== blockTypes.air && isTransparent(leftNeighbor)) {
+        maskLeft[y][z] = block
+      } else {
+        maskLeft[y][z] = null
+      }
+
+      if (block !== blockTypes.air && isTransparent(rightNeighbor)) {
+        maskRight[y][z] = block
+      } else {
+        maskRight[y][z] = null
+      }
+    }
+  }
+
+  generateQuadsFromMask(maskLeft, c, x, addQuadLeft)
+  generateQuadsFromMask(maskRight, c, x, addQuadRight)
+}
+
+function greedyYFace(c: chunk, y: number) {
+  const maskTop: (number | null)[][] = []
+  const maskBottom: (number | null)[][] = []
+
+  for (let z = 0; z < sChunkZ; z++) {
+    maskTop[z] = []
+    maskBottom[z] = []
+    for (let x = 0; x < sChunkX; x++) {
+      const block = getBlock(c, x, y, z)
+      if (block === blockTypes.air) {
+        maskTop[z][x] = null
+        maskBottom[z][x] = null
+        continue
+      }
+
+      const above = getBlock(c, x, y + 1, z)
+      const below = getBlock(c, x, y - 1, z)
+
+      maskTop[z][x] = isTransparent(above) ? block : null
+      maskBottom[z][x] = isTransparent(below) ? block : null
+    }
+  }
+
+  // Top-Flächen
+  generateQuadsFromMaskYZ(maskTop, c, y, addQuadTop)
+  // Bottom-Flächen
+  generateQuadsFromMaskYZ(maskBottom, c, y, addQuadBottom)
+}
+
+function greedyZFace(c: chunk, z: number) {
+  const maskBack: (number | null)[][] = []
+  const maskFront: (number | null)[][] = []
+
+  for (let y = 0; y < sChunkYA * sChunkY; y++) {
+    maskBack[y] = []
+    maskFront[y] = []
+    for (let x = 0; x < sChunkX; x++) {
+      const block = getBlock(c, x, y, z)
+      const backNeighbor = getBlockWorld(
+        c.x * sChunkX + x,
+        y,
+        c.z * sChunkZ + z - 1,
+      )
+      const frontNeighbor = getBlockWorld(
+        c.x * sChunkX + x,
+        y,
+        c.z * sChunkZ + z + 1,
+      )
+
+      if (block !== blockTypes.air && isTransparent(backNeighbor)) {
+        maskBack[y][x] = block
+      } else {
+        maskBack[y][x] = null
+      }
+
+      if (block !== blockTypes.air && isTransparent(frontNeighbor)) {
+        maskFront[y][x] = block
+      } else {
+        maskFront[y][x] = null
+      }
+    }
+  }
+
+  generateQuadsFromMask(maskBack, c, z, addQuadBack)
+  generateQuadsFromMask(maskFront, c, z, addQuadFront)
+}
+
+/*function addQuadX(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x = start[0]
+  const y0 = start[1]
+  const z0 = start[2]
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+
+  const v0: Vec3 = [x, y0, z0]
+  const v1: Vec3 = [x, y0 + h, z0]
+  const v2: Vec3 = [x, y0, z0 + w]
+  const v3: Vec3 = [x, y0 + h, z0 + w]
+
+  scene.push([v0, v3, v1, color])
+  scene.push([v0, v2, v3, color])
+}
+
+function addQuadZ(start: Vec3, h: number, w: number, blockType: blockTypes) {
+  const x0 = start[0]
+  const y0 = start[1]
+  const z = start[2]
+  const color = colorMap[blockTypes[blockType] as keyof typeof colorMap]
+
+  const v0: Vec3 = [x0, y0, z]
+  const v1: Vec3 = [x0 + w, y0, z]
+  const v2: Vec3 = [x0, y0 + h, z]
+  const v3: Vec3 = [x0 + w, y0 + h, z]
+
+  scene.push([v0, v3, v1, color])
+  scene.push([v0, v2, v3, color])
+}*/
+
+// Definiere, welche Blocktypen Texturen haben
+function getBlockTexture(
+  blockType: blockTypes,
+  face: "top" | "bottom" | "left" | "right" | "front" | "back" | "side",
+): string | undefined {
+  switch (blockType) {
+    case blockTypes.grass:
+      if (face === "top") return "grass_top"
+      if (face === "bottom") return "dirt"
+      return "grass_side"
+    case blockTypes.dirt:
+      return "dirt"
+    case blockTypes.stone:
+      return "stone"
+    case blockTypes.bedrock:
+      return "bedrock"
+    case blockTypes.oak_log:
+      if (face === "top" || face === "bottom") return "oak_log"
+      return "oak_planks"
+    case blockTypes.birch_log:
+      if (face === "top" || face === "bottom") return "birch_log"
+      return "birch_planks"
+    case blockTypes.cactus:
+      if (face === "top" || face === "bottom") return "cactus_top"
+      return "cactus"
+    case blockTypes.oak_planks:
+      return "oak_planks"
+    case blockTypes.spruce_planks:
+      return "spruce_planks"
+    case blockTypes.birch_planks:
+      return "birch_planks"
+    case blockTypes.coal_block:
+      return "coal_block"
+    case blockTypes.coal_ore:
+      return "coal_ore"
+    case blockTypes.stonebrick:
+      return "stonebrick"
+    case blockTypes.diamond_block:
+      return "diamond_block"
+    case blockTypes.diamond_ore:
+      return "diamond_ore"
+    case blockTypes.iron_block:
+      return "iron_block"
+    case blockTypes.iron_ore:
+      return "iron_ore"
+    case blockTypes.gravel:
+      return "gravel"
+    case blockTypes.deadbush:
+      return "deadbush"
+    case blockTypes.fern:
+      return "fern"
+    case blockTypes.tall_grass:
+      return "tall_grass"
+    case blockTypes.redstone:
+      return "redstone"
+    case blockTypes.sand:
+      return "sand"
+    case blockTypes.sandstone:
+      if (face === "top" || face === "bottom") return "sand"
+      else return "sandstone"
+    default:
+      return undefined
+  }
+}
+
+function addQuadTop(
+  start: Vec3,
+  w: number,
+  h: number,
+  blockType: blockTypes,
+  c: chunk,
+) {
+  const x0 = start[0]
+  const y = start[1]
+  const z0 = start[2]
+
+  const colors = getBlockColors(blockType)
+  const color = colors ? colors.topColor : 0xffffff
+  let texId = undefined
+  if (TEXTURES_ENABLED) texId = getBlockTexture(blockType, "top") // Funktion, die optional Textur liefert
+
+  const v0: Vec3 = [x0, y + 1, z0]
+  const v1: Vec3 = [x0 + w, y + 1, z0]
+  const v2: Vec3 = [x0, y + 1, z0 + h]
+  const v3: Vec3 = [x0 + w, y + 1, z0 + h]
+
+  const uv0: Vec2 = [0, 0]
+  const uv1: Vec2 = [w, 0]
+  const uv2: Vec2 = [0, h]
+  const uv3: Vec2 = [w, h]
+
+  if (texId) {
+    c.mesh.push([v0, v3, v1, uv0, uv3, uv1, texId] as TriangleTexture)
+    c.mesh.push([v0, v2, v3, uv0, uv2, uv3, texId] as TriangleTexture)
+  } else {
+    c.mesh.push([v0, v3, v1, color] as TriangleColor)
+    c.mesh.push([v0, v2, v3, color] as TriangleColor)
+  }
+}
+
+function addQuadBottom(
+  start: Vec3,
+  w: number,
+  h: number,
+  blockType: blockTypes,
+  c: chunk,
+) {
+  const x0 = start[0]
+  const y = start[1]
+  const z0 = start[2]
+
+  const colors = getBlockColors(blockType)
+  const color = colors
+    ? blendColor(colors.bottomColor ?? colors.ssColor, 0x000000, 0.3)
+    : 0xffffff
+  let texId = undefined
+  if (TEXTURES_ENABLED) texId = getBlockTexture(blockType, "bottom")
+
+  const v0: Vec3 = [x0, y, z0]
+  const v1: Vec3 = [x0 + w, y, z0]
+  const v2: Vec3 = [x0, y, z0 + h]
+  const v3: Vec3 = [x0 + w, y, z0 + h]
+
+  const uv0: Vec2 = [0, 0]
+  const uv1: Vec2 = [w, 0]
+  const uv2: Vec2 = [0, h]
+  const uv3: Vec2 = [w, h]
+
+  if (texId) {
+    c.mesh.push([v0, v1, v3, uv0, uv1, uv3, texId])
+    c.mesh.push([v0, v3, v2, uv0, uv3, uv2, texId])
+  } else {
+    c.mesh.push([v0, v1, v3, color])
+    c.mesh.push([v0, v3, v2, color])
+  }
+}
+
+function addQuadLeft(
+  start: Vec3,
+  h: number,
+  w: number,
+  blockType: blockTypes,
+  c: chunk,
+) {
+  const x = start[0]
+  const y0 = start[1]
+  const z0 = start[2]
+
+  const colors = getBlockColors(blockType)
+  const color = colors
+    ? blendColor(colors.eColor ?? colors.ssColor, 0x000000, 0.2)
+    : 0xffffff
+  let texId = undefined
+  if (TEXTURES_ENABLED) texId = getBlockTexture(blockType, "left")
+
+  // Wand nach Westen
+  const v0: Vec3 = [x, y0 + h, z0 + w]
+  const v1: Vec3 = [x, y0 + h, z0]
+  const v2: Vec3 = [x, y0, z0]
+  const v3: Vec3 = [x, y0, z0 + w]
+
+  // UVs wie gehabt – oben bleibt oben
+  const uv0: Vec2 = [0, 0]
+  const uv1: Vec2 = [w, 0]
+  const uv2: Vec2 = [w, h]
+  const uv3: Vec2 = [0, h]
+
+  if (texId) {
+    c.mesh.push([v0, v1, v2, uv0, uv1, uv2, texId])
+    c.mesh.push([v0, v2, v3, uv0, uv2, uv3, texId])
+  } else {
+    c.mesh.push([v0, v1, v2, color])
+    c.mesh.push([v0, v2, v3, color])
+  }
+}
+
+function addQuadRight(
+  start: Vec3,
+  h: number,
+  w: number,
+  blockType: blockTypes,
+  c: chunk,
+) {
+  const x = start[0] + 1
+  const y0 = start[1]
+  const z0 = start[2]
+
+  const colors = getBlockColors(blockType)
+  const color = colors
+    ? blendColor(colors.wColor ?? colors.ssColor, 0x000000, 0.2)
+    : 0xffffff
+  let texId = undefined
+  if (TEXTURES_ENABLED) texId = getBlockTexture(blockType, "right")
+
+  // Wand nach Osten
+  const v0: Vec3 = [x, y0 + h, z0]
+  const v1: Vec3 = [x, y0 + h, z0 + w]
+  const v2: Vec3 = [x, y0, z0 + w]
+  const v3: Vec3 = [x, y0, z0]
+
+  const uv0: Vec2 = [0, 0]
+  const uv1: Vec2 = [w, 0]
+  const uv2: Vec2 = [w, h]
+  const uv3: Vec2 = [0, h]
+
+  if (texId) {
+    c.mesh.push([v0, v1, v2, uv0, uv1, uv2, texId])
+    c.mesh.push([v0, v2, v3, uv0, uv2, uv3, texId])
+  } else {
+    c.mesh.push([v0, v1, v2, color])
+    c.mesh.push([v0, v2, v3, color])
+  }
+}
+
+function addQuadBack(
+  start: Vec3,
+  h: number,
+  w: number,
+  blockType: blockTypes,
+  c: chunk,
+) {
+  const x0 = start[0]
+  const y0 = start[1]
+  const z = start[2]
+
+  const colors = getBlockColors(blockType)
+  const color = colors
+    ? blendColor(colors.nColor ?? colors.ssColor, 0x000000, 0.6)
+    : 0xffffff
+  let texId = undefined
+  if (TEXTURES_ENABLED) texId = getBlockTexture(blockType, "back")
+
+  const v0: Vec3 = [x0, y0 + h, z]
+  const v1: Vec3 = [x0 + w, y0 + h, z]
+  const v2: Vec3 = [x0 + w, y0, z]
+  const v3: Vec3 = [x0, y0, z]
+
+  const uv0: Vec2 = [0, 0]
+  const uv1: Vec2 = [w, 0]
+  const uv2: Vec2 = [w, h]
+  const uv3: Vec2 = [0, h]
+
+  if (texId) {
+    c.mesh.push([v0, v1, v2, uv0, uv1, uv2, texId])
+    c.mesh.push([v0, v2, v3, uv0, uv2, uv3, texId])
+  } else {
+    c.mesh.push([v0, v1, v2, color])
+    c.mesh.push([v0, v2, v3, color])
+  }
+}
+
+function addQuadFront(
+  start: Vec3,
+  h: number,
+  w: number,
+  blockType: blockTypes,
+  c: chunk,
+) {
+  const x0 = start[0]
+  const y0 = start[1]
+  const z = start[2] + 1
+
+  const colors = getBlockColors(blockType)
+  const color = colors
+    ? blendColor(colors.sColor ?? colors.ssColor, 0x000000, 0.6)
+    : 0xffffff
+  let texId = undefined
+  if (TEXTURES_ENABLED) texId = getBlockTexture(blockType, "front")
+
+  const v0: Vec3 = [x0 + w, y0 + h, z]
+  const v1: Vec3 = [x0, y0 + h, z]
+  const v2: Vec3 = [x0, y0, z]
+  const v3: Vec3 = [x0 + w, y0, z]
+
+  const uv0: Vec2 = [0, 0]
+  const uv1: Vec2 = [w, 0]
+  const uv2: Vec2 = [w, h]
+  const uv3: Vec2 = [0, h]
+
+  if (texId) {
+    c.mesh.push([v0, v1, v2, uv0, uv1, uv2, texId])
+    c.mesh.push([v0, v2, v3, uv0, uv2, uv3, texId])
+  } else {
+    c.mesh.push([v0, v1, v2, color])
+    c.mesh.push([v0, v2, v3, color])
+  }
+}
+
+function generateQuadsFromMask(
+  mask: (number | null)[][],
+  c: chunk,
+  axisCoord: number,
+  addQuadFunc: (
+    start: Vec3,
+    h: number,
+    w: number,
+    blockType: blockTypes,
+    c: chunk,
+  ) => void,
+) {
+  const isXAxis = addQuadFunc === addQuadLeft || addQuadFunc === addQuadRight
+  const visited: boolean[][] = Array.from({ length: sChunkYA * sChunkY }, () =>
+    Array(isXAxis ? sChunkZ : sChunkX).fill(false),
+  )
+
+  const ySize = sChunkYA * sChunkY
+  const otherSize = isXAxis ? sChunkZ : sChunkX
+
+  for (let y = 0; y < ySize; y++) {
+    for (let other = 0; other < otherSize; other++) {
+      if (visited[y][other] || mask[y][other] === null) continue
+
+      const color = mask[y][other]
+      let height = 1
+      while (
+        y + height < ySize &&
+        mask[y + height][other] === color &&
+        !visited[y + height][other]
+      ) {
+        height++
+      }
+
+      let width = 1
+      let keep = true
+      while (keep && other + width < otherSize) {
+        for (let k = 0; k < height; k++) {
+          if (
+            mask[y + k][other + width] !== color ||
+            visited[y + k][other + width]
+          ) {
+            keep = false
+            break
+          }
+        }
+        if (keep) width++
+      }
+
+      const x0 = isXAxis ? axisCoord : other
+      const y0 = y
+      const z0 = isXAxis ? other : axisCoord
+      addQuadFunc(
+        [c.x * sChunkX + x0, y0, c.z * sChunkZ + z0],
+        height,
+        width,
+        color,
+        c,
+      )
+
+      for (let dy = 0; dy < height; dy++) {
+        for (let dw = 0; dw < width; dw++) {
+          visited[y + dy][other + dw] = true
+        }
+      }
+    }
+  }
+}
+
+function generateQuadsFromMaskYZ(
+  mask: (number | null)[][],
+  c: chunk,
+  y: number,
+  addQuadFunc: (
+    start: Vec3,
+    w: number,
+    h: number,
+    blockType: blockTypes,
+    c: chunk,
+  ) => void,
+) {
+  const visited: boolean[][] = Array.from({ length: sChunkZ }, () =>
+    Array(sChunkX).fill(false),
+  )
+
+  for (let z = 0; z < sChunkZ; z++) {
+    for (let x = 0; x < sChunkX; x++) {
+      if (visited[z][x] || mask[z][x] === null) continue
+
+      const color = mask[z][x]
+      let width = 1
+      while (
+        x + width < sChunkX &&
+        mask[z][x + width] === color &&
+        !visited[z][x + width]
+      )
+        width++
+
+      let height = 1
+      let keep = true
+      while (keep && z + height < sChunkZ) {
+        for (let k = 0; k < width; k++) {
+          if (mask[z + height][x + k] !== color || visited[z + height][x + k]) {
+            keep = false
+            break
+          }
+        }
+        if (keep) height++
+      }
+
+      const x0 = c.x * sChunkX + x
+      const z0 = c.z * sChunkZ + z
+      addQuadFunc([x0, y, z0], width, height, color!, c)
+
+      for (let dz = 0; dz < height; dz++) {
+        for (let dx = 0; dx < width; dx++) {
+          visited[z + dz][x + dx] = true
+        }
+      }
+    }
+  }
+}
+
+// ================== TEXTURES =====================
+function loadTextures8_8() {}
+
+// ================ CLONE VERSION - TRIANGLE & LINE RENDERER ================
+
+//globals.gameRunning = true
+//const triAmt = 400
+/*function createFrame() {
+  for (let i = 0; i < triAmt; i++) {
+    drawTriangle(
+      Math.random(-SW2, SW2),
+      Math.random(-SH2, SH2),
+      Math.random(-SW2, SW2),
+      Math.random(-SH2, SH2),
+      Math.random(-SW2, SW2),
+      Math.random(-SH2, SH2),
+      randColor(),
+      Math.random(-100, -1),
+    )
+  }
+}*/
+
+const xPixelSize = 2650 / 8 / Game.width
+const yPixelSize = 1880 / 8 / Game.height
+const triangleM = 64 / 55
+sprite.x = 1000
+sprite.y = 1000
+sprite.size = 1
+
+const allSprites = [
+  "triangle_yh",
+  "triangle_yh_r",
+  "triangle_yh_l",
+  "square_yh",
+]
+
+function randColor() {
+  return Math.random(0x000000, 0xdddddd)
+}
+
+function blendColor(c1: number, c2: number, t: number): number {
+  t = Math.max(0, Math.min(1, t))
+
+  const r1 = (c1 >> 16) & 0xff
+  const g1 = (c1 >> 8) & 0xff
+  const b1 = c1 & 0xff
+
+  const r2 = (c2 >> 16) & 0xff
+  const g2 = (c2 >> 8) & 0xff
+  const b2 = c2 & 0xff
+
+  const r = Math.round(r1 + (r2 - r1) * t)
+  const g = Math.round(g1 + (g2 - g1) * t)
+  const b = Math.round(b1 + (b2 - b1) * t)
+
+  return (r << 16) | (g << 8) | b
+}
+
+interface CloneEntry {
+  clone: any
+}
+interface DrawEntry {
+  width: number
+  height: number
+  x: number
+  y: number
+  rotation: number
+  texture: string
+  color: number
+  dist: number
+}
+
+let cloneList: CloneEntry[] = []
+let drawList: DrawEntry[] = []
+let lastUsedClones = 0
+
+let cloneGroups: { [key: string]: { clones: CloneEntry[]; lastUsed: number } } =
+  {}
+let drawGroups: { [key: string]: DrawEntry[] } = {}
+function addToDrawList(entry: DrawEntry) {
+  if (!drawGroups[entry.texture]) {
+    drawGroups[entry.texture] = []
+  }
+  drawGroups[entry.texture].push(entry)
+}
+
+onCloneStart(function (clone) {
+  cloneList.push({
+    clone: clone,
+  })
+})
+
+function CV_drawFrame() {
+  clonesThisFrame = 0
+  const usedClonesInThisFrame: { [key: string]: boolean } = {}
+
+  for (const texture in drawGroups) {
+    const drawListSprite = drawGroups[texture]
+
+    usedClonesInThisFrame[texture] = true
+
+    let group = cloneGroups[texture]
+    if (!group) {
+      group = { clones: [], lastUsed: 0 }
+      cloneGroups[texture] = group
+    }
+
+    for (let j = group.clones.length; j < drawListSprite.length; j++) {
+      const newClone = createClone()
+      newClone.setCostume(texture)
+      group.clones.push({ clone: newClone })
+    }
+
+    for (let j = 0; j < drawListSprite.length; j++) {
+      const entry = drawListSprite[j]
+      const clone = group.clones[j].clone
+
+      clone.layer = entry.dist - globals.renderM
+      clone.x = entry.x
+      clone.y = entry.y
+      clone.width = entry.width
+      clone.height = entry.height
+      clone.rotation = entry.rotation
+      clone.tint = entry.color
+      clone.visible = true
+      clonesThisFrame++
+    }
+
+    group.lastUsed = drawListSprite.length
+    drawGroups[texture] = []
+  }
+
+  for (const texture in cloneGroups) {
+    if (!usedClonesInThisFrame[texture]) {
+      const group = cloneGroups[texture]
+      for (let j = 0; j < group.clones.length; j++) {
+        group.clones[j].clone.visible = false
+      }
+      group.lastUsed = 0
+    } else {
+      const group = cloneGroups[texture]
+      for (let j = group.lastUsed; j < group.clones.length; j++) {
+        group.clones[j].clone.visible = false
+      }
+    }
+  }
+}
+
+function CV_drawTriangle(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  color: number,
+  dist: number,
+) {
+  const orientation = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+  if (orientation > 0) {
+    const tempX = x2
+    x2 = x3
+    x3 = tempX
+
+    const tempY = y2
+    y2 = y3
+    y3 = tempY
+  }
+
+  //---TRIANGLE TYPE FILTER
+  const triVals = analyzeTriangle(x1, y1, x2, y2, x3, y3)
+  const hypSideP = triVals.hypSideP
+  const rightTriangles = splitTriangleIntoRightTriangles(hypSideP)
+  const t = rightTriangles[0]
+  const triVals1 = analyzeTriangleR(t.x1, t.y1, t.x2, t.y2, t.x3, t.y3)
+  drawTrianglePartRA(
+    triVals1.hypSideP,
+    triVals1.kathl1,
+    triVals1.kathl2,
+    true,
+    color,
+    dist,
+  )
+  const d = rightTriangles[1]
+  const triVals2 = analyzeTriangleR(d.x1, d.y1, d.x2, d.y2, d.x3, d.y3)
+  drawTrianglePartRA(
+    triVals2.hypSideP,
+    triVals2.kathl1,
+    triVals2.kathl2,
+    true,
+    color,
+    dist,
+  )
+}
+
+function splitTriangleIntoRightTriangles(hypSidePoints: {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  x3: number
+  y3: number
+}) {
+  const A = { x: hypSidePoints.x1, y: hypSidePoints.y1 }
+  const B = { x: hypSidePoints.x2, y: hypSidePoints.y2 }
+  const C = { x: hypSidePoints.x3, y: hypSidePoints.y3 }
+  const an = angleBetween(A, B)
+  const g = intersectPoint(C, an, A, B)
+
+  return [
+    { x1: B.x, y1: B.y, x2: C.x, y2: C.y, x3: g.x, y3: g.y },
+    { x1: A.x, y1: A.y, x2: g.x, y2: g.y, x3: C.x, y3: C.y },
+  ]
+}
+
+function drawTrianglePartRA(
+  hypSidePoints: { x1: number; y1: number; x2: number; y2: number },
+  kathl: { x1: number; y1: number; x2: number; y2: number },
+  kathl2: { x1: number; y1: number; x2: number; y2: number },
+  c: boolean,
+  co: number,
+  dist: number,
+) {
+  const k1 = { x: kathl.x1, y: kathl.y1 }
+  const k2 = { x: kathl.x2, y: kathl.y2 }
+
+  const kk1 = { x: kathl2.x1, y: kathl2.y1 }
+  const kk2 = { x: kathl2.x2, y: kathl2.y2 }
+
+  const baseLength = distance(kk1, kk2)
+  const height = distance(k1, k2)
+  const midX = (k1.x + k2.x) / 2
+  const midY = (k1.y + k2.y) / 2
+
+  const rightPoint = {
+    x:
+      hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1
+        ? kathl2.x1
+        : kathl2.x2,
+    y:
+      hypSidePoints.x1 !== kathl2.x1 || hypSidePoints.y1 !== kathl2.y1
+        ? kathl2.y1
+        : kathl2.y2,
+  }
+  const vx = k2.x - k1.x
+  const vy = k2.y - k1.y
+  const wx = rightPoint.x - k1.x
+  const wy = rightPoint.y - k1.y
+
+  const cross = vx * wy - vy * wx
+  const rot = cross < 0 ? 90 : -90
+
+  const angle = angleBetween(k1, k2) + rot
+  const moved = move(midX, midY, angle, -height / 12.6)
+
+  let drawSprite = "triangle_yh_r"
+  if (rot == 90) drawSprite = "triangle_yh_l"
+  addToDrawList({
+    width: baseLength * xPixelSize * 1.91,
+    height: height * yPixelSize * triangleM,
+    x: moved.x,
+    y: moved.y,
+    rotation: angle + 90,
+    texture: drawSprite,
+    color: co,
+    dist: dist,
+  })
+}
+
+function trianglePieceHyp(
+  kathl2: {
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+    x3: number
+    y3: number
+  },
+  c: number,
+  dist: number,
+) {
+  const p1 = { x: kathl2.x1, y: kathl2.y1 }
+  const p2 = { x: kathl2.x2, y: kathl2.y2 }
+  const p3 = { x: kathl2.x3, y: kathl2.y3 }
+  const hypAngle = angleBetween(p1, p2)
+  const p1p2xM = (p1.x + p2.x) / 2
+  const p1p2yM = (p1.y + p2.y) / 2
+
+  const angle = hypAngle - 180
+  const height = distance({ x: p1p2xM, y: p1p2yM }, p3) * triangleM
+  const moved = move(p1p2xM, p1p2yM, angle, -(height / 2) / triangleM)
+  addToDrawList({
+    width: distance(p1, p2) * xPixelSize,
+    height: height * yPixelSize,
+    x: moved.x,
+    y: moved.y,
+    rotation: angle + 90,
+    texture: "triangle_yh",
+    color: c,
+    dist: dist,
+  })
+}
+
+function analyzeTriangle(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+) {
+  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+
+  let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+
+  if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+    hypSideP = { x1, y1, x2, y2, x3, y3 }
+  } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+  } else {
+    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+  }
+
+  return {
+    hypSideP,
+  }
+}
+
+function analyzeTriangleR(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+) {
+  const length_p1p2 = distance({ x: x1, y: y1 }, { x: x2, y: y2 })
+  const length_p2p3 = distance({ x: x2, y: y2 }, { x: x3, y: y3 })
+  const length_p3p1 = distance({ x: x3, y: y3 }, { x: x1, y: y1 })
+
+  let hypSideP = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+  let kathl1 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+  let kathl2 = { x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 }
+
+  if (length_p1p2 >= length_p2p3 && length_p1p2 >= length_p3p1) {
+    hypSideP = { x1, y1, x2, y2, x3, y3 }
+    const k1 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+    const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+    kathl1 = length_p2p3 >= length_p3p1 ? k1 : k2
+    kathl2 = length_p2p3 >= length_p3p1 ? k2 : k1
+  } else if (length_p2p3 >= length_p1p2 && length_p2p3 >= length_p3p1) {
+    hypSideP = { x1: x2, y1: y2, x2: x3, y2: y3, x3: x1, y3: y1 }
+    const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+    const k2 = { x1: x3, y1: y3, x2: x1, y2: y1, x3, y3 }
+    kathl1 = length_p1p2 >= length_p3p1 ? k1 : k2
+    kathl2 = length_p1p2 >= length_p3p1 ? k2 : k1
+  } else {
+    hypSideP = { x1: x3, y1: y3, x2: x1, y2: y1, x3: x2, y3: y2 }
+    const k1 = { x1: x1, y1: y1, x2: x2, y2: y2, x3, y3 }
+    const k2 = { x1: x2, y1: y2, x2: x3, y2: y3, x3, y3 }
+    kathl1 = length_p1p2 >= length_p2p3 ? k1 : k2
+    kathl2 = length_p1p2 >= length_p2p3 ? k2 : k1
+  }
+
+  return {
+    hypSideP,
+    kathl1,
+    kathl2,
+  }
+}
+
+function getRightAngleVertex(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  toleranceT: number = 1e-6,
+): { x: number; y: number } | null {
+  const dot1 = (x2 - x1) * (x3 - x1) + (y2 - y1) * (y3 - y1)
+  if (Math.abs(dot1) < toleranceT) return { x: x1, y: y1 }
+
+  const dot2 = (x1 - x2) * (x3 - x2) + (y1 - y2) * (y3 - y2)
+  if (Math.abs(dot2) < toleranceT) return { x: x2, y: y2 }
+
+  const dot3 = (x1 - x3) * (x2 - x3) + (y1 - y3) * (y2 - y3)
+  if (Math.abs(dot3) < toleranceT) return { x: x3, y: y3 }
+
+  return null
+}
+
+function drawLine(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  t: number,
+  c: number,
+  d: number = 100,
+) {
+  const p1 = { x: x1, y: y1 }
+  const p2 = { x: x2, y: y2 }
+
+  addToDrawList({
+    width: xPixelSize * t,
+    height: distance(p1, p2) * yPixelSize,
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2,
+    rotation: angleBetween(p1, p2),
+    texture: "square_yh",
+    color: c,
+    dist: d,
+  })
+}
+
+function drawDot(x1: number, y1: number, t: number, c: number, dist: number) {
+  addToDrawList({
+    width: xPixelSize * t,
+    height: t * yPixelSize,
+    x: x1,
+    y: y1,
+    rotation: 0,
+    texture: "square_yh",
+    color: c,
+    dist: dist,
+  })
+}
+
+function move(x: number, y: number, rotation: number, amount: number) {
+  return {
+    x: x + Math.cos(rotation) * amount,
+    y: y - Math.sin(rotation) * amount,
+  }
+}
+
+function intersectPoint(
+  p: { x: number; y: number },
+  angle: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+) {
+  angle += 90
+  const dx1 = b.x - a.x
+  const dy1 = b.y - a.y
+  const dx2 = Math.sin(angle)
+  const dy2 = Math.cos(angle)
+
+  const det = dx2 * dy1 - dy2 * dx1
+  if (Math.abs(det) < 1e-10) {
+    //console.log("PARALLEL")
+    Game.stop()
+  }
+
+  const s = ((a.x - p.x) * dy1 - (a.y - p.y) * dx1) / det
+
+  const ix = p.x + s * dx2
+  const iy = p.y + s * dy2
+
+  return { x: ix, y: iy }
+}
+
+function angleBetween(p1: any, p2: any): number {
+  const dx = p2.x - p1.x
+  const dy = p2.y - p1.y
+  return Math.atan2(dx, dy)
+}
+
+function distance(p1: any, p2: any): number {
+  const dx = p2.x - p1.x
+  const dy = p2.y - p1.y
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
+// ============= PIXEL RENDERER ===============
+
+function PV_init() {
+  textWidth = Math.ceil(Game.width / (textSize * textScX) / 1.86) + 2
+  textHeight = Math.ceil(Game.height / textSize)
+  totalPixels = textWidth * textHeight
+  for (let i = 0; i < totalPixels; i++) {
+    const x = i % textWidth
+    const y = Math.floor(i / textWidth)
+    const t = Game.createText("██", {
+      fontSize: textSize,
+      fontFamily: "Cascadia Mono",
+      lineHeight: textSize * 1.15,
+      letterSpacing: -0.85,
+      align: "center",
+    })
+    t.x = -Game.width / 2 + textSize / 2 + x * textSize + 1
+    t.y = -Game.height / 2 + textSize / 2 + y * textSize
+    textObjects.push(t)
+    pixelColors.push(0)
+  }
+}
+
+function PV_initZBuffer() {
+  for (let i = 0; i < totalPixels; i++) {
+    zBuffer[i] = -65536
+  }
+}
+
+function PV_clearZBuffer() {
+  zBuffer.fill(-65536)
+}
+
+function PV_setPixel(x: number, y: number, color: number) {
+  if (x < 0 || x >= textWidth || y < 0 || y >= textHeight) return
+  const index = y * textWidth + x
+  if (pixelColors[index] !== color) {
+    textObjects[index].style.fill = color
+    pixelColors[index] = color
+  }
+}
+
+function PV_getPixel(x: number, y: number): number | null {
+  if (x < 0 || x >= textWidth || y < 0 || y >= textHeight) return null
+  return pixelColors[y * textWidth + x]
+}
+
+function PV_drawTriangle(p0: Vec3, p1: Vec3, p2: Vec3, color: number) {
+  const sx = [p0[0], p1[0], p2[0]]
+  const sy = [p0[1], p1[1], p2[1]]
+  const width = Math.max(...(sx as any)) - Math.min(...(sx as any))
+  const height = Math.max(...(sy as any)) - Math.min(...(sy as any))
+
+  if (width < 1 || height < 1) return
+
+  const mapX = (x: number) => ((x + SW2) / (SW2 * 2)) * textWidth
+  const mapY = (y: number) => ((y + SH2) / (SH2 * 2)) * textHeight
+
+  const x0f = mapX(p0[0])
+  const y0f = mapY(p0[1])
+  const x1f = mapX(p1[0])
+  const y1f = mapY(p1[1])
+  const x2f = mapX(p2[0])
+  const y2f = mapY(p2[1])
+
+  const padding = 1
+  const minX = Math.max(0, Math.floor(Math.min(x0f, x1f, x2f)) - padding)
+  const maxX = Math.min(
+    textWidth - 1,
+    Math.ceil(Math.max(x0f, x1f, x2f)) + padding,
+  )
+  const minY = Math.max(0, Math.floor(Math.min(y0f, y1f, y2f)) - padding)
+  const maxY = Math.min(
+    textHeight - 1,
+    Math.ceil(Math.max(y0f, y1f, y2f)) + padding,
+  )
+
+  const edgeFunction = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x: number,
+    y: number,
+  ) => (y0 - y1) * x + (x1 - x0) * y + x0 * y1 - x1 * y0
+
+  const area = edgeFunction(x0f, y0f, x1f, y1f, x2f, y2f)
+  if (area === 0) return
+
+  const e = 0.01 // leicht erhöht für Kanten-Lücken
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const w0 = edgeFunction(x1f, y1f, x2f, y2f, x + 0.5, y + 0.5) / area
+      const w1 = edgeFunction(x2f, y2f, x0f, y0f, x + 0.5, y + 0.5) / area
+      const w2 = edgeFunction(x0f, y0f, x1f, y1f, x + 0.5, y + 0.5) / area
+
+      if (w0 >= -e && w1 >= -e && w2 >= -e) {
+        const z = -(w0 * p0[2] + w1 * p1[2] + w2 * p2[2])
+        const ix = Math.round(x)
+        const iy = Math.round(y)
+        const index = iy * textWidth + ix
+        const last = PV_getPixel(ix, iy)
+        /*if (last) {
+          //PV_setPixel(ix, iy, blendColor(color, last, 0.3))
+        }*/
+
+        // Optional Z-Puffer
+        if (z > zBuffer[index]) {
+          PV_setPixel(ix, iy, color)
+          zBuffer[index] = z
+        }
+      }
+    }
+  }
+}
+
+function PV_drawTriangleTextured(
+  p0: Vec3,
+  p1: Vec3,
+  p2: Vec3,
+  uvs: [Vec2, Vec2, Vec2],
+  texId: string,
+) {
+  //console.log(globals.textureAtlas)
+  const tex = globals.textureAtlas.find((t) => t.id === texId)
+  if (!tex) return
+
+  const mapX = (x: number) => ((x + SW2) / (SW2 * 2)) * textWidth
+  const mapY = (y: number) => ((y + SH2) / (SH2 * 2)) * textHeight
+
+  const x0f = mapX(p0[0]),
+    y0f = mapY(p0[1])
+  const x1f = mapX(p1[0]),
+    y1f = mapY(p1[1])
+  const x2f = mapX(p2[0]),
+    y2f = mapY(p2[1])
+
+  const edgeFunction = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x: number,
+    y: number,
+  ) => (y0 - y1) * x + (x1 - x0) * y + x0 * y1 - x1 * y0
+
+  const area = edgeFunction(x0f, y0f, x1f, y1f, x2f, y2f)
+  if (area === 0) return
+
+  const minX = Math.max(0, Math.floor(Math.min(x0f, x1f, x2f)))
+  const maxX = Math.min(textWidth - 1, Math.ceil(Math.max(x0f, x1f, x2f)))
+  const minY = Math.max(0, Math.floor(Math.min(y0f, y1f, y2f)))
+  const maxY = Math.min(textHeight - 1, Math.ceil(Math.max(y0f, y1f, y2f)))
+
+  const [uv0, uv1, uv2] = uvs
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const w0 = edgeFunction(x1f, y1f, x2f, y2f, x + 0.5, y + 0.5) / area
+      const w1 = edgeFunction(x2f, y2f, x0f, y0f, x + 0.5, y + 0.5) / area
+      const w2 = edgeFunction(x0f, y0f, x1f, y1f, x + 0.5, y + 0.5) / area
+
+      if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+        //const u = w0 * uv0[0] + w1 * uv1[0] + w2 * uv2[0]
+        //const v = w0 * uv0[1] + w1 * uv1[1] + w2 * uv2[1]
+        const z0 = 1 / p0[2]
+        const z1 = 1 / p1[2]
+        const z2 = 1 / p2[2]
+
+        const invZ = w0 * z0 + w1 * z1 + w2 * z2
+
+        const u =
+          (w0 * uv0[0] * z0 + w1 * uv1[0] * z1 + w2 * uv2[0] * z2) / invZ
+        const v =
+          (w0 * uv0[1] * z0 + w1 * uv1[1] * z1 + w2 * uv2[1] * z2) / invZ
+
+        let color: number
+
+        const uWrapped = u % 1
+        const vWrapped = v % 1
+        if (useLinear) {
+          const txF = uWrapped * (tex.xs - 1)
+          const tyF = vWrapped * (tex.ys - 1)
+          const x0t = Math.floor(txF)
+          const y0t = Math.floor(tyF)
+          const x1t = Math.min(x0t + 1, tex.xs - 1)
+          const y1t = Math.min(y0t + 1, tex.ys - 1)
+          const fx = txF - x0t
+          const fy = tyF - y0t
+
+          const getColor = (ix: number, iy: number) =>
+            tex.texture[iy * tex.xs + ix]
+          const c00 = getColor(x0t, y0t)
+          const c10 = getColor(x1t, y0t)
+          const c01 = getColor(x0t, y1t)
+          const c11 = getColor(x1t, y1t)
+
+          const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+          const r = lerp(
+            lerp((c00 >> 16) & 0xff, (c10 >> 16) & 0xff, fx),
+            lerp((c01 >> 16) & 0xff, (c11 >> 16) & 0xff, fx),
+            fy,
+          )
+          const g = lerp(
+            lerp((c00 >> 8) & 0xff, (c10 >> 8) & 0xff, fx),
+            lerp((c01 >> 8) & 0xff, (c11 >> 8) & 0xff, fx),
+            fy,
+          )
+          const b = lerp(
+            lerp(c00 & 0xff, c10 & 0xff, fx),
+            lerp(c01 & 0xff, c11 & 0xff, fx),
+            fy,
+          )
+
+          color = (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b)
+        } else {
+          const tx = Math.floor(uWrapped * tex.xs)
+          const ty = Math.floor(vWrapped * tex.ys)
+          color = tex.texture[ty * tex.xs + tx]
+        }
+
+        const z = -(w0 * p0[2] + w1 * p1[2] + w2 * p2[2])
+        const index = y * textWidth + x
+        if (z > zBuffer[index]) {
+          PV_setPixel(x, y, color)
+          zBuffer[index] = z
+        }
+      }
+    }
+  }
+}
+
+function PV_drawTriangleRGB(
+  p0: Vec3,
+  p1: Vec3,
+  p2: Vec3,
+  c0: number,
+  c1: number,
+  c2: number,
+) {
+  const mapX = (x: number) => ((x + SW2) / (SW2 * 2)) * textWidth
+  const mapY = (y: number) => ((y + SH2) / (SH2 * 2)) * textHeight
+
+  const x0 = mapX(p0[0]),
+    y0 = mapY(p0[1])
+  const x1 = mapX(p1[0]),
+    y1 = mapY(p1[1])
+  const x2 = mapX(p2[0]),
+    y2 = mapY(p2[1])
+
+  const edge = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x: number,
+    y: number,
+  ) => (y0 - y1) * x + (x1 - x0) * y + x0 * y1 - x1 * y0
+
+  const area = edge(x0, y0, x1, y1, x2, y2)
+  if (area === 0) return
+
+  const minX = Math.max(0, Math.floor(Math.min(x0, x1, x2)))
+  const maxX = Math.min(textWidth - 1, Math.ceil(Math.max(x0, x1, x2)))
+  const minY = Math.max(0, Math.floor(Math.min(y0, y1, y2)))
+  const maxY = Math.min(textHeight - 1, Math.ceil(Math.max(y0, y1, y2)))
+
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const w0 = edge(x1, y1, x2, y2, x + 0.5, y + 0.5) / area
+      const w1 = edge(x2, y2, x0, y0, x + 0.5, y + 0.5) / area
+      const w2 = edge(x0, y0, x1, y1, x + 0.5, y + 0.5) / area
+
+      if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+        // Interpolation der Farben
+        const r = Math.floor(
+          w0 * ((c0 >> 16) & 0xff) +
+            w1 * ((c1 >> 16) & 0xff) +
+            w2 * ((c2 >> 16) & 0xff),
+        )
+        const g = Math.floor(
+          w0 * ((c0 >> 8) & 0xff) +
+            w1 * ((c1 >> 8) & 0xff) +
+            w2 * ((c2 >> 8) & 0xff),
+        )
+        const b = Math.floor(
+          w0 * (c0 & 0xff) + w1 * (c1 & 0xff) + w2 * (c2 & 0xff),
+        )
+        const color = (r << 16) | (g << 8) | b
+
+        const z = -(w0 * p0[2] + w1 * p1[2] + w2 * p2[2])
+        const index = y * textWidth + x
+        if (z > zBuffer[index]) {
+          PV_setPixel(x, y, color)
+          zBuffer[index] = z
+        }
+      }
+    }
+  }
+}
+
+/*function PV_drawTriangle(p0: Vec3, p1: Vec3, p2: Vec3, color: number) { const sx = [p0[0], p1[0], p2[0]] const sy = [p0[1], p1[1], p2[1]] const width = Math.max(...(sx as any)) - Math.min(...(sx as any)) const height = Math.max(...(sy as any)) - Math.min(...(sy as any)) if (width < 1 || height < 1) return const mapX = (x: number) => Math.floor(((x + SW2) / (SW2 * 2)) * textWidth) const mapY = (y: number) => Math.floor(((y + SH2) / (SH2 * 2)) * textHeight) const x0 = mapX(p0[0]) const y0 = mapY(p0[1]) const x1 = mapX(p1[0]) const y1 = mapY(p1[1]) const x2 = mapX(p2[0]) const y2 = mapY(p2[1]) const minX = Math.max(0, Math.floor(Math.min(x0, x1, x2) - 0.5)) const maxX = Math.min(textWidth - 1, Math.ceil(Math.max(x0, x1, x2) + 0.5)) const minY = Math.max(0, Math.floor(Math.min(y0, y1, y2) - 0.5)) const maxY = Math.min(textHeight - 1, Math.ceil(Math.max(y0, y1, y2) + 0.5)) const edgeFunction = ( x0: number, y0: number, x1: number, y1: number, x: number, y: number, ) => (y0 - y1) * x + (x1 - x0) * y + x0 * y1 - x1 * y0 const area = edgeFunction(x0, y0, x1, y1, x2, y2) if (area === 0) return for (let y = minY; y <= maxY; y++) { for (let x = minX; x <= maxX; x++) { const w0 = edgeFunction(x1, y1, x2, y2, x, y) / area const w1 = edgeFunction(x2, y2, x0, y0, x, y) / area const w2 = edgeFunction(x0, y0, x1, y1, x, y) / area const e = 0.001 if (w0 >= -e && w1 >= -e && w2 >= -e) { const z = -(w0 * p0[2] + w1 * p1[2] + w2 * p2[2]) const index = y * textWidth + x const last = PV_getPixel(Math.round(x), Math.round(y)) if (last) { PV_setPixel( Math.round(x), Math.round(y), blendColor(color, last, 0.3), ) }  } } } }*/
+
+function PV_drawLineZB(p0: Vec3, p1: Vec3, color: number) {
+  const mapX = (x: number) => Math.floor(((x + SW2) / (SW2 * 2)) * textWidth)
+  const mapY = (y: number) => Math.floor(((y + SH2) / (SH2 * 2)) * textHeight)
+
+  let x0 = mapX(p0[0])
+  let y0 = mapY(p0[1])
+  let x1 = mapX(p1[0])
+  let y1 = mapY(p1[1])
+  const z0 = -p0[2]
+  const z1 = -p1[2]
+
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+
+  let steps = Math.max(dx, dy)
+  if (steps < 1000)
+    for (let i = 0; i <= steps; i++) {
+      const t = steps === 0 ? 0 : i / steps
+      const z = z0 * (1 - t) + z1 * t
+      const index = y0 * textWidth + x0
+      if (z > zBuffer[index]) {
+        PV_setPixel(Math.floor(x0), Math.floor(y0), color)
+        zBuffer[index] = z
+      }
+
+      if (x0 === x1 && y0 === y1) break
+      const e2 = 2 * err
+      if (e2 > -dy) {
+        err -= dy
+        x0 += sx
+      }
+      if (e2 < dx) {
+        err += dx
+        y0 += sy
+      }
+    }
+}
+
+function PV_setPixelGenerous(x: number, y: number, color: number) {
+  const offsets = [
+    [0, 0],
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]
+  for (const [dx, dy] of offsets as any) {
+    const nx = x + dx
+    const ny = y + dy
+    if (nx < 0 || nx >= textWidth || ny < 0 || ny >= textHeight) continue
+    const index = ny * textWidth + nx
+    if (pixelColors[index] !== color) {
+      textObjects[index].style.fill = color
+      pixelColors[index] = color
+    }
+  }
+}
+
+function PV_drawLineNZB(p0: Vec3, p1: Vec3, color: number) {
+  const mapX = (x: number) => Math.floor(((x + SW2) / (SW2 * 2)) * textWidth)
+  const mapY = (y: number) => Math.floor(((y + SH2) / (SH2 * 2)) * textHeight)
+
+  let x0 = mapX(p0[0])
+  let y0 = mapY(p0[1])
+  let x1 = mapX(p1[0])
+  let y1 = mapY(p1[1])
+
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+
+  let steps = Math.max(dx, dy)
+  for (let i = 0; i <= steps; i++) {
+    const t = steps === 0 ? 0 : i / steps
+    const index = y0 * textWidth + x0
+    PV_setPixel(Math.floor(x0), Math.floor(y0), color)
+
+    if (x0 === x1 && y0 === y1) break
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x0 += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y0 += sy
+    }
+  }
+}
+
+function PV_fillGrid(color: number = 0) {
+  const colorHex = color
+  for (let i = 0; i < totalPixels; i++) {
+    if (pixelColors[i] !== color) {
+      textObjects[i].style.fill = color
+      pixelColors[i] = color
+    }
+  }
+}
+
+function PV_deleteAllClones() {
+  for (let i = 0; i < totalPixels; i++) {
+    if (textObjects[i]) {
+      Game.removeText(textObjects[i])
+      //textObjects[i].destroy()
+    }
+  }
+  textObjects.length = 0
+  pixelColors.length = 0
+}
+
+//EVERY PIXEL ONE TEXT DISPLAY
+
+
+
+
+interface DrawEntry {
+  //width: number
+  //height: number
+  x: number
+  y: number
+  s: number
+  //rotation?: number
+  t: string
+  c: number
+  l: number
+}
+enum blockTypes {
+  air,
+  stone,
+  dirt,
+  grass,
+}
+interface blockColors {
+  blockType: blockTypes
+  topColor: number
+  nColor?: number
+  eColor?: number
+  sColor?: number
+  wColor?: number
+  aColor: number
+  ssColor: number
+  bottomColor: number
+}
+interface item {
+  identifier: string
+  blockID?: blockTypes
+  display_name: string
+  max_stack_size: number
+}
+interface invSlot {
+  slot: number
+  item: null | item
+  count: number
+}
+wait(0.01)
+const blockPalette: blockColors[] = globals.blockPalette
+let drawEntry: DrawEntry[] = []
+let drawEntryO: DrawEntry[] = []
+let cloneList: CloneObject[] = []
+let redraw = false
+
+const t1 = Game.createText("1")
+t1.y = 100
+
+onCloneStart(function (clone) {
+  /*if (clone.data.has) {
+    const d = clone.data
+    clone.x = d.x
+    clone.y = d.y
+    clone.size = d.s
+    clone.setCostume(d.c)
+    clone.tint = d.t
+  }*/
+  cloneList.push(clone)
+})
+
+let crosshair: null | GameObject = null
+let hotbar: null | GameObject = null
+let hotbar_selected: null | GameObject = null
+
+interface blockItemDispObj {
+  top: CloneObject
+  left: CloneObject
+  right: CloneObject
+  number: Text
+}
+
+let itemDisplays: Text[] = []
+
+wait(0.5)
+
+const itemInfoShadow = Game.createText("1", {
+  fill: "0x000000ff",
+  align: "center",
+})
+const itemInfo = Game.createText("1", {
+  fill: "0xffffffff",
+  align: "center",
+})
+itemInfo.x = 0
+itemInfo.y = -130
+itemInfoShadow.x = 2
+itemInfoShadow.y = -132
+
+sprite.visible = false
+
+globals.updateHotbar = 0
+
+let showItemInfoTime = 0
+let showItemInfoTimeSet = 150
+let showItemInfoTimefadeDuration = 30
+
+const hotbarY = -210
+
+showCrosshair()
+showHotbar()
+showHotbarSelected()
+
+//wait(0.1)
+globals.updateHotbar = 3
+
+forever(function () {
+  //if (!arraysEqual(drawEntryO, drawEntry) || redraw || true) {
+  drawEntries()
+
+  //if (drawEntryO.slice() != drawEntry.slice() || redraw) drawEntries()
+  t1.text = cloneList.length + ""
+  //drawEntryO = drawEntry.slice()
+  //redraw = false
+  //if (globals.updateHotbar == 0) return
+  const movAMT = (180 / 90) * 22.5
+  //console.log(globals.inventory)
+  //globals.updateHotbar = 0
+  //return
+  if (globals.updateHotbar == 1 || globals.updateHotbar == 3) {
+    if (hotbar_selected)
+      hotbar_selected.x = movAMT * globals.hotbarSlot - movAMT * 4
+    const selectedSlot = findSelectedSlot(globals.hotbarSlot)
+    if (selectedSlot && selectedSlot.item) {
+      //const selectedItem = selectedSlot.item
+      //const selectedItem = globals.hotbar[globals.hotbarSlot]
+
+      const dispName = selectedSlot.item.display_name
+      itemInfo.text = dispName
+      itemInfoShadow.text = dispName
+      showItemInfoTime = showItemInfoTimeSet
+    } else {
+      itemInfo.text = ""
+      itemInfoShadow.text = ""
+      showItemInfoTime = 0
+    }
+  }
+
+  /*createItem(
+      movAMT * (globals.hotbarSlot + 1) - movAMT * 4,
+      hotbarY,
+      100,
+      20,
+      true,
+      5,
+    )*/
+
+  if (globals.updateHotbar == 2 || globals.updateHotbar == 3) {
+    drawEntry = []
+    for (const iD of itemDisplays as any) {
+      Game.removeText(iD)
+      //iD.top.destroy()
+      //iD.left.destroy()
+      //iD.right.destroy()
+    }
+    itemDisplays = []
+
+    for (let i = 0; i < 9; i++) {
+      const currentSlot = findSelectedSlot(i)
+      if (!currentSlot) continue
+      //const currentItem = globals.hotbar[i]
+      if (currentSlot.item != null) {
+        //console.log("item: c:", currentSlot.count)
+        /*createItem(
+          movAMT * i - movAMT * 4,
+          hotbarY,
+          100,
+          20,
+          currentSlot.item,
+          currentSlot.count,
+        )*/
+      }
+    }
+  }
+  globals.updateHotbar = 0
+  if (showItemInfoTime > 0) {
+    showItemInfoTime -= globals.deltaTime
+    if (showItemInfoTime <= showItemInfoTimefadeDuration) {
+      let alpha = Math.max(
+        0,
+        ((showItemInfoTime / showItemInfoTimefadeDuration) * 255) | 0,
+      )
+      const hexChars = "0123456789abcdef" as any
+      const high = hexChars[(alpha >> 4) & 0xf]
+      const low = hexChars[alpha & 0xf]
+      const alphaHex = high + low
+      itemInfoShadow.style.fill = "#000000" + alphaHex
+      itemInfo.style.fill = "#ffffff" + alphaHex
+    } else {
+      itemInfo.style.fill = "#ffffffff"
+      itemInfoShadow.style.fill = "#000000ff"
+    }
+    if (showItemInfoTime <= 0) {
+      itemInfo.text = ""
+      itemInfoShadow.text = ""
+    }
+  }
+})
+
+function arraysEqual(a: any[], b: any[]) {
+  return a.length === b.length && a.every((val, i) => val === b[i])
+}
+
+function findSelectedSlot(id: number): invSlot | undefined {
+  const selectedSlot: invSlot | undefined = globals.inventory.find(
+    (inventarSlot: invSlot) => inventarSlot.slot === id,
+  )
+  return selectedSlot
+}
+
+function drawEntries() {
+  //console.log(drawEntryO, drawEntry, redraw)
+  let finished = true
+  for (const cl of cloneList as any) {
+    if (cl.data.permanent == false) cl.data.used = false
+  }
+
+  for (const entry of drawEntry as any) {
+    let c = cloneList.find((cl) => !cl.data.permanent && !cl.data.used)
+
+    if (!c) {
+      const c1 = createClone()
+      c1.data.permanent = false
+      finished = false
+      redraw = true
+      continue
+      //c.data.costume = entry.t
+      //cloneList.push(c)
+    }
+
+    c.x = entry.x
+    c.y = entry.y
+    c.size = entry.s
+    c.layer = entry.l
+    c.tint = entry.c
+    //console.log(c.tint, entry.c)
+    c.setCostume(entry.t)
+    c.visible = true
+    c.data.used = true
+  }
+
+  for (const cl of cloneList as any) {
+    if (!cl.data.permanent && !cl.data.used) {
+      cl.visible = false
+    }
+  }
+}
+
+function showCrosshair() {
+  crosshair = createCloneObj("crosshair_y", 0, 0, 10, 99)
+}
+
+function showHotbar() {
+  hotbar = createCloneObj("hotbar_y", 0, hotbarY, 70, 99)
+}
+
+function showHotbarSelected() {
+  hotbar_selected = createCloneObj(
+    "hotbar_selected_slot_y",
+    0,
+    hotbarY,
+    70,
+    100,
+  )
+}
+
+function createItem(
+  x: number,
+  y: number,
+  layer: number,
+  size: number,
+  item: item,
+  count: number,
+) {
+  let blockLeft: CloneObject, blockRight: CloneObject, blockTop: CloneObject
+  const clnsS = sprite.clones.slice()
+  //console.log("1", "c")
+
+  if (item.blockID) {
+    const colors = getBlockColors(item.blockID)
+    //console.log(colors)
+    if (!colors) return
+    drawEntry.push({
+      x: x,
+      y: y,
+      s: size,
+      l: layer,
+      c: blendColor(
+        colors.nColor ?? colors.sColor ?? colors.ssColor ?? colors.aColor,
+        0x000000,
+        0.2,
+      ),
+      t: "block_left",
+    })
+    drawEntry.push({
+      x: x,
+      y: y,
+      s: size,
+      l: layer,
+      c: colors.topColor ?? colors.aColor,
+      t: "block_top",
+    })
+    drawEntry.push({
+      x: x,
+      y: y,
+      s: size,
+      l: layer,
+      c: blendColor(
+        colors.eColor ?? colors.wColor ?? colors.ssColor ?? colors.aColor,
+        0x000000,
+        0.6,
+      ),
+      t: "block_right",
+    })
+    /*console.log(
+      "c1:",
+      colors.nColor ?? colors.sColor ?? colors.ssColor ?? colors.aColor + "\n",
+      "c2:",
+      colors.eColor ?? colors.wColor ?? colors.ssColor ?? colors.aColor + "\n",
+      "c3:",
+      colors.topColor ?? colors.aColor + "\n",
+    )
+    console.log("set colors")*/
+  }
+  //createCloneObj("block_left", x, y, size, layer, 0xaa7700, "left")
+  //createCloneObj("block_top", x, y, size, layer, 0x007711, "top")
+  //createCloneObj("block_right", x, y, size, layer, 0xaa7700, "right")
+
+  /*
+  onCloneStart((clone) => {
+    console.log(clone, "RAN")
+    if (!clone.data) return
+    if (clone.data.side === "left") blockLeft = clone
+    if (clone.data.side === "top") blockTop = clone
+    if (clone.data.side === "right") blockRight = clone
+  })
+  console.log("2", "c")
+  const clnsE = sprite.clones.slice()
+  const added = clnsE.filter((clone) => !clnsS.includes(clone))*/
+  //blockLeft = added.find((clone) => clone.data.side == "left")
+  //blockRight = added.find((clone) => clone.data.side == "right")
+  //blockTop = added.find((clone) => clone.data.side == "top")
+
+  const countTXT = Game.createText(count + "", {
+    fontSize: 25,
+    dropShadow: false,
+    fill: "0xffffffff",
+    align: "center",
+  })
+  countTXT.x = x
+  countTXT.y = y + 35
+  itemDisplays.push(countTXT)
+}
+
+function getBlockColors(block: blockTypes): blockColors | null {
+  return blockPalette.find((b) => b.blockType === block) ?? null
+}
+
+function blendColor(c1: number, c2: number, t: number): number {
+  t = Math.max(0, Math.min(1, t))
+
+  const r1 = (c1 >> 16) & 0xff
+  const g1 = (c1 >> 8) & 0xff
+  const b1 = c1 & 0xff
+
+  const r2 = (c2 >> 16) & 0xff
+  const g2 = (c2 >> 8) & 0xff
+  const b2 = c2 & 0xff
+
+  const r = Math.round(r1 + (r2 - r1) * t)
+  const g = Math.round(g1 + (g2 - g1) * t)
+  const b = Math.round(b1 + (b2 - b1) * t)
+
+  return (r << 16) | (g << 8) | b
+}
+
+function createCloneObj(
+  costume: string,
+  x: number,
+  y: number,
+  size: number,
+  layer: number,
+  tint: number = 0xffffff,
+): GameObject {
+  const cln = createClone()
+  cln.x = x
+  cln.y = y
+  cln.setCostume(costume)
+  cln.size = size
+  cln.layer = layer
+  cln.visible = true
+  cln.tint = tint
+  cln.data.permanent = true
+  return cln
+}
+
+
+globals.textureAtlas = []
+globals.textureAtlas.push({
+  id: "bedrock",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x343434, 0x343434, 0x343434, 0x343434, 0x343434, 0x343434, 0x000000,
+    0xa6a6a6, 0x646464, 0x646464, 0x343434, 0x646464, 0xa6a6a6, 0xa6a6a6,
+    0xa6a6a6, 0xa6a6a6, 0x646464, 0x343434, 0x343434, 0x343434, 0x343434,
+    0x343434, 0x343434, 0x343434, 0x000000, 0xa6a6a6, 0xa6a6a6, 0x646464,
+    0x000000, 0x343434, 0x646464, 0xa6a6a6, 0x000000, 0xa6a6a6, 0x343434,
+    0x343434, 0x343434, 0x343434, 0x343434, 0xa6a6a6, 0xa6a6a6, 0xa6a6a6,
+    0xa6a6a6, 0x343434, 0x646464, 0x000000, 0xa6a6a6, 0xa6a6a6, 0x343434,
+    0x343434, 0x343434, 0x343434, 0x343434, 0x343434, 0xa6a6a6, 0xa6a6a6,
+    0x646464, 0x000000, 0xa6a6a6, 0xa6a6a6, 0xa6a6a6, 0x646464, 0x646464,
+    0x646464,
+  ],
+})
+globals.textureAtlas.push({
+  id: "birch_log",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0xc1bbb6, 0x6f716b, 0xc1bbb6, 0xc1bbb6, 0xcccccc, 0xcccccc, 0xcccccc,
+    0xc1bbb6, 0xc1bbb6, 0xb0a8ab, 0xb0a8ab, 0x96938d, 0xc1bbb6, 0xc1bbb6,
+    0x292929, 0x1a141b, 0x96938d, 0x292929, 0x292929, 0x1a141b, 0x1a141b,
+    0xc1bbb6, 0xc1bbb6, 0x292929, 0xc1bbb6, 0xc1bbb6, 0x1a141b, 0x292929,
+    0x292929, 0xc1bbb6, 0x96938d, 0xc1bbb6, 0xc1bbb6, 0xcccccc, 0xcccccc,
+    0xc1bbb6, 0xc1bbb6, 0xc1bbb6, 0x292929, 0x6f716b, 0x292929, 0xc1bbb6,
+    0x96938d, 0xc1bbb6, 0x292929, 0x292929, 0x1a141b, 0x292929, 0x1a141b,
+    0x292929, 0x6f716b, 0xc1bbb6, 0xb0a8ab, 0xb0a8ab, 0xb0a8ab, 0xc1bbb6,
+    0xb0a8ab, 0xc1bbb6, 0x292929, 0xcccccc, 0xc1bbb6, 0xc1bbb6, 0x96938d,
+    0xc1bbb6,
+  ],
+})
+globals.textureAtlas.push({
+  id: "birch_planks",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0xa69871, 0xa69871, 0xa69871, 0xa3946d, 0xa69871, 0xa1926a, 0xa1926a,
+    0x847753, 0xa69871, 0x847753, 0xa69871, 0xa3946d, 0xa3946d, 0xa1926a,
+    0xa1926a, 0xa69871, 0xa1926a, 0xa1926a, 0xa1926a, 0xa3946d, 0xa3946d,
+    0x847753, 0xa1926a, 0xa1926a, 0x847753, 0x847753, 0x8a7c57, 0x8a7c57,
+    0x8a7c57, 0x847753, 0x847753, 0x847753, 0xa1926a, 0xa1926a, 0xa1926a,
+    0xa3946d, 0x847753, 0xa3946d, 0xa3946d, 0xa3946d, 0xa69871, 0xa3946d,
+    0xa3946d, 0xa3946d, 0xa1926a, 0xa3946d, 0xa1926a, 0xa1926a, 0xa69871,
+    0xa69871, 0x847753, 0xa3946d, 0xa1926a, 0xa3946d, 0xa3946d, 0xa1926a,
+    0x8a7c57, 0x847753, 0x8a7c57, 0x8a7c57, 0x8a7c57, 0x8a7c57, 0x847753,
+    0x847753,
+  ],
+})
+globals.textureAtlas.push({
+  id: "cactus",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x1b2b16, 0x111b0e, 0x21331a, 0x1b2b16, 0x1b2b16, 0x152111, 0x111b0e,
+    0x21331a, 0x1b2b16, 0x000000, 0x21331a, 0x1b2b16, 0x152111, 0x152111,
+    0x111b0e, 0x21331a, 0x21331a, 0x111b0e, 0x21331a, 0x1b2b16, 0x152111,
+    0x152111, 0x000000, 0x111b0e, 0x21331a, 0x111b0e, 0x152111, 0x000000,
+    0x152111, 0x21331a, 0x111b0e, 0x111b0e, 0x21331a, 0x111b0e, 0x152111,
+    0x152111, 0x21331a, 0x21331a, 0x111b0e, 0x1b2b16, 0x1b2b16, 0x111b0e,
+    0x0e150b, 0x111b0e, 0x1b2b16, 0x1b2b16, 0x111b0e, 0x111b0e, 0x1b2b16,
+    0x21331a, 0x000000, 0x21331a, 0x152111, 0x1b2b16, 0x21331a, 0x111b0e,
+    0x1b2b16, 0x1b2b16, 0x111b0e, 0x1b2b16, 0x152111, 0x000000, 0x21331a,
+    0x111b0e,
+  ],
+})
+globals.textureAtlas.push({
+  id: "cactus_top",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x1b2b16, 0x111b0e, 0x21331a, 0x1b2b16, 0x1b2b16, 0x152111, 0x111b0e,
+    0x21331a, 0x1b2b16, 0xb2a46f, 0xb8ab7d, 0xb9ad81, 0xb7a97a, 0xb5a675,
+    0xb2a26d, 0x21331a, 0x21331a, 0xb6a777, 0xcfbd7e, 0xdacc9c, 0xdbcd9d,
+    0xdacc9b, 0xb3a471, 0x111b0e, 0x21331a, 0xb4a573, 0xd9cb98, 0xcfbc7d,
+    0xd8c996, 0xd5c48c, 0xb6a879, 0x111b0e, 0x21331a, 0xb0a068, 0xd3c287,
+    0xd0be80, 0xddd0a2, 0xd3c289, 0xb8ac80, 0x1b2b16, 0x1b2b16, 0xb8ab7d,
+    0xd0be80, 0xd0bf81, 0xd6c68f, 0xd6c68f, 0xb3a572, 0x111b0e, 0x1b2b16,
+    0xb6a777, 0xbaae85, 0xb1a06a, 0xbcb188, 0xb8ab7d, 0xb1a06a, 0x111b0e,
+    0x1b2b16, 0x1b2b16, 0x111b0e, 0x1b2b16, 0x152111, 0x000000, 0x21331a,
+    0x111b0e,
+  ],
+})
+globals.textureAtlas.push({
+  id: "coal_block",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x131313, 0x131313, 0x131313, 0x131313, 0x111111, 0x111111, 0x111111,
+    0x131313, 0x131313, 0x111111, 0x111111, 0x101010, 0x111111, 0x101010,
+    0x101010, 0x131313, 0x111111, 0x111111, 0x141414, 0x141414, 0x141414,
+    0x0d0d0d, 0x101010, 0x131313, 0x111111, 0x111111, 0x141414, 0x101010,
+    0x101010, 0x0d0d0d, 0x101010, 0x111111, 0x111111, 0x101010, 0x141414,
+    0x101010, 0x101010, 0x0d0d0d, 0x101010, 0x111111, 0x111111, 0x101010,
+    0x0d0d0d, 0x0d0d0d, 0x0d0d0d, 0x0d0d0d, 0x101010, 0x111111, 0x131313,
+    0x111111, 0x101010, 0x101010, 0x101010, 0x101010, 0x101010, 0x131313,
+    0x131313, 0x131313, 0x111111, 0x131313, 0x131313, 0x131313, 0x131313,
+    0x131313,
+  ],
+})
+globals.textureAtlas.push({
+  id: "coal_ore",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x898989, 0x181818, 0x898989, 0x898989, 0x7f7f7f, 0x181818, 0x181818,
+    0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x7f7f7f,
+    0x121212, 0x121212, 0x727272, 0x727272, 0x181818, 0x181818, 0x7f7f7f,
+    0x7f7f7f, 0x898989, 0x898989, 0x121212, 0x121212, 0x121212, 0x121212,
+    0x121212, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x727272, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x181818, 0x121212,
+    0x7f7f7f, 0x7f7f7f, 0x181818, 0x181818, 0x898989, 0x7f7f7f, 0x898989,
+    0x898989, 0x898989, 0x181818, 0x181818, 0x121212, 0x121212, 0x727272,
+    0x898989, 0x898989, 0x7f7f7f, 0x727272, 0x727272, 0x121212, 0x121212,
+    0x7f7f7f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "cobblestone",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x464646, 0x898989, 0x898989, 0x5d5d5d, 0x7f7f7f, 0x7f7f7f, 0x5d5d5d,
+    0x7f7f7f, 0x464646, 0x515151, 0x898989, 0x898989, 0x5d5d5d, 0x5d5d5d,
+    0x7f7f7f, 0x7f7f7f, 0x727272, 0x515151, 0x727272, 0x727272, 0x7f7f7f,
+    0x7f7f7f, 0x5d5d5d, 0x898989, 0x727272, 0x7f7f7f, 0x5d5d5d, 0x727272,
+    0x727272, 0x515151, 0x464646, 0x464646, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x5d5d5d, 0x5d5d5d, 0x515151, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x464646,
+    0x464646, 0x7f7f7f, 0x898989, 0x898989, 0x515151, 0x7f7f7f, 0x898989,
+    0x5d5d5d, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x5d5d5d, 0x5d5d5d, 0x727272,
+    0x5d5d5d, 0x898989, 0x7f7f7f, 0x727272, 0x5d5d5d, 0x727272, 0x727272,
+    0x5d5d5d,
+  ],
+})
+globals.textureAtlas.push({
+  id: "deadbush",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x000000, 0x000000, 0x000000, 0x926421, 0x000000, 0x000000, 0x926421,
+    0x000000, 0x000000, 0x000000, 0x926421, 0x593304, 0x000000, 0x926421,
+    0x926421, 0x000000, 0x926421, 0x000000, 0x593304, 0x926421, 0x926421,
+    0x593304, 0x593304, 0x926421, 0x000000, 0x926421, 0x926421, 0x926421,
+    0x926421, 0x000000, 0x000000, 0x000000, 0x000000, 0x593304, 0x593304,
+    0x926421, 0x926421, 0x926421, 0x926421, 0x000000, 0x000000, 0x000000,
+    0x926421, 0x593304, 0x926421, 0x593304, 0x593304, 0x926421, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x926421, 0x593304, 0x000000, 0x593304,
+    0x000000, 0x000000, 0x000000, 0x593304, 0x926421, 0x926421, 0x000000,
+    0x000000,
+  ],
+})
+globals.textureAtlas.push({
+  id: "diamond_block",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x9acece, 0x9acece, 0x9acece, 0x9acece, 0x8ac7c7, 0x8ac7c7, 0x8ac7c7,
+    0x9acece, 0x9acece, 0x86c5c5, 0x86c5c5, 0x7ec1c1, 0x86c5c5, 0x7ec1c1,
+    0x81c3c3, 0x9acece, 0x8ac7c7, 0x86c5c5, 0xbbdfdf, 0xbbdfdf, 0xbbdfdf,
+    0xa4d3d3, 0x7ec1c1, 0x9acece, 0x8ac7c7, 0x86c5c5, 0xbbdfdf, 0x7ec1c1,
+    0x7ec1c1, 0xa4d3d3, 0x7ec1c1, 0x8ac7c7, 0x8ac7c7, 0x7ec1c1, 0xbbdfdf,
+    0x7ec1c1, 0x81c3c3, 0xa4d3d3, 0x7ec1c1, 0x8ac7c7, 0x8ac7c7, 0x81c3c3,
+    0xa4d3d3, 0xa4d3d3, 0xa4d3d3, 0xa4d3d3, 0x81c3c3, 0x8ac7c7, 0x9acece,
+    0x86c5c5, 0x81c3c3, 0x81c3c3, 0x81c3c3, 0x81c3c3, 0x81c3c3, 0x9acece,
+    0x9acece, 0x9acece, 0x8ac7c7, 0x9acece, 0x9acece, 0x9acece, 0x9acece,
+    0x9acece,
+  ],
+})
+globals.textureAtlas.push({
+  id: "diamond_ore",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x898989, 0xbdfff4, 0x898989, 0x898989, 0x7f7f7f, 0xbdfff4, 0x92e8da,
+    0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x7f7f7f,
+    0x72baaf, 0x72baaf, 0x727272, 0x727272, 0xbdfff4, 0x92e8da, 0x7f7f7f,
+    0x7f7f7f, 0x898989, 0x898989, 0xbdfff4, 0x92e8da, 0x92e8da, 0x72baaf,
+    0x72baaf, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x727272, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0xbdfff4, 0x72baaf,
+    0x7f7f7f, 0x7f7f7f, 0xbdfff4, 0x92e8da, 0x898989, 0x7f7f7f, 0x898989,
+    0x898989, 0x898989, 0xbdfff4, 0x92e8da, 0x92e8da, 0x72baaf, 0x727272,
+    0x898989, 0x898989, 0x7f7f7f, 0x727272, 0x727272, 0x72baaf, 0x72baaf,
+    0x7f7f7f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "dirt",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x7c5a22, 0x634619, 0x583d15, 0x846125, 0x503712, 0x765520, 0x856126,
+    0x5c4016, 0x583d15, 0x624519, 0x6f4f1d, 0x70501e, 0x563c14, 0x5d4116,
+    0x624519, 0x6d4e1d, 0x815e24, 0x5b3f16, 0x6b4c1c, 0x7a5821, 0x6d4e1d,
+    0x7a5821, 0x6d4e1d, 0x694b1b, 0x6c4d1c, 0x694a1b, 0x6e4e1d, 0x624519,
+    0x593e15, 0x846025, 0x72521e, 0x6c4d1c, 0x825e24, 0x6c4d1c, 0x755520,
+    0x856126, 0x684a1b, 0x533913, 0x66481a, 0x6d4e1d, 0x70501e, 0x624518,
+    0x7f5c23, 0x7e5b23, 0x5f4317, 0x805d24, 0x694b1b, 0x5d4117, 0x624519,
+    0x795721, 0x614418, 0x5b3f16, 0x815e24, 0x6b4c1c, 0x5d4117, 0x7b5922,
+    0x523813, 0x6a4c1c, 0x4f3611, 0x553b14, 0x6c4d1c, 0x805d24, 0x523813,
+    0x805d24,
+  ],
+})
+globals.textureAtlas.push({
+  id: "fern",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x000000, 0x000000, 0x000000, 0x59884e, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x35502e, 0x59884e, 0x476b3d, 0x476b3d,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x476b3d, 0x59884e, 0x476b3d,
+    0x000000, 0x000000, 0x000000, 0x476b3d, 0x35502e, 0x35502e, 0x4c7343,
+    0x35502e, 0x35502e, 0x000000, 0x000000, 0x35502e, 0x476b3d, 0x476b3d,
+    0x59884e, 0x476b3d, 0x476b3d, 0x35502e, 0x476b3d, 0x000000, 0x476b3d,
+    0x35502e, 0x59884e, 0x35502e, 0x35502e, 0x476b3d, 0x000000, 0x476b3d,
+    0x000000, 0x000000, 0x395832, 0x35502e, 0x000000, 0x000000, 0x476b3d,
+    0x000000, 0x000000, 0x000000, 0x395832, 0x35502e, 0x000000, 0x000000,
+    0x000000,
+  ],
+})
+globals.textureAtlas.push({
+  id: "grass_side",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x43a232, 0x43a233, 0x68bf4e, 0x51ad3d, 0x66be4d, 0x4daa3a, 0x42a132,
+    0x70c654, 0x62ba49, 0x46a434, 0x65bd4c, 0x5fb847, 0x6bc250, 0x64bc4b,
+    0x51ad3d, 0x42a132, 0x45a334, 0x4ca839, 0x67491a, 0x533913, 0x5fb847,
+    0x593e15, 0x42a132, 0x64bc4b, 0x7d5b23, 0x624518, 0x856125, 0x6c4d1c,
+    0x775620, 0x6b4c1c, 0x614418, 0x44a334, 0x6f501d, 0x71511e, 0x825f25,
+    0x513712, 0x815e24, 0x624518, 0x6f4f1d, 0x694b1b, 0x825f24, 0x624519,
+    0x846025, 0x644719, 0x503712, 0x614418, 0x66491a, 0x4f3612, 0x563b14,
+    0x7c5a22, 0x73521f, 0x7d5a22, 0x6a4b1b, 0x6f4f1d, 0x785721, 0x553a14,
+    0x553a13, 0x785721, 0x634619, 0x805d24, 0x624519, 0x573d15, 0x7b5922,
+    0x66481a,
+  ],
+})
+globals.textureAtlas.push({
+  id: "grass_top",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x60b948, 0x4ca939, 0x56b141, 0x68bf4e, 0x42a132, 0x5ab444, 0x47a435,
+    0x4eab3b, 0x45a334, 0x61ba49, 0x5bb544, 0x43a233, 0x65bd4c, 0x64bc4b,
+    0x64bc4b, 0x65bd4c, 0x4da93a, 0x51ad3d, 0x4da93a, 0x47a536, 0x59b343,
+    0x43a132, 0x69c04f, 0x60b948, 0x4fab3b, 0x5cb645, 0x45a334, 0x55b040,
+    0x54af3f, 0x49a637, 0x52ae3e, 0x51ad3d, 0x48a536, 0x63bb4a, 0x63bb4a,
+    0x64bc4b, 0x5db646, 0x46a435, 0x5eb746, 0x45a434, 0x6cc251, 0x5bb545,
+    0x44a233, 0x58b242, 0x72c756, 0x72c755, 0x4ba838, 0x6ec452, 0x4fab3b,
+    0x47a535, 0x6ac150, 0x70c654, 0x59b443, 0x6ac14f, 0x61b949, 0x5bb545,
+    0x6fc553, 0x6ec453, 0x51ad3d, 0x58b342, 0x59b343, 0x44a233, 0x55b040,
+    0x46a435,
+  ],
+})
+globals.textureAtlas.push({
+  id: "gravel",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x656565, 0x555555, 0x606060, 0x6a6a6a, 0x636363, 0x555555, 0x6c6c6c,
+    0x696969, 0x565656, 0x6e6e6e, 0x696969, 0x6c6c6c, 0x565656, 0x535353,
+    0x5e5e5e, 0x6a6a6a, 0x636363, 0x616161, 0x616161, 0x606060, 0x606060,
+    0x5a5a5a, 0x6c6c6c, 0x656565, 0x5a5a5a, 0x5c5c5c, 0x636363, 0x6a6a6a,
+    0x515151, 0x616161, 0x535353, 0x555555, 0x6a6a6a, 0x5e5e5e, 0x616161,
+    0x696969, 0x565656, 0x6e6e6e, 0x676767, 0x636363, 0x585858, 0x616161,
+    0x696969, 0x606060, 0x535353, 0x515151, 0x5e5e5e, 0x606060, 0x707070,
+    0x636363, 0x5e5e5e, 0x696969, 0x555555, 0x6e6e6e, 0x535353, 0x606060,
+    0x5c5c5c, 0x676767, 0x656565, 0x6c6c6c, 0x676767, 0x656565, 0x6c6c6c,
+    0x606060,
+  ],
+})
+globals.textureAtlas.push({
+  id: "iron_block",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x9d9d9d, 0x9d9d9d, 0x9d9d9d, 0x9d9d9d, 0x979797, 0x979797, 0x979797,
+    0x9d9d9d, 0x9d9d9d, 0x959595, 0x959595, 0x929292, 0x959595, 0x929292,
+    0x939393, 0x9d9d9d, 0x979797, 0x959595, 0xbcbcbc, 0xbcbcbc, 0xbcbcbc,
+    0xb4b4b4, 0x929292, 0x9d9d9d, 0x979797, 0x959595, 0xbcbcbc, 0x929292,
+    0x929292, 0xb4b4b4, 0x929292, 0x979797, 0x979797, 0x929292, 0xbcbcbc,
+    0x929292, 0x939393, 0xb4b4b4, 0x929292, 0x979797, 0x979797, 0x939393,
+    0xb4b4b4, 0xb4b4b4, 0xb4b4b4, 0xb4b4b4, 0x939393, 0x979797, 0x9d9d9d,
+    0x959595, 0x939393, 0x939393, 0x939393, 0x939393, 0x939393, 0x9d9d9d,
+    0x9d9d9d, 0x9d9d9d, 0x979797, 0x9d9d9d, 0x9d9d9d, 0x9d9d9d, 0x9d9d9d,
+    0x9d9d9d,
+  ],
+})
+globals.textureAtlas.push({
+  id: "iron_ore",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x898989, 0xd4ac90, 0x898989, 0x898989, 0x7f7f7f, 0xd4ac90, 0xd4ac90,
+    0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x7f7f7f,
+    0x8c725f, 0x8c725f, 0x727272, 0x727272, 0xd4ac90, 0xd4ac90, 0x7f7f7f,
+    0x7f7f7f, 0x898989, 0x898989, 0x8c725f, 0x8c725f, 0x8c725f, 0x8c725f,
+    0x8c725f, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x727272, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0xd4ac90, 0x8c725f,
+    0x7f7f7f, 0x7f7f7f, 0xd4ac90, 0xd4ac90, 0x898989, 0x7f7f7f, 0x898989,
+    0x898989, 0x898989, 0xd4ac90, 0xd4ac90, 0x8c725f, 0x8c725f, 0x727272,
+    0x898989, 0x898989, 0x7f7f7f, 0x727272, 0x727272, 0x8c725f, 0x8c725f,
+    0x7f7f7f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "lever",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x000000, 0x000000, 0x000000, 0x777777, 0x626262, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x777777, 0x626262, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x704219, 0x562f0b,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x704219,
+    0x562f0b, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x704219, 0x562f0b, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x704219, 0x562f0b, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x777777, 0x777777, 0x626262, 0x626262, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x777777, 0x626262, 0x626262, 0x626262, 0x000000,
+    0x000000,
+  ],
+})
+globals.textureAtlas.push({
+  id: "oak_log",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x654e2c, 0x785d34, 0x41311d, 0x4d3c21, 0x654e2c, 0x41311d, 0x654e2c,
+    0x654e2c, 0x654e2c, 0x785d34, 0x41311d, 0x4d3c21, 0x785d34, 0x41311d,
+    0x654e2c, 0x654e2c, 0x654e2c, 0x41311d, 0x2e2618, 0x654e2c, 0x785d34,
+    0x41311d, 0x785d34, 0x654e2c, 0x654e2c, 0x41311d, 0x654e2c, 0x654e2c,
+    0x41311d, 0x41311d, 0x785d34, 0x654e2c, 0x41311d, 0x41311d, 0x654e2c,
+    0x785d34, 0x654e2c, 0x2e2618, 0x41311d, 0x654e2c, 0x41311d, 0x2e2618,
+    0x4d3c21, 0x785d34, 0x654e2c, 0x4d3c21, 0x41311d, 0x654e2c, 0x785d34,
+    0x41311d, 0x4d3c21, 0x785d34, 0x654e2c, 0x4d3c21, 0x41311d, 0x654e2c,
+    0x785d34, 0x41311d, 0x4d3c21, 0x654e2c, 0x654e2c, 0x4d3c21, 0x41311d,
+    0x654e2c,
+  ],
+})
+globals.textureAtlas.push({
+  id: "oak_planks",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x765f3d, 0x765f3d, 0x765f3d, 0x715a38, 0x765f3d, 0x6e5735, 0x6e5735,
+    0x423520, 0x765f3d, 0x423520, 0x765f3d, 0x715a38, 0x715a38, 0x6e5735,
+    0x6e5735, 0x765f3d, 0x6e5735, 0x6e5735, 0x6e5735, 0x715a38, 0x715a38,
+    0x423520, 0x6e5735, 0x6e5735, 0x423520, 0x423520, 0x483b24, 0x483b24,
+    0x483b24, 0x423520, 0x423520, 0x423520, 0x6e5735, 0x6e5735, 0x6e5735,
+    0x715a38, 0x423520, 0x715a38, 0x715a38, 0x715a38, 0x765f3d, 0x715a38,
+    0x715a38, 0x715a38, 0x6e5735, 0x715a38, 0x6e5735, 0x6e5735, 0x765f3d,
+    0x765f3d, 0x423520, 0x715a38, 0x6e5735, 0x715a38, 0x715a38, 0x6e5735,
+    0x483b24, 0x423520, 0x483b24, 0x483b24, 0x483b24, 0x483b24, 0x423520,
+    0x423520,
+  ],
+})
+globals.textureAtlas.push({
+  id: "redstone",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x000000, 0x000000, 0x000000, 0xb22f2f, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x000000, 0xc24545, 0x8f2626, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0xb22f2f,
+    0x000000, 0x000000, 0x000000, 0x8f2626, 0xc24545, 0x000000, 0xb22f2f,
+    0x962f2f, 0xb22f2f, 0xb22f2f, 0x000000, 0xb22f2f, 0x000000, 0xb22f2f,
+    0xc24545, 0xb22f2f, 0x000000, 0x8f2626, 0xc24545, 0x000000, 0x000000,
+    0x000000, 0x8f2626, 0xc24545, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x000000, 0xb22f2f, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x962f2f, 0x000000, 0x000000,
+    0x000000,
+  ],
+})
+globals.textureAtlas.push({
+  id: "redstone_block",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0xb33333, 0xb33333, 0xb33333, 0xb33333, 0xa62929, 0xa62929, 0xa62929,
+    0xb33333, 0xb33333, 0xe26d6d, 0xe26d6d, 0xdf5a5a, 0xdf5a5a, 0x992929,
+    0x8b2525, 0xb33333, 0xa62929, 0xe26d6d, 0x8b2525, 0x8e2626, 0x8b2525,
+    0x8b2525, 0x992929, 0xb33333, 0xa62929, 0xe26d6d, 0x992929, 0x8b2525,
+    0x8b2525, 0x992929, 0x8b2525, 0xa62929, 0xa62929, 0xdf5a5a, 0x8b2525,
+    0x8b2525, 0x8e2626, 0x8b2525, 0x8b2525, 0xa62929, 0xa62929, 0x8b2525,
+    0x8e2626, 0x8b2525, 0x8b2525, 0x992929, 0x8b2525, 0xa62929, 0xb33333,
+    0x8e2626, 0x8e2626, 0x992929, 0x8b2525, 0x992929, 0x8e2626, 0xb33333,
+    0xb33333, 0xb33333, 0xa62929, 0xb33333, 0xb33333, 0xb33333, 0xb33333,
+    0xb33333,
+  ],
+})
+globals.textureAtlas.push({
+  id: "redstone_lamp",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f,
+    0x2f2f2f, 0x2f2f2f, 0x341905, 0x341905, 0x341905, 0x341905, 0x341905,
+    0x341905, 0x2f2f2f, 0x2f2f2f, 0x341905, 0x381c07, 0x381c07, 0x381c07,
+    0x381c07, 0x341905, 0x2f2f2f, 0x2f2f2f, 0x341905, 0x381c07, 0x341905,
+    0x341905, 0x381c07, 0x341905, 0x2f2f2f, 0x2f2f2f, 0x341905, 0x381c07,
+    0x341905, 0x341905, 0x381c07, 0x341905, 0x2f2f2f, 0x2f2f2f, 0x341905,
+    0x381c07, 0x381c07, 0x381c07, 0x381c07, 0x341905, 0x2f2f2f, 0x2f2f2f,
+    0x341905, 0x341905, 0x341905, 0x341905, 0x341905, 0x341905, 0x2f2f2f,
+    0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f,
+    0x2f2f2f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "redstone_lamp_on",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f,
+    0x2f2f2f, 0x2f2f2f, 0xbe8b29, 0xbe8b29, 0xbe8b29, 0xbe8b29, 0xbe8b29,
+    0xbe8b29, 0x2f2f2f, 0x2f2f2f, 0xbe8b29, 0xca9634, 0xca9634, 0xca9634,
+    0xca9634, 0xbe8b29, 0x2f2f2f, 0x2f2f2f, 0xbe8b29, 0xca9634, 0xbe8b29,
+    0xbe8b29, 0xca9634, 0xbe8b29, 0x2f2f2f, 0x2f2f2f, 0xbe8b29, 0xca9634,
+    0xbe8b29, 0xbe8b29, 0xca9634, 0xbe8b29, 0x2f2f2f, 0x2f2f2f, 0xbe8b29,
+    0xca9634, 0xca9634, 0xca9634, 0xca9634, 0xbe8b29, 0x2f2f2f, 0x2f2f2f,
+    0xbe8b29, 0xbe8b29, 0xbe8b29, 0xbe8b29, 0xbe8b29, 0xbe8b29, 0x2f2f2f,
+    0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f, 0x2f2f2f,
+    0x2f2f2f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "redstone_ore",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x898989, 0xdf5a5a, 0x898989, 0x898989, 0x7f7f7f, 0xdf5a5a, 0xc23232,
+    0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x7f7f7f,
+    0xa62929, 0xa62929, 0x727272, 0x727272, 0xdf5a5a, 0xc23232, 0x7f7f7f,
+    0x7f7f7f, 0x898989, 0x898989, 0xdf5a5a, 0xc23232, 0xc23232, 0xa62929,
+    0xa62929, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x727272, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0xdf5a5a, 0xc23232,
+    0x7f7f7f, 0x7f7f7f, 0xdf5a5a, 0xc23232, 0x898989, 0x7f7f7f, 0x898989,
+    0x898989, 0x898989, 0xdf5a5a, 0xc23232, 0xc23232, 0xa62929, 0x727272,
+    0x898989, 0x898989, 0x7f7f7f, 0x727272, 0x727272, 0xa62929, 0xa62929,
+    0x7f7f7f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "redstone_torch",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x000000, 0x000000, 0x000000, 0x7c1b1b, 0x7c1b1b, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x7c1b1b, 0xc52d2d, 0xb02323, 0x7c1b1b,
+    0x000000, 0x000000, 0x000000, 0x000000, 0x7c1b1b, 0xb02323, 0x9c1c1c,
+    0x7c1b1b, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x704219,
+    0x562f0b, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x704219, 0x562f0b, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x704219, 0x562f0b, 0x000000, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x704219, 0x562f0b, 0x000000, 0x000000, 0x000000,
+    0x000000, 0x000000, 0x000000, 0x704219, 0x562f0b, 0x000000, 0x000000,
+    0x000000,
+  ],
+})
+globals.textureAtlas.push({
+  id: "sand",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0xc9b28a, 0xd8c5a2, 0xdcc9a7, 0xd6c39f, 0xd4c19c, 0xd8c5a2, 0xccb68e,
+    0xceb992, 0xcfba93, 0xcdb891, 0xd7c4a0, 0xdbc8a6, 0xd6c29e, 0xd2bd98,
+    0xccb68e, 0xcdb790, 0xd5c19c, 0xd3bf9a, 0xcab48b, 0xddcba9, 0xdeccab,
+    0xdccaa8, 0xceb992, 0xddcbaa, 0xdbc8a6, 0xcfbb94, 0xdbc8a6, 0xc9b38a,
+    0xd9c6a3, 0xd3bf9a, 0xd4c09c, 0xdbc8a6, 0xd1bc96, 0xc8b289, 0xd0bb95,
+    0xcbb68e, 0xe1d0af, 0xd1bc96, 0xd9c7a4, 0xdccaa8, 0xdbc8a5, 0xd7c4a1,
+    0xcbb68e, 0xccb68f, 0xd5c19c, 0xd5c19c, 0xcfba94, 0xdeccab, 0xe1d0af,
+    0xd3bf99, 0xddcbaa, 0xc9b38b, 0xe0ceae, 0xd7c4a0, 0xc9b38a, 0xd9c7a4,
+    0xd2be98, 0xceb992, 0xd2bd98, 0xd0bb95, 0xd5c19d, 0xdeccab, 0xcfba94,
+    0xdbc8a6,
+  ],
+})
+globals.textureAtlas.push({
+  id: "sandstone",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0xcbb68e, 0xdac7a4, 0xd7c4a0, 0xe0cead, 0xd1bd97, 0xcbb58d, 0xdcc9a7,
+    0xd4c09b, 0x927e4e, 0xad9969, 0xad9969, 0x927e4e, 0x927e4e, 0xad9969,
+    0xad9969, 0xad9969, 0xe0ceae, 0xd2be99, 0xceb992, 0xd3bf9a, 0xdeccab,
+    0xd7c3a0, 0xdac7a4, 0xad9969, 0xd3bf9a, 0xccb68f, 0xd9c6a4, 0xd7c4a1,
+    0xcdb790, 0xe0ceae, 0xcfbb94, 0x927e4e, 0xdfcdac, 0xd7c39f, 0xc8b289,
+    0xd5c19c, 0xd2be98, 0xe0cfae, 0xcfba94, 0x927e4e, 0xdfcead, 0xcbb58d,
+    0xdac8a5, 0xdfcdac, 0xe0ceae, 0xd5c19d, 0xccb78f, 0x927e4e, 0xd8c5a2,
+    0xd2be98, 0xdccaa8, 0xccb68e, 0xc8b289, 0xd8c4a1, 0xdccaa8, 0xad9969,
+    0xad9969, 0x927e4e, 0x927e4e, 0xad9969, 0xad9969, 0x927e4e, 0x927e4e,
+    0xad9969,
+  ],
+})
+globals.textureAtlas.push({
+  id: "smoothstone",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x5d5d5d, 0x5d5d5d, 0x5d5d5d, 0x464646, 0x515151, 0x515151, 0x515151,
+    0x5d5d5d, 0x5d5d5d, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f,
+    0x7f7f7f, 0x5d5d5d, 0x515151, 0x7f7f7f, 0x898989, 0x898989, 0x898989,
+    0x898989, 0x7f7f7f, 0x5d5d5d, 0x515151, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f,
+    0x7f7f7f, 0x727272, 0x727272, 0x5d5d5d, 0x515151, 0x727272, 0x727272,
+    0x898989, 0x898989, 0x7f7f7f, 0x727272, 0x5d5d5d, 0x464646, 0x727272,
+    0x727272, 0x727272, 0x7f7f7f, 0x898989, 0x898989, 0x5d5d5d, 0x515151,
+    0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x898989, 0x898989, 0x515151,
+    0x515151, 0x5d5d5d, 0x5d5d5d, 0x5d5d5d, 0x5d5d5d, 0x464646, 0x515151,
+    0x515151,
+  ],
+})
+globals.textureAtlas.push({
+  id: "spruce_log",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x301e07, 0x392409, 0x1e1305, 0x241706, 0x301e07, 0x1e1305, 0x301e07,
+    0x301e07, 0x301e07, 0x392409, 0x1e1305, 0x241706, 0x392409, 0x1e1305,
+    0x301e07, 0x301e07, 0x301e07, 0x1e1305, 0x170f04, 0x301e07, 0x392409,
+    0x1e1305, 0x392409, 0x301e07, 0x301e07, 0x1e1305, 0x301e07, 0x301e07,
+    0x1e1305, 0x1e1305, 0x392409, 0x301e07, 0x1e1305, 0x1e1305, 0x301e07,
+    0x392409, 0x301e07, 0x170f04, 0x1e1305, 0x301e07, 0x1e1305, 0x170f04,
+    0x241706, 0x392409, 0x301e07, 0x241706, 0x1e1305, 0x301e07, 0x392409,
+    0x1e1305, 0x241706, 0x392409, 0x301e07, 0x241706, 0x1e1305, 0x301e07,
+    0x392409, 0x1e1305, 0x241706, 0x301e07, 0x301e07, 0x241706, 0x1e1305,
+    0x301e07,
+  ],
+})
+globals.textureAtlas.push({
+  id: "spruce_planks",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x644824, 0x644824, 0x644824, 0x624723, 0x644824, 0x604622, 0x604622,
+    0x4f391c, 0x644824, 0x4f391c, 0x644824, 0x624723, 0x624723, 0x604622,
+    0x604622, 0x644824, 0x604622, 0x604622, 0x604622, 0x624723, 0x624723,
+    0x4f391c, 0x604622, 0x604622, 0x4f391c, 0x4f391c, 0x523b1d, 0x523b1d,
+    0x523b1d, 0x4f391c, 0x4f391c, 0x4f391c, 0x604622, 0x604622, 0x604622,
+    0x624723, 0x4f391c, 0x624723, 0x624723, 0x624723, 0x644824, 0x624723,
+    0x624723, 0x624723, 0x604622, 0x624723, 0x604622, 0x604622, 0x644824,
+    0x644824, 0x4f391c, 0x624723, 0x604622, 0x624723, 0x624723, 0x604622,
+    0x523b1d, 0x4f391c, 0x523b1d, 0x523b1d, 0x523b1d, 0x523b1d, 0x4f391c,
+    0x4f391c,
+  ],
+})
+globals.textureAtlas.push({
+  id: "stone",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x898989, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f,
+    0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x7f7f7f,
+    0x7f7f7f, 0x7f7f7f, 0x727272, 0x727272, 0x727272, 0x727272, 0x7f7f7f,
+    0x7f7f7f, 0x898989, 0x898989, 0x727272, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x727272, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x727272,
+    0x727272, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f, 0x7f7f7f,
+    0x7f7f7f, 0x7f7f7f, 0x898989, 0x898989, 0x898989, 0x7f7f7f, 0x898989,
+    0x898989, 0x898989, 0x7f7f7f, 0x7f7f7f, 0x727272, 0x727272, 0x727272,
+    0x898989, 0x898989, 0x7f7f7f, 0x727272, 0x727272, 0x727272, 0x727272,
+    0x7f7f7f,
+  ],
+})
+globals.textureAtlas.push({
+  id: "stonebrick",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x909090, 0x949494, 0x909090, 0x909090, 0x909090, 0x949494, 0x949494,
+    0x4f4f4f, 0x8b8b8b, 0x777777, 0x777777, 0x777777, 0x7f7f7f, 0x7f7f7f,
+    0x858585, 0x4f4f4f, 0x8b8b8b, 0x7f7f7f, 0x7f7f7f, 0x777777, 0x777777,
+    0x858585, 0x858585, 0x464646, 0x4f4f4f, 0x4f4f4f, 0x464646, 0x464646,
+    0x4f4f4f, 0x464646, 0x4f4f4f, 0x4f4f4f, 0x949494, 0x949494, 0x909090,
+    0x464646, 0x949494, 0x949494, 0x949494, 0x909090, 0x858585, 0x858585,
+    0x858585, 0x464646, 0x909090, 0x777777, 0x777777, 0x777777, 0x858585,
+    0x858585, 0x7f7f7f, 0x4f4f4f, 0x8b8b8b, 0x777777, 0x777777, 0x7f7f7f,
+    0x4f4f4f, 0x464646, 0x464646, 0x464646, 0x464646, 0x4f4f4f, 0x4f4f4f,
+    0x464646,
+  ],
+})
+globals.textureAtlas.push({
+  id: "tall_grass",
+  xs: 8,
+  ys: 8,
+  texture: [
+    0x000000, 0x000000, 0x000000, 0x59884e, 0x000000, 0x000000, 0x59884e,
+    0x000000, 0x4e7744, 0x000000, 0x59884e, 0x000000, 0x000000, 0x000000,
+    0x4e7744, 0x59884e, 0x4e7744, 0x000000, 0x406037, 0x000000, 0x59884e,
+    0x406037, 0x000000, 0x000000, 0x000000, 0x59884e, 0x395832, 0x000000,
+    0x000000, 0x406037, 0x000000, 0x000000, 0x000000, 0x59884e, 0x000000,
+    0x4e7744, 0x406037, 0x59884e, 0x000000, 0x395832, 0x4e7744, 0x476b3d,
+    0x000000, 0x395832, 0x4e7744, 0x476b3d, 0x4e7744, 0x000000, 0x000000,
+    0x406037, 0x395832, 0x395832, 0x395832, 0x000000, 0x406037, 0x476b3d,
+    0x395832, 0x395832, 0x35502e, 0x395832, 0x406037, 0x476b3d, 0x4e7744,
+    0x406037,
+  ],
+})
